@@ -18,7 +18,10 @@ type IPRInterface struct {
 }
 
 func (i *IPRInterface) IsLan() bool {
-	if i.Description != "" && i.Description == "lan" {
+	if i.Description == "" {
+		return false
+	}
+	if i.Description == "lan" || i.Description == "LAN" {
 		return true
 	}
 	return false
@@ -83,7 +86,7 @@ func FindLANInterface() (*IPRInterface, error) {
 		return nil, err
 	}
 	for _, iface := range ifaces {
-		if iface.Description != "" && iface.Description == "lan" {
+		if iface.IsLan() {
 			return &iface, nil
 		}
 	}
