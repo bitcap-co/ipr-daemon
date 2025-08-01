@@ -45,7 +45,7 @@ func getAllInterfaces() ([]IPRInterface, error) {
 	for _, iface := range ifaces {
 		for _, address := range iface.Addresses {
 			// Get first IPv4 address
-			if address.IP != nil && address.IP.To4() != nil {
+			if address.IP != nil && address.IP.To4() != nil && !address.IP.IsLoopback() {
 				addr = address.IP
 				break
 			}
