@@ -21,28 +21,34 @@ func main() {
 	if iface.IsLan() {
 		fmt.Println("interface is marked LAN.")
 	}
+	var filter string = "udp port 14235"
+	if err := listen(iface.Name, filter); err != nil {
+		log.Panicf("Failed to start listening: %v", err)
+	}
+}
 
-	handle, err := pcap.OpenLive(iface.Name, int32(1600), true, pcap.BlockForever)
+func listen(iface, filter string) error {
+	handle, err := pcap.OpenLive(iface, int32(1600), true, pcap.BlockForever)
 	if err != nil {
-		log.Panicln(err)
+		return fmt.Errorf("failed to open handle for interface %s", iface)
 	}
 	defer handle.Close()
-	var filter string = "udp port 14235"
 	err = handle.SetBPFFilter(filter)
 	if err != nil {
-		log.Panicln(err)
+		return fmt.Errorf("failed to set BPF filter.")
 	}
 
 	source := gopacket.NewPacketSource(handle, handle.LinkType())
 	for packet := range source.Packets() {
-		ipreport := iprd.HandlePacket(packet)
-		if ipreport == nil {
+		ipReport := iprd.HandlePacket(packet)
+		if ipReport == nil {
 			continue
 		}
 		fmt.Println("received IP Report packet.")
 		fmt.Printf("IP: %s -> %s, MAC: %s -> %s, UDP: %d -> %d\n",
-			ipreport.SrcIP, ipreport.DstIP,
-			ipreport.SrcMAC, ipreport.DstMAC,
-			ipreport.SrcPort, ipreport.DstPort)
+			ipReport.SrcIP, ipReport.DstIP,
+			ipReport.SrcMAC, ipReport.DstMAC,
+			ipReport.SrcPort, ipReport.DstPort)
 	}
+	return nil
 }
