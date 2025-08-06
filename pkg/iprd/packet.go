@@ -41,12 +41,10 @@ func HandlePacket(packet gopacket.Packet) *IPRReportPacket {
 	}
 	udp, _ := udpLayer.(*layers.UDP)
 
-	// Check for empty datagram/payload
-	appLayer := packet.ApplicationLayer()
-	if appLayer == nil {
+	// Check for empty datagram/paylaod
+	if len(udp.Payload) == 0 {
 		return nil
 	}
-	payload := appLayer.Payload()
 
 	return &IPRReportPacket{
 		SrcIP:    ip.SrcIP.String(),
@@ -55,6 +53,6 @@ func HandlePacket(packet gopacket.Packet) *IPRReportPacket {
 		DstMAC:   eth.DstMAC.String(),
 		SrcPort:  int(udp.SrcPort),
 		DstPort:  int(udp.DstPort),
-		Datagram: payload,
+		Datagram: udp.Payload,
 	}
 }
