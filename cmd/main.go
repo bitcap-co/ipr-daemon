@@ -1,19 +1,46 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
 )
 
+type flagSlice []string
+
+func (f *flagSlice) String() string {
+	return fmt.Sprintf("%v", *f)
+}
+
+func (f *flagSlice) Set(value string) error {
+	*f = append(*f, value)
+	return nil
+}
+
+var defaultPortConfig = []string{
+	"14235", // bitmain-common
+	"11503", // iceriver
+	"8888",  // whatsminer
+	"18650", // sealminer
+	"1314",  // goldshell
+	"9999",  // elphapex
+}
+
 func main() {
-	iface, err := iprd.FindLANInterface()
-	if err != nil {
-		log.Panicln(err)
-	}
+	// flags
+	var (
+		flInterface   = flag.String("i", "", "network interface name")
+		flFilterPorts flagSlice
+	)
+	flag.Var(&flFilterPorts, "f", "list of UDP ports for BPF filter")
+	flag.Parse()
+
+	iface := get_interface(*flInterface)
 	fmt.Printf("%+v\n", *iface)
 	if iface.IsUp() {
 		fmt.Println("interface is up!")
@@ -21,10 +48,41 @@ func main() {
 	if iface.IsLan() {
 		fmt.Println("interface is marked LAN.")
 	}
-	var filter string = "udp port 14235"
-	if err := listen(iface.Name, filter); err != nil {
+	if flFilterPorts == nil {
+		flFilterPorts = defaultPortConfig
+	}
+
+	bpf := bpf_builder(flFilterPorts)
+	if err := listen(iface.Name, bpf); err != nil {
 		log.Panicf("Failed to start listening: %v", err)
 	}
+}
+
+func get_interface(name string) *iprd.IPRInterface {
+	if name != "" {
+		iface, err := iprd.GetInterfaceByName(name)
+		if err != nil {
+			log.Panicln(err)
+		}
+		return iface
+	}
+	iface, err := iprd.FindLANInterface()
+	if err != nil {
+		log.Panicln(err)
+	}
+	return iface
+}
+
+func bpf_builder(ports []string) string {
+	var filter strings.Builder
+	for _, port := range ports {
+		sep := "or"
+		if ports[len(ports)-1] == port {
+			sep = ""
+		}
+		filter.WriteString(fmt.Sprintf("udp port %s %s ", port, sep))
+	}
+	return filter.String()
 }
 
 func listen(iface, filter string) error {
