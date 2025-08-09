@@ -33,39 +33,34 @@ var defaultPortConfig = []string{
 
 func main() {
 	// flags
-	var (
-		flInterface   = flag.String("i", "", "network interface name")
-		flFilterPorts flagSlice
-	)
-	flag.Var(&flFilterPorts, "f", "list of UDP ports for BPF filter")
+	var flInterface = flag.String("i", "", "name of network interface to listen on.")
+	var flFilterPorts flagSlice
+	flag.Var(&flFilterPorts, "f", "list of UDP ports for BPF filter.")
 	flag.Parse()
 
-	iface := get_interface(*flInterface)
-	fmt.Printf("%+v\n", *iface)
-	if iface.IsUp() {
-		fmt.Println("interface is up!")
+	iface := getInterfaceFromFlag(*flInterface)
+	fmt.Printf("Found %s interface...\n", iface.Name)
+	if !iface.IsUp() {
+		log.Panicf("interface %s is not marked as up\n", iface.Name)
 	}
-	if iface.IsLan() {
-		fmt.Println("interface is marked LAN.")
-	}
+
 	if flFilterPorts == nil {
 		flFilterPorts = defaultPortConfig
 	}
+	filter := getBPFFilterFromPorts(flFilterPorts)
 
-	bpf := bpf_builder(flFilterPorts)
-	if err := listen(iface.Name, bpf); err != nil {
+	if err := listen(iface.Name, filter); err != nil {
 		log.Panicf("Failed to start listening: %v", err)
 	}
 }
 
-func get_interface(name string) *iprd.IPRInterface {
+func getInterfaceFromFlag(name string) *iprd.IPRInterface {
 	if name != "" {
-		iface, err := iprd.GetInterfaceByName(name)
-		if err != nil {
-			log.Panicln(err)
+		if iface, err := iprd.GetInterfaceByName(name); err == nil {
+			return iface
 		}
-		return iface
 	}
+	// Try and find interface marked as LAN
 	iface, err := iprd.FindLANInterface()
 	if err != nil {
 		log.Panicln(err)
@@ -73,7 +68,7 @@ func get_interface(name string) *iprd.IPRInterface {
 	return iface
 }
 
-func bpf_builder(ports []string) string {
+func getBPFFilterFromPorts(ports []string) string {
 	var filter strings.Builder
 	for _, port := range ports {
 		sep := "or"
