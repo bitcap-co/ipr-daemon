@@ -93,7 +93,7 @@ func listen(iface, filter string) error {
 
 	source := gopacket.NewPacketSource(handle, handle.LinkType())
 	for packet := range source.Packets() {
-		ipReport := iprd.HandlePacket(packet)
+		ipReport := iprd.GetIPRReportPacket(packet)
 		if ipReport == nil {
 			continue
 		}

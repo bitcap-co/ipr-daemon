@@ -19,7 +19,7 @@ type IPRReportPacket struct {
 
 var mutex sync.Mutex
 
-func HandlePacket(packet gopacket.Packet) *IPRReportPacket {
+func GetIPRReportPacket(packet gopacket.Packet) *IPRReportPacket {
 	mutex.Lock()
 	defer mutex.Unlock()
 
