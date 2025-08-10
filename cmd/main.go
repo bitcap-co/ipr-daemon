@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"log"
+	"os"
 	"strings"
 
 	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
@@ -31,44 +32,68 @@ var defaultPortConfig = []string{
 	"9999",  // elphapex
 }
 
+var iprlog = log.New(os.Stdout, "iprd: ", log.LstdFlags)
+
 func main() {
 	// flags
+	var flAutoFind bool
+	flag.BoolVar(&flAutoFind, "a", false, "switch to toggle to try and auto find interface.")
 	var flInterface = flag.String("i", "", "name of network interface to listen on.")
-	var flFilterPorts flagSlice
-	flag.Var(&flFilterPorts, "f", "list of UDP ports for BPF filter.")
+	var flPortConfig flagSlice
+	flag.Var(&flPortConfig, "f", "list of UDP ports for BPF filter.")
 	flag.Parse()
 
-	iface := getInterfaceFromFlag(*flInterface)
-	fmt.Printf("Found %s interface...\n", iface.Name)
+	iprlog.Println("start ipr daemon...")
+
+	if flAutoFind && *flInterface != "" {
+		iprlog.Fatalln("error: -a and -i are mutually exclusive")
+	}
+
+	if !flAutoFind && *flInterface == "" {
+		iprlog.Fatalln("error: must specify interface name.")
+	}
+
+	var iface *iprd.IPRInterface
+	if !flAutoFind {
+		iface = getInterfaceFromFlag(*flInterface)
+	} else {
+		iface = autoFindLANInterface()
+	}
+	iprlog.Printf("set interface: %s", iface.Name)
 	if !iface.IsUp() {
-		log.Panicf("interface %s is not marked as up\n", iface.Name)
+		iprlog.Fatalf("interface %s is not marked as up\n", iface.Name)
 	}
 
-	if flFilterPorts == nil {
-		flFilterPorts = defaultPortConfig
+	iprlog.Println("get port config.")
+	if flPortConfig == nil {
+		flPortConfig = defaultPortConfig
 	}
-	filter := getBPFFilterFromPorts(flFilterPorts)
+	filter := getBPFFilterFromConfig(flPortConfig)
+	iprlog.Printf("set BPF filter: %s", filter)
 
+	iprlog.Println("start listen...")
 	if err := listen(iface.Name, filter); err != nil {
-		log.Panicf("Failed to start listening: %v", err)
+		iprlog.Fatalf("Failed to start listening: %v", err)
 	}
 }
 
 func getInterfaceFromFlag(name string) *iprd.IPRInterface {
-	if name != "" {
-		if iface, err := iprd.GetInterfaceByName(name); err == nil {
-			return iface
-		}
-	}
-	// Try and find interface marked as LAN
-	iface, err := iprd.FindLANInterface()
+	iface, err := iprd.GetInterfaceByName(name)
 	if err != nil {
-		log.Panicln(err)
+		iprlog.Fatalln(err)
 	}
 	return iface
 }
 
-func getBPFFilterFromPorts(ports []string) string {
+func autoFindLANInterface() *iprd.IPRInterface {
+	iface, err := iprd.FindLANInterface()
+	if err != nil {
+		iprlog.Fatalln(err)
+	}
+	return iface
+}
+
+func getBPFFilterFromConfig(ports []string) string {
 	var filter strings.Builder
 	for _, port := range ports {
 		sep := "or"
@@ -97,8 +122,8 @@ func listen(iface, filter string) error {
 		if ipReport == nil {
 			continue
 		}
-		fmt.Println("received IP Report packet.")
-		fmt.Printf("IP: %s -> %s, MAC: %s -> %s, UDP: %d -> %d\n",
+		iprlog.Println("received IP Report packet.")
+		iprlog.Printf("IP: %s -> %s, MAC: %s -> %s, UDP: %d -> %d\n",
 			ipReport.SrcIP, ipReport.DstIP,
 			ipReport.SrcMAC, ipReport.DstMAC,
 			ipReport.SrcPort, ipReport.DstPort)
