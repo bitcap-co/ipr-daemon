@@ -32,7 +32,11 @@ var defaultPortConfig = []string{
 	"9999",  // elphapex
 }
 
+// logger
 var iprlog = log.New(os.Stdout, "iprd: ", log.LstdFlags)
+
+// broadcast msg channel
+var msgCh = make(chan []byte)
 
 func main() {
 	// flags
@@ -70,6 +74,21 @@ func main() {
 	}
 	filter := getBPFFilterFromConfig(flPortConfig)
 	iprlog.Printf("set BPF filter: %s", filter)
+
+	broadcaster, err := iprd.NewBroadcaster(7788)
+	if err != nil {
+		iprlog.Fatalln(err)
+	}
+	go broadcaster.Listen()
+	go func() {
+		for {
+			select {
+			case msg := <-msgCh:
+				broadcaster.Msgs <- msg
+			}
+		}
+	}()
+	iprlog.Println("set tcp forwarding -> :7788")
 
 	iprlog.Println("start listen...")
 	if err := listen(iface.Name, filter); err != nil {
@@ -127,6 +146,11 @@ func listen(iface, filter string) error {
 			ipReport.SrcIP, ipReport.DstIP,
 			ipReport.SrcMAC, ipReport.DstMAC,
 			ipReport.SrcPort, ipReport.DstPort)
+		msg, err := iprd.GetMarshalledJSONData(*ipReport)
+		if err != nil {
+			continue
+		}
+		msgCh <- msg
 	}
 	return nil
 }

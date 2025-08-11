@@ -1,0 +1,100 @@
+package iprd
+
+import (
+	"fmt"
+	"log"
+	"math"
+	"net"
+	"sync"
+)
+
+// https://github.com/magicpool-co/pool/blob/dev/cmd/proxy/server.go
+type tcpBroadcaster struct {
+	listener net.Listener
+	counter  uint64
+	mu       sync.RWMutex
+	clients  map[uint64]net.Conn
+	Msgs     chan []byte
+	errs     chan error
+}
+
+func NewBroadcaster(port int) (*tcpBroadcaster, error) {
+	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	if err != nil {
+		return nil, err
+	}
+
+	b := &tcpBroadcaster{
+		listener: listener,
+		clients:  make(map[uint64]net.Conn),
+		Msgs:     make(chan []byte),
+		errs:     make(chan error),
+	}
+	return b, nil
+}
+
+func (b *tcpBroadcaster) incrementCounter() uint64 {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	b.counter++
+	if b.counter == math.MaxUint64 {
+		b.counter = 0
+	}
+	return b.counter
+}
+
+func (b *tcpBroadcaster) broadcast(msg []byte) []error {
+	b.mu.RLock()
+	defer b.mu.RUnlock()
+
+	errs := make([]error, 0)
+	for _, conn := range b.clients {
+		if _, err := conn.Write(append(msg, '\n')); err != nil {
+			errs = append(errs, err)
+		}
+	}
+
+	return errs
+}
+
+func (b *tcpBroadcaster) Listen() {
+	for {
+		conn, err := b.listener.Accept()
+		if err != nil {
+			b.errs <- err
+		}
+
+		if conn == nil {
+			continue
+		}
+
+		go func() {
+			id := b.incrementCounter()
+			defer func() {
+				b.mu.Lock()
+				defer b.mu.Unlock()
+				delete(b.clients, id)
+				log.Printf("delete id: %d", id)
+				conn.Close()
+			}()
+
+			b.mu.Lock()
+			b.clients[id] = conn
+			log.Println(id)
+			b.mu.Unlock()
+
+			for {
+				select {
+				case msg := <-b.Msgs:
+					errs := b.broadcast(msg)
+					for _, err := range errs {
+						if err != nil {
+							log.Println(err)
+						}
+					}
+				}
+			}
+		}()
+	}
+}
