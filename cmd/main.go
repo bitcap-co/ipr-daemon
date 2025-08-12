@@ -147,11 +147,11 @@ func listen(iface, filter string) error {
 		if ipReport == nil {
 			continue
 		}
-		iprlog.Println("received IP Report packet.")
-		iprlog.Printf("IP: %s -> %s, MAC: %s -> %s, UDP: %d -> %d\n",
+		iprlog.Info("received IP Report packet.")
+		iprlog.Debug(fmt.Sprintf("IP: %s -> %s, MAC: %s -> %s, UDP: %d -> %d",
 			ipReport.SrcIP, ipReport.DstIP,
 			ipReport.SrcMAC, ipReport.DstMAC,
-			ipReport.SrcPort, ipReport.DstPort)
+			ipReport.SrcPort, ipReport.DstPort))
 		msg, err := iprd.GetMarshalledJSONData(*ipReport)
 		if err != nil {
 			continue

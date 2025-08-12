@@ -1,7 +1,10 @@
 package iprd
 
 import (
+	"bytes"
+	"compress/zlib"
 	"sync"
+	"unicode/utf8"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
@@ -44,6 +47,19 @@ func GetIPRReportPacket(packet gopacket.Packet) *IPRReportPacket {
 	// Check for empty datagram/paylaod
 	if len(udp.Payload) == 0 {
 		return nil
+	}
+
+	// check for valid datagram
+	if !utf8.Valid(udp.Payload) {
+		// sealminer data is compressed with standard zlib compression
+		if int(udp.DstPort) == 18650 {
+			_, err := zlib.NewReader(bytes.NewReader(udp.Payload))
+			if err != nil {
+				return nil
+			}
+		} else {
+			return nil
+		}
 	}
 
 	return &IPRReportPacket{
