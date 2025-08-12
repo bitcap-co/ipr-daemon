@@ -44,6 +44,7 @@ func main() {
 	var flInterface = flag.String("i", "", "name of network interface to listen on.")
 	var flPortConfig flagSlice
 	flag.Var(&flPortConfig, "f", "list of UDP ports for BPF filter.")
+	var flTCPForwardPort = flag.Int("p", 7788, "tcp port to forward packet data. Default: :7788")
 	flag.Parse()
 
 	iprlog.Info("start ipr daemon...")
@@ -76,7 +77,7 @@ func main() {
 	filter := getBPFFilterFromConfig(flPortConfig)
 	iprlog.Info(fmt.Sprintf("set BPF filter: %s", filter))
 
-	broadcaster, err := iprd.NewBroadcaster(7788)
+	broadcaster, err := iprd.NewBroadcaster(*flTCPForwardPort)
 	if err != nil {
 		iprlog.Fatalln(err)
 	}
