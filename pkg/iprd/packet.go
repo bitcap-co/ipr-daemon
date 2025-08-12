@@ -3,11 +3,13 @@ package iprd
 import (
 	"bytes"
 	"compress/zlib"
+	"encoding/json"
 	"sync"
 	"unicode/utf8"
 
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
+	"github.com/google/uuid"
 )
 
 type IPRReportPacket struct {
@@ -22,31 +24,31 @@ type IPRReportPacket struct {
 
 var mutex sync.Mutex
 
-func GetIPRReportPacket(packet gopacket.Packet) *IPRReportPacket {
+func IsValidIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, bool) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
 	ethLayer := packet.Layer(layers.LayerTypeEthernet)
 	if ethLayer == nil {
-		return nil
+		return nil, false
 	}
 	eth, _ := ethLayer.(*layers.Ethernet)
 
 	ipLayer := packet.Layer(layers.LayerTypeIPv4)
 	if ipLayer == nil {
-		return nil
+		return nil, false
 	}
 	ip, _ := ipLayer.(*layers.IPv4)
 
 	udpLayer := packet.Layer(layers.LayerTypeUDP)
 	if udpLayer == nil {
-		return nil
+		return nil, false
 	}
 	udp, _ := udpLayer.(*layers.UDP)
 
 	// Check for empty datagram/paylaod
 	if len(udp.Payload) == 0 {
-		return nil
+		return nil, false
 	}
 
 	// check for valid datagram
@@ -55,10 +57,10 @@ func GetIPRReportPacket(packet gopacket.Packet) *IPRReportPacket {
 		if int(udp.DstPort) == 18650 {
 			_, err := zlib.NewReader(bytes.NewReader(udp.Payload))
 			if err != nil {
-				return nil
+				return nil, false
 			}
 		} else {
-			return nil
+			return nil, false
 		}
 	}
 
@@ -70,5 +72,28 @@ func GetIPRReportPacket(packet gopacket.Packet) *IPRReportPacket {
 		SrcPort:  int(udp.SrcPort),
 		DstPort:  int(udp.DstPort),
 		Datagram: udp.Payload,
+	}, true
+}
+
+type IPRJSONObject struct {
+	ID      uuid.UUID `json:"id"`
+	IPAddr  string    `json:"ip_addr"`
+	MACAddr string    `json:"mac_addr"`
+}
+
+func (r *IPRReportPacket) ToJson() ([]byte, error) {
+	packetID, err := uuid.NewV7()
+	if err != nil {
+		return nil, err
 	}
+	jsonObj := IPRJSONObject{
+		ID:      packetID,
+		IPAddr:  r.SrcIP,
+		MACAddr: r.SrcMAC,
+	}
+	data, err := json.Marshal(jsonObj)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }

@@ -35,7 +35,7 @@ var defaultPortConfig = []string{
 var iprlog = iprd.NewLogger()
 
 // broadcast msg channel
-var msgCh = make(chan []byte)
+var broadcastCh = make(chan []byte)
 
 func main() {
 	// flags
@@ -84,7 +84,7 @@ func main() {
 	go func() {
 		for {
 			select {
-			case msg := <-msgCh:
+			case msg := <-broadcastCh:
 				broadcaster.Msgs <- msg
 			case err := <-broadcaster.Errs:
 				iprlog.Error(err)
@@ -143,20 +143,22 @@ func listen(iface, filter string) error {
 
 	source := gopacket.NewPacketSource(handle, handle.LinkType())
 	for packet := range source.Packets() {
-		ipReport := iprd.GetIPRReportPacket(packet)
-		if ipReport == nil {
+		ipr, ok := iprd.IsValidIPReportPacket(packet)
+		if !ok {
 			continue
 		}
 		iprlog.Info("received IP Report packet.")
 		iprlog.Debug(fmt.Sprintf("IP: %s -> %s, MAC: %s -> %s, UDP: %d -> %d",
-			ipReport.SrcIP, ipReport.DstIP,
-			ipReport.SrcMAC, ipReport.DstMAC,
-			ipReport.SrcPort, ipReport.DstPort))
-		msg, err := iprd.GetMarshalledJSONData(*ipReport)
+			ipr.SrcIP, ipr.DstIP,
+			ipr.SrcMAC, ipr.DstMAC,
+			ipr.SrcPort, ipr.DstPort))
+		msg, err := ipr.ToJson()
 		if err != nil {
+			iprlog.Error(fmt.Errorf("failed to marshal packet to JSON: %v", err))
 			continue
 		}
-		msgCh <- msg
+		// send msg to be broadcasted
+		broadcastCh <- msg
 	}
 	return nil
 }
