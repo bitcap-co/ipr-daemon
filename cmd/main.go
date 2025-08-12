@@ -3,7 +3,6 @@ package main
 import (
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"strings"
 
@@ -33,7 +32,7 @@ var defaultPortConfig = []string{
 }
 
 // logger
-var iprlog = log.New(os.Stdout, "iprd: ", log.LstdFlags)
+var iprlog = iprd.NewLogger()
 
 // broadcast msg channel
 var msgCh = make(chan []byte)
@@ -47,14 +46,16 @@ func main() {
 	flag.Var(&flPortConfig, "f", "list of UDP ports for BPF filter.")
 	flag.Parse()
 
-	iprlog.Println("start ipr daemon...")
+	iprlog.Info("start ipr daemon...")
 
 	if flAutoFind && *flInterface != "" {
-		iprlog.Fatalln("error: -a and -i are mutually exclusive")
+		iprlog.Error(fmt.Errorf("argurment error: -i and -a are mutually exclusive"))
+		os.Exit(1)
 	}
 
 	if !flAutoFind && *flInterface == "" {
-		iprlog.Fatalln("error: must specify interface name.")
+		iprlog.Error(fmt.Errorf("argurment error: must include -i or -a"))
+		os.Exit(1)
 	}
 
 	var iface *iprd.IPRInterface
@@ -63,17 +64,17 @@ func main() {
 	} else {
 		iface = autoFindLANInterface()
 	}
-	iprlog.Printf("set interface: %s", iface.Name)
 	if !iface.IsUp() {
-		iprlog.Fatalf("interface %s is not marked as up\n", iface.Name)
+		iprlog.Error(fmt.Errorf("interface %s is not marked at up", iface.Name))
+		os.Exit(1)
 	}
+	iprlog.Info(fmt.Sprintf("set interface: %s", iface.Name))
 
-	iprlog.Println("get port config.")
 	if flPortConfig == nil {
 		flPortConfig = defaultPortConfig
 	}
 	filter := getBPFFilterFromConfig(flPortConfig)
-	iprlog.Printf("set BPF filter: %s", filter)
+	iprlog.Info(fmt.Sprintf("set BPF filter: %s", filter))
 
 	broadcaster, err := iprd.NewBroadcaster(7788)
 	if err != nil {
@@ -85,21 +86,25 @@ func main() {
 			select {
 			case msg := <-msgCh:
 				broadcaster.Msgs <- msg
+			case err := <-broadcaster.Errs:
+				iprlog.Error(err)
 			}
 		}
 	}()
-	iprlog.Println("set tcp forwarding -> :7788")
+	iprlog.Info("set tcp forwarding -> :7788")
 
-	iprlog.Println("start listen...")
+	iprlog.Info("start listen...")
 	if err := listen(iface.Name, filter); err != nil {
-		iprlog.Fatalf("Failed to start listening: %v", err)
+		iprlog.Error(fmt.Errorf("listen error: %v", err))
+		os.Exit(1)
 	}
 }
 
 func getInterfaceFromFlag(name string) *iprd.IPRInterface {
 	iface, err := iprd.GetInterfaceByName(name)
 	if err != nil {
-		iprlog.Fatalln(err)
+		iprlog.Error(err)
+		os.Exit(1)
 	}
 	return iface
 }
@@ -107,7 +112,8 @@ func getInterfaceFromFlag(name string) *iprd.IPRInterface {
 func autoFindLANInterface() *iprd.IPRInterface {
 	iface, err := iprd.FindLANInterface()
 	if err != nil {
-		iprlog.Fatalln(err)
+		iprlog.Error(err)
+		os.Exit(1)
 	}
 	return iface
 }

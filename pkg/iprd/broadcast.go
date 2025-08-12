@@ -2,7 +2,6 @@ package iprd
 
 import (
 	"fmt"
-	"log"
 	"math"
 	"net"
 	"sync"
@@ -15,7 +14,7 @@ type tcpBroadcaster struct {
 	mu       sync.RWMutex
 	clients  map[uint64]net.Conn
 	Msgs     chan []byte
-	errs     chan error
+	Errs     chan error
 }
 
 func NewBroadcaster(port int) (*tcpBroadcaster, error) {
@@ -28,7 +27,7 @@ func NewBroadcaster(port int) (*tcpBroadcaster, error) {
 		listener: listener,
 		clients:  make(map[uint64]net.Conn),
 		Msgs:     make(chan []byte),
-		errs:     make(chan error),
+		Errs:     make(chan error),
 	}
 	return b, nil
 }
@@ -62,7 +61,7 @@ func (b *tcpBroadcaster) Listen() {
 	for {
 		conn, err := b.listener.Accept()
 		if err != nil {
-			b.errs <- err
+			b.Errs <- err
 		}
 
 		if conn == nil {
@@ -75,13 +74,11 @@ func (b *tcpBroadcaster) Listen() {
 				b.mu.Lock()
 				defer b.mu.Unlock()
 				delete(b.clients, id)
-				log.Printf("delete id: %d", id)
 				conn.Close()
 			}()
 
 			b.mu.Lock()
 			b.clients[id] = conn
-			log.Println(id)
 			b.mu.Unlock()
 
 			for {
@@ -90,7 +87,7 @@ func (b *tcpBroadcaster) Listen() {
 					errs := b.broadcast(msg)
 					for _, err := range errs {
 						if err != nil {
-							log.Println(err)
+							b.Errs <- err
 						}
 					}
 				}
