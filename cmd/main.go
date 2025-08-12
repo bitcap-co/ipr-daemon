@@ -92,7 +92,8 @@ func main() {
 			}
 		}
 	}()
-	iprlog.Info("set tcp forwarding -> :7788")
+	iprlog.Info(fmt.Sprintf("set tcp forwarding -> :%d", *flTCPForwardPort))
+	iprlog.Info("successfully started iprd!")
 
 	iprlog.Info("start listen...")
 	if err := listen(iface.Name, filter); err != nil {
