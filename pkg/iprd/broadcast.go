@@ -10,6 +10,7 @@ import (
 
 // https://github.com/magicpool-co/pool/blob/dev/cmd/proxy/server.go
 type tcpBroadcaster struct {
+	logger   *IPRLogger
 	listener net.Listener
 	counter  uint64
 	mu       sync.RWMutex
@@ -25,6 +26,7 @@ func NewBroadcaster(port int) (*tcpBroadcaster, error) {
 	}
 
 	b := &tcpBroadcaster{
+		logger:   NewLogger(),
 		listener: listener,
 		clients:  make(map[uint64]net.Conn),
 		Msgs:     make(chan []byte),
@@ -73,7 +75,7 @@ func (b *tcpBroadcaster) Listen() {
 		if conn == nil {
 			continue
 		}
-
+		b.logger.Info(fmt.Sprintf("accepted new connection from: %s", conn.RemoteAddr().String()))
 		go func() {
 			id := b.incrementCounter()
 			defer func() {
