@@ -49,3 +49,6 @@ echo "iprd_enable=\"YES\"" >> /etc/rc.conf
 
 echo "Starting iprd service..."
 service iprd start
+
+echo "Done!"
+exit 0
