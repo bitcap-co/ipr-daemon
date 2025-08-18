@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"flag"
 	"fmt"
 	"log"
 	"net"
@@ -10,10 +11,13 @@ import (
 	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
 )
 
-var localPort = 7788
-
 func main() {
-	conn, err := net.Dial("tcp", fmt.Sprintf(":%d", localPort))
+	var (
+		flHost = flag.String("host", "", "host addr")
+		flPort = flag.Int("port", 7788, "tcp port")
+	)
+	flag.Parse()
+	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", *flHost, *flPort))
 	if err != nil {
 		log.Fatalf("error connecting: %s", err)
 	}
