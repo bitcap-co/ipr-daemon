@@ -1,0 +1,21 @@
+#!/bin/sh
+#
+# PROVIDE: iprd
+# KEYWORD: shutdown
+
+. /etc/rc.subr
+
+name=iprd
+desc="IP Report Daemon"
+rcvar=iprd_enable
+command="/usr/sbin/${name}"
+
+start_precmd="${name}_prestart"
+
+iprd_prestart()
+{
+    rcflags="-a ${rc_flags} > /var/log/iprd.log &"
+}
+
+load_rc_config $name
+run_rc_command "$1"
