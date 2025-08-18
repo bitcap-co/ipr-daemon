@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"net"
+	"strings"
 	"sync"
 )
 
@@ -48,8 +49,13 @@ func (b *tcpBroadcaster) broadcast(msg []byte) []error {
 	defer b.mu.RUnlock()
 
 	errs := make([]error, 0)
-	for _, conn := range b.clients {
+	for id, conn := range b.clients {
 		if _, err := conn.Write(append(msg, '\n')); err != nil {
+			// remove dead clients
+			if strings.Contains(err.Error(), "broken pipe") {
+				conn.Close()
+				delete(b.clients, id)
+			}
 			errs = append(errs, err)
 		}
 	}
