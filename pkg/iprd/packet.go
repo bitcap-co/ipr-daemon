@@ -22,8 +22,24 @@ type IPRReportPacket struct {
 	Datagram []byte
 }
 
+type IPRBroadcastMessage struct {
+	ID        string `json:"id"`
+	IPAddr    string `json:"ip_addr"`
+	MACAddr   string `json:"mac_addr"`
+	MinerType string `json:"miner_type"`
+}
+
 var mutex sync.Mutex
 var zlibDefaultMagic = []byte{0x78, 0x9c}
+
+var mapMinerType = map[int]string{
+	14235: "bitmain-common",
+	11503: "iceriver",
+	8888:  "whatsminer",
+	1314:  "goldshell",
+	18650: "sealminer",
+	9999:  "elphapex",
+}
 
 func IsValidIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, bool) {
 	mutex.Lock()
@@ -76,10 +92,8 @@ func IsValidIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, bool) {
 	}, true
 }
 
-type IPRJSONObject struct {
-	ID      string `json:"id"`
-	IPAddr  string `json:"ip_addr"`
-	MACAddr string `json:"mac_addr"`
+func (r *IPRReportPacket) getMinerType() string {
+	return mapMinerType[r.DstPort]
 }
 
 func (r *IPRReportPacket) ToJson() ([]byte, error) {
@@ -87,10 +101,11 @@ func (r *IPRReportPacket) ToJson() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	jsonObj := IPRJSONObject{
-		ID:      packetID.String(),
-		IPAddr:  r.SrcIP,
-		MACAddr: r.SrcMAC,
+	jsonObj := IPRBroadcastMessage{
+		ID:        packetID.String(),
+		IPAddr:    r.SrcIP,
+		MACAddr:   r.SrcMAC,
+		MinerType: r.getMinerType(),
 	}
 	data, err := json.Marshal(jsonObj)
 	if err != nil {
