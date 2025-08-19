@@ -23,6 +23,7 @@ type IPRReportPacket struct {
 }
 
 var mutex sync.Mutex
+var zlibDefaultMagic = []byte{0x78, 0x9c}
 
 func IsValidIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, bool) {
 	mutex.Lock()
@@ -54,7 +55,7 @@ func IsValidIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, bool) {
 	// check for valid datagram
 	if !utf8.Valid(udp.Payload) {
 		// sealminer data is compressed with standard zlib compression
-		if int(udp.DstPort) == 18650 {
+		if bytes.Contains(udp.Payload, zlibDefaultMagic) {
 			_, err := zlib.NewReader(bytes.NewReader(udp.Payload))
 			if err != nil {
 				return nil, false
