@@ -23,7 +23,21 @@ func main() {
 	}
 	defer conn.Close()
 
+	log.Println("Sending subscribe command...")
+	var subMsgObj = iprd.IPRSubscribeMessage{
+		Command: "iprd_subscribe",
+	}
+	subscribeMsg, err := json.Marshal(subMsgObj)
+	if err != nil {
+		log.Fatalf("error marshalling subscribe message: %v", err)
+	}
+	_, err = conn.Write(append(subscribeMsg, '\n'))
+	if err != nil {
+		log.Fatalf("error sending subscribe message: %v", err)
+	}
+
 	log.Printf("Connected: %s <-> %s", conn.RemoteAddr().String(), conn.LocalAddr().String())
+
 	reader := bufio.NewReader(conn)
 	var obj iprd.IPRJSONObject
 	for {
