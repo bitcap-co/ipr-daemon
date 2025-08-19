@@ -55,6 +55,7 @@ func (b *tcpBroadcaster) broadcast(msg []byte) []error {
 	errs := make([]error, 0)
 	for id, conn := range b.clients {
 		if _, err := conn.Write(append(msg, '\n')); err != nil {
+			// close and remove client on error
 			conn.Close()
 			delete(b.clients, id)
 			errs = append(errs, err)
