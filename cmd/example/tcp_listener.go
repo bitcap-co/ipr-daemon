@@ -39,7 +39,7 @@ func main() {
 	log.Printf("Connected: %s <-> %s", conn.RemoteAddr().String(), conn.LocalAddr().String())
 
 	reader := bufio.NewReader(conn)
-	var obj iprd.IPRJSONObject
+	var obj iprd.IPRBroadcastMessage
 	for {
 		data, err := reader.ReadBytes('\n')
 		if err != nil {
@@ -50,6 +50,6 @@ func main() {
 		if err != nil {
 			log.Println("error unmarshalling json:", err)
 		}
-		log.Printf("Receieved: [%s] -- IP:%s,MAC:%s", obj.ID, obj.IPAddr, obj.MACAddr)
+		log.Printf("Receieved: [%s] -- TYPE:%s,IP:%s,MAC:%s", obj.ID, obj.MinerType, obj.IPAddr, obj.MACAddr)
 	}
 }
