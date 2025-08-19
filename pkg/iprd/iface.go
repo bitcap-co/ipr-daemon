@@ -3,6 +3,7 @@ package iprd
 import (
 	"fmt"
 	"net"
+	"regexp"
 	"strings"
 
 	"github.com/google/gopacket/pcap"
@@ -21,10 +22,8 @@ func (i *IPRInterface) IsLan() bool {
 	if i.Description == "" {
 		return false
 	}
-	if i.Description == "lan" || i.Description == "LAN" {
-		return true
-	}
-	return false
+	matched, _ := regexp.MatchString(`lan|LAN`, i.Description)
+	return matched
 }
 
 func (i *IPRInterface) IsUp() bool {
