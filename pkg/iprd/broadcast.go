@@ -2,10 +2,10 @@ package iprd
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"math"
 	"net"
-	"strings"
 	"sync"
 	"time"
 )
@@ -19,6 +19,10 @@ type tcpBroadcaster struct {
 	clients  map[uint64]net.Conn
 	Msgs     chan []byte
 	Errs     chan error
+}
+
+type IPRSubscribeMessage struct {
+	Command string `json:"command"`
 }
 
 func NewBroadcaster(port int) (*tcpBroadcaster, error) {
@@ -88,7 +92,6 @@ func (b *tcpBroadcaster) Listen() {
 		if conn == nil {
 			continue
 		}
-		b.logger.Info(fmt.Sprintf("accepted new connection from: %s", conn.RemoteAddr().String()))
 		go func() {
 			id := b.incrementCounter()
 			defer func() {
@@ -99,19 +102,23 @@ func (b *tcpBroadcaster) Listen() {
 			}()
 
 			conn.SetReadDeadline(time.Now().Add(time.Second * 10))
-			subscribed := false
+			clientSubscribed := false
 			scanner := bufio.NewScanner(conn)
 			for scanner.Scan() {
-				if subscribed {
+				if clientSubscribed {
 					continue
 				}
 				msg := scanner.Bytes()
-				if strings.HasPrefix(string(msg), "subscribe") {
-					conn.SetReadDeadline(time.Time{})
-					subscribed = true
-					b.mu.Lock()
-					b.clients[id] = conn
-					b.mu.Unlock()
+				var subMsg IPRSubscribeMessage
+				if err := json.Unmarshal(msg, &subMsg); err == nil {
+					if subMsg.Command == "iprd_subscribe" {
+						conn.SetReadDeadline(time.Time{})
+						clientSubscribed = true
+						b.mu.Lock()
+						b.clients[id] = conn
+						b.mu.Unlock()
+						b.logger.Info(fmt.Sprintf("accepted new connection from: %s", conn.RemoteAddr().String()))
+					}
 				}
 			}
 		}()
