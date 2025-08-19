@@ -29,9 +29,7 @@ type IPRBroadcastMessage struct {
 	MinerType string `json:"miner_type"`
 }
 
-var mutex sync.Mutex
 var zlibDefaultMagic = []byte{0x78, 0x9c}
-
 var mapMinerType = map[int]string{
 	14235: "bitmain-common",
 	11503: "iceriver",
@@ -40,6 +38,8 @@ var mapMinerType = map[int]string{
 	18650: "sealminer",
 	9999:  "elphapex",
 }
+
+var mutex sync.Mutex
 
 func IsValidIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, bool) {
 	mutex.Lock()
