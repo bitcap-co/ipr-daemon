@@ -9,8 +9,8 @@ fi
 
 echo "Start iprd installer..."
 echo "Write iprd service to /etc/rc.d/..."
-if [ ! -e /etc/rc.d/iprd ]; then
-    cat > /etc/rc.d/iprd << EOF
+if [ ! -e /usr/local/etc/rc.d/iprd ]; then
+    cat > /usr/local/etc/rc.d/iprd << EOF
 #!/bin/sh
 #
 # PROVIDE: iprd
@@ -33,7 +33,7 @@ iprd_prestart()
 load_rc_config \$name
 run_rc_command "\$1"
 EOF
-    chmod +x /etc/rc.d/iprd
+    chmod +x /usr/local/etc/rc.d/iprd
 fi
 
 
@@ -45,7 +45,7 @@ fi
 cp -v iprd /usr/sbin/
 
 echo "Add iprd_enable to /etc/rc.conf..."
-echo "iprd_enable=\"YES\"" >> /etc/rc.conf
+echo "iprd_enable=\"YES\"" > /etc/rc.conf.local
 
 echo "Starting iprd service..."
 service iprd start
