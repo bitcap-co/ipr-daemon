@@ -14,7 +14,7 @@ start_precmd="${name}_prestart"
 
 iprd_prestart()
 {
-    rcflags="-a ${rc_flags} > /var/log/iprd.log &"
+    rc_flags="-a ${rc_flags} > /var/log/iprd.log &"
 }
 
 load_rc_config $name

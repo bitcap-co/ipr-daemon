@@ -1,11 +1,13 @@
 package iprd
 
 import (
+	"bufio"
 	"fmt"
 	"math"
 	"net"
 	"strings"
 	"sync"
+	"time"
 )
 
 // https://github.com/magicpool-co/pool/blob/dev/cmd/proxy/server.go
@@ -53,11 +55,8 @@ func (b *tcpBroadcaster) broadcast(msg []byte) []error {
 	errs := make([]error, 0)
 	for id, conn := range b.clients {
 		if _, err := conn.Write(append(msg, '\n')); err != nil {
-			// remove dead clients
-			if strings.Contains(err.Error(), "broken pipe") {
-				conn.Close()
-				delete(b.clients, id)
-			}
+			conn.Close()
+			delete(b.clients, id)
 			errs = append(errs, err)
 		}
 	}
@@ -66,6 +65,19 @@ func (b *tcpBroadcaster) broadcast(msg []byte) []error {
 }
 
 func (b *tcpBroadcaster) Listen() {
+	go func() {
+		for {
+			select {
+			case msg := <-b.Msgs:
+				errs := b.broadcast(msg)
+				for _, err := range errs {
+					if err != nil {
+						b.Errs <- err
+					}
+				}
+			}
+		}
+	}()
 	for {
 		conn, err := b.listener.Accept()
 		if err != nil {
@@ -85,19 +97,20 @@ func (b *tcpBroadcaster) Listen() {
 				conn.Close()
 			}()
 
-			b.mu.Lock()
-			b.clients[id] = conn
-			b.mu.Unlock()
-
-			for {
-				select {
-				case msg := <-b.Msgs:
-					errs := b.broadcast(msg)
-					for _, err := range errs {
-						if err != nil {
-							b.Errs <- err
-						}
-					}
+			conn.SetReadDeadline(time.Now().Add(time.Second * 10))
+			subscribed := false
+			scanner := bufio.NewScanner(conn)
+			for scanner.Scan() {
+				if subscribed {
+					continue
+				}
+				msg := scanner.Bytes()
+				if strings.HasPrefix(string(msg), "subscribe") {
+					conn.SetReadDeadline(time.Time{})
+					subscribed = true
+					b.mu.Lock()
+					b.clients[id] = conn
+					b.mu.Unlock()
 				}
 			}
 		}()

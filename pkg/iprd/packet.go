@@ -76,9 +76,9 @@ func IsValidIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, bool) {
 }
 
 type IPRJSONObject struct {
-	ID      uuid.UUID `json:"id"`
-	IPAddr  string    `json:"ip_addr"`
-	MACAddr string    `json:"mac_addr"`
+	ID      string `json:"id"`
+	IPAddr  string `json:"ip_addr"`
+	MACAddr string `json:"mac_addr"`
 }
 
 func (r *IPRReportPacket) ToJson() ([]byte, error) {
@@ -87,7 +87,7 @@ func (r *IPRReportPacket) ToJson() ([]byte, error) {
 		return nil, err
 	}
 	jsonObj := IPRJSONObject{
-		ID:      packetID,
+		ID:      packetID.String(),
 		IPAddr:  r.SrcIP,
 		MACAddr: r.SrcMAC,
 	}
