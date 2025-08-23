@@ -9,11 +9,14 @@ Goals:
 
 ## Building
 
-### FreeBSD Static binary
+#### FreeBSD Static binary
 ```bash
 make build-freebsd
 ```
 
 
+## Subscribing to TCP
+By default, the TCP Broadcaster listens on port 7788.
 
-
+To start listening for messages, send the message:
+`{"command": "iprd_subscribe"}` after connecting to the broadcaster.
