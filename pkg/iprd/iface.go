@@ -9,6 +9,7 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
+// IPRInterface defines information from a system interface.
 type IPRInterface struct {
 	Index        int
 	Name         string
@@ -18,6 +19,7 @@ type IPRInterface struct {
 	Flags        net.Flags
 }
 
+// IsLan checks if IPRInterface is marked as LAN interface.
 func (i *IPRInterface) IsLan() bool {
 	if i.Description == "" {
 		return false
@@ -26,6 +28,7 @@ func (i *IPRInterface) IsLan() bool {
 	return matched
 }
 
+// IsUp checks if IPRInterface is marked as up.
 func (i *IPRInterface) IsUp() bool {
 	if strings.Contains(i.Flags.String(), "up") {
 		return true
@@ -66,6 +69,7 @@ func getAllInterfaces() ([]IPRInterface, error) {
 	return interfaces, nil
 }
 
+// GetInterfaceByName returns IPRInterface matching name.
 func GetInterfaceByName(name string) (*IPRInterface, error) {
 	ifaces, err := getAllInterfaces()
 	if err != nil {
@@ -79,6 +83,7 @@ func GetInterfaceByName(name string) (*IPRInterface, error) {
 	return nil, fmt.Errorf("interface not found: %s", name)
 }
 
+// FindLANInterface returns the first IPRInterface marked as LAN, if any.
 func FindLANInterface() (*IPRInterface, error) {
 	ifaces, err := getAllInterfaces()
 	if err != nil {

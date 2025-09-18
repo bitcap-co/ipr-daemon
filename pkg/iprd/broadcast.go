@@ -21,10 +21,12 @@ type tcpBroadcaster struct {
 	Errs     chan error
 }
 
-type IPRSubscribeMessage struct {
+// IPRTcpCommand describes the tcp message command format {"command": "COMMAND"}
+type IPRTcpCommand struct {
 	Command string `json:"command"`
 }
 
+// NewBroadcaster returns a new tcpBroadcaster at specified port.
 func NewBroadcaster(port int) (*tcpBroadcaster, error) {
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
@@ -69,6 +71,7 @@ func (b *tcpBroadcaster) broadcast(msg []byte) []error {
 	return errs
 }
 
+// Listen accepts incoming clients and subscribes them for broadcasted messages.
 func (b *tcpBroadcaster) Listen() {
 	go func() {
 		for {
@@ -109,9 +112,9 @@ func (b *tcpBroadcaster) Listen() {
 					continue
 				}
 				msg := scanner.Bytes()
-				var subMsg IPRSubscribeMessage
-				if err := json.Unmarshal(msg, &subMsg); err == nil {
-					if subMsg.Command == "iprd_subscribe" {
+				var cmd IPRTcpCommand
+				if err := json.Unmarshal(msg, &cmd); err == nil {
+					if cmd.Command == "iprd_subscribe" {
 						conn.SetReadDeadline(time.Time{})
 						clientSubscribed = true
 						b.mu.Lock()

@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 )
 
+// IPRReportPacket defines the structure of a IP Report packet.
 type IPRReportPacket struct {
 	SrcIP    string
 	DstIP    string
@@ -22,6 +23,7 @@ type IPRReportPacket struct {
 	Datagram []byte
 }
 
+// IPRBroadcastMessage defines the structure of a TCP broadcast message.
 type IPRBroadcastMessage struct {
 	ID        string `json:"id"`
 	IPAddr    string `json:"ip_addr"`
@@ -30,7 +32,7 @@ type IPRBroadcastMessage struct {
 }
 
 var zlibDefaultMagic = []byte{0x78, 0x9c}
-var mapMinerType = map[int]string{
+var knownMinerTypes = map[int]string{
 	14235: "bitmain-common",
 	11503: "iceriver",
 	8888:  "whatsminer",
@@ -41,6 +43,8 @@ var mapMinerType = map[int]string{
 
 var mutex sync.Mutex
 
+// IsValidIPReportPacket checks if packet is a valid IP Report packet. Returns a IPRReportPacket if valid.
+// Ignores packet if datagram is empty.
 func IsValidIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, bool) {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -70,9 +74,10 @@ func IsValidIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, bool) {
 
 	// check for valid datagram
 	if !utf8.Valid(udp.Payload) {
+		b := bytes.NewReader(udp.Payload)
 		// sealminer data is compressed with standard zlib compression
 		if bytes.Contains(udp.Payload, zlibDefaultMagic) {
-			_, err := zlib.NewReader(bytes.NewReader(udp.Payload))
+			_, err := zlib.NewReader(b)
 			if err != nil {
 				return nil, false
 			}
@@ -93,9 +98,14 @@ func IsValidIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, bool) {
 }
 
 func (r *IPRReportPacket) getMinerType() string {
-	return mapMinerType[r.DstPort]
+	minerType, ok := knownMinerTypes[r.DstPort]
+	if !ok {
+		return "Unknown"
+	}
+	return minerType
 }
 
+// ToJson marshals the IP Report packet data into IPRBroadcastMessage struct.
 func (r *IPRReportPacket) ToJson() ([]byte, error) {
 	packetID, err := uuid.NewV7()
 	if err != nil {
