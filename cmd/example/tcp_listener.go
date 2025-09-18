@@ -24,10 +24,10 @@ func main() {
 	defer conn.Close()
 
 	log.Println("Sending subscribe command...")
-	var subMsgObj = iprd.IPRSubscribeMessage{
+	var subCmd = iprd.IPRTcpCommand{
 		Command: "iprd_subscribe",
 	}
-	subscribeMsg, err := json.Marshal(subMsgObj)
+	subscribeMsg, err := json.Marshal(subCmd)
 	if err != nil {
 		log.Fatalf("error marshalling subscribe message: %v", err)
 	}
