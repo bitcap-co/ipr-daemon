@@ -1,3 +1,4 @@
+// https://github.com/magicpool-co/pool/blob/dev/cmd/proxy/server.go
 package iprd
 
 import (
@@ -10,7 +11,6 @@ import (
 	"time"
 )
 
-// https://github.com/magicpool-co/pool/blob/dev/cmd/proxy/server.go
 type tcpBroadcaster struct {
 	logger   *IPRLogger
 	listener net.Listener

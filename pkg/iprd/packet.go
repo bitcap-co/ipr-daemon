@@ -31,17 +31,19 @@ type IPRBroadcastMessage struct {
 	MinerType string `json:"miner_type"`
 }
 
-var zlibDefaultMagic = []byte{0x78, 0x9c}
-var knownMinerTypes = map[int]string{
-	14235: "bitmain-common",
-	11503: "iceriver",
-	8888:  "whatsminer",
-	1314:  "goldshell",
-	18650: "sealminer",
-	9999:  "elphapex",
-}
+var (
+	mutex sync.Mutex
 
-var mutex sync.Mutex
+	zlibDefaultMagic = []byte{0x78, 0x9c}
+	knownMinerTypes  = map[int]string{
+		14235: "bitmain-common",
+		11503: "iceriver",
+		8888:  "whatsminer",
+		1314:  "goldshell",
+		18650: "sealminer",
+		9999:  "elphapex",
+	}
+)
 
 // IsValidIPReportPacket checks if packet is a valid IP Report packet. Returns a IPRReportPacket if valid.
 // Ignores packet if datagram is empty.
@@ -97,7 +99,8 @@ func IsValidIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, bool) {
 	}, true
 }
 
-func (r *IPRReportPacket) getMinerType() string {
+// GetMinerType returns known miner type.
+func (r *IPRReportPacket) GetMinerType() string {
 	minerType, ok := knownMinerTypes[r.DstPort]
 	if !ok {
 		return "Unknown"
@@ -115,7 +118,7 @@ func (r *IPRReportPacket) ToJson() ([]byte, error) {
 		ID:        packetID.String(),
 		IPAddr:    r.SrcIP,
 		MACAddr:   r.SrcMAC,
-		MinerType: r.getMinerType(),
+		MinerType: r.GetMinerType(),
 	}
 	data, err := json.Marshal(jsonObj)
 	if err != nil {
