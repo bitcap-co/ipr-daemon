@@ -22,14 +22,14 @@ func (f *flagSlice) Set(value string) error {
 	return nil
 }
 
-var defaultPortConfig = []string{
-	"14235", // bitmain-common
-	"11503", // iceriver
-	"8888",  // whatsminer
-	"18650", // sealminer
-	"1314",  // goldshell
-	"9999",  // elphapex
-}
+// var defaultPortConfig = []string{
+// 	"14235", // bitmain-common
+// 	"11503", // iceriver
+// 	"8888",  // whatsminer
+// 	"18650", // sealminer
+// 	"1314",  // goldshell
+// 	"9999",  // elphapex
+// }
 
 // logger
 var iprlog = iprd.NewLogger()
@@ -71,11 +71,13 @@ func main() {
 	}
 	iprlog.Info(fmt.Sprintf("set interface: %s", iface.Name))
 
-	if flPortConfig == nil {
-		flPortConfig = defaultPortConfig
-	}
-	filter := getBPFFilterFromConfig(flPortConfig)
-	iprlog.Info(fmt.Sprintf("set BPF filter: %s", filter))
+	// if flPortConfig == nil {
+	// 	flPortConfig = defaultPortConfig
+	// }
+	// filter := getBPFFilterFromConfig(flPortConfig)
+	netFilter := strings.Join(strings.Split(iface.Addr.String(), ".")[0:2], ".")
+	bpf := fmt.Sprintf("udp dst portrange 1024-49151 and dst net 255 or dst net %s", netFilter)
+	iprlog.Info(fmt.Sprintf("set BPF filter: %s", bpf))
 
 	broadcaster, err := iprd.NewBroadcaster(*flTCPForwardPort)
 	if err != nil {
@@ -96,7 +98,7 @@ func main() {
 	iprlog.Info("successfully started iprd!")
 
 	iprlog.Info("start listen...")
-	if err := listen(iface.Name, filter); err != nil {
+	if err := listen(iface.Name, bpf); err != nil {
 		iprlog.Error(fmt.Errorf("listen error: %v", err))
 		os.Exit(1)
 	}
@@ -120,17 +122,17 @@ func autoFindLANInterface() *iprd.IPRInterface {
 	return iface
 }
 
-func getBPFFilterFromConfig(ports []string) string {
-	var filter strings.Builder
-	for _, port := range ports {
-		sep := "or"
-		if ports[len(ports)-1] == port {
-			sep = ""
-		}
-		filter.WriteString(fmt.Sprintf("udp port %s %s ", port, sep))
-	}
-	return filter.String()
-}
+// func getBPFFilterFromConfig(ports []string) string {
+// 	var filter strings.Builder
+// 	for _, port := range ports {
+// 		sep := "or"
+// 		if ports[len(ports)-1] == port {
+// 			sep = ""
+// 		}
+// 		filter.WriteString(fmt.Sprintf("udp port %s %s ", port, sep))
+// 	}
+// 	return filter.String()
+// }
 
 func listen(iface, filter string) error {
 	handle, err := pcap.OpenLive(iface, int32(1600), true, pcap.BlockForever)
