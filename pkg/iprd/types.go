@@ -99,7 +99,15 @@ func (s *SealminerIPReport) getInterfaces(data []interface{}) (*[]SMInterface, e
 	return sminterfaces, nil
 }
 
-func (s *SealminerIPReport) UnmarshalJSON(data []byte) error {
+func (i *IPReportSealminer) UnmarshalJSON(data []byte) error {
+	// remove null bytes
+	data = bytes.ReplaceAll(data, []byte(`\x00`), []byte{})
+	// // fix commas
+	data = bytes.ReplaceAll(data, []byte("}{"), []byte("}, {"))
+	// // fix booleans
+	data = bytes.ReplaceAll(data, []byte("TRUE"), []byte("true"))
+	data = bytes.ReplaceAll(data, []byte("FALSE"), []byte("false"))
+
 	var temp []interface{}
 	if err := json.Unmarshal(data, &temp); err != nil {
 		return fmt.Errorf("failed to unmarshal payload: %W", err)
