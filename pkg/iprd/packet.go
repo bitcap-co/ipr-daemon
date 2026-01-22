@@ -3,10 +3,10 @@ package iprd
 import (
 	"bytes"
 	"compress/zlib"
-	"encoding/json"
 	"sync"
 	"unicode/utf8"
 
+	"github.com/goccy/go-json"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/uuid"
