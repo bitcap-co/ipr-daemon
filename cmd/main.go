@@ -47,12 +47,7 @@ func main() {
 	}
 	iprlog.Info(fmt.Sprintf("set interface: %s", iface.Name))
 
-	// if flPortConfig == nil {
-	// 	flPortConfig = defaultPortConfig
-	// }
-	// filter := getBPFFilterFromConfig(flPortConfig)
-	netFilter := strings.Join(strings.Split(iface.Addr.String(), ".")[0:2], ".")
-	bpf := fmt.Sprintf("udp dst portrange 1024-49151 and dst net 255 or dst net %s", netFilter)
+	bpf := fmt.Sprintf("src host %s and (dst net 255 or dst net %s) and udp dst portrange 1024-49151", iface.LocalNet(), iface.LocalNet())
 	iprlog.Info(fmt.Sprintf("set BPF filter: %s", bpf))
 
 	broadcaster, err := iprd.NewBroadcaster(*flTCPForwardPort)
