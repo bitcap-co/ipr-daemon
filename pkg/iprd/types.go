@@ -1,6 +1,7 @@
 package iprd
 
 import (
+	"bytes"
 	"fmt"
 	"regexp"
 
@@ -10,20 +11,16 @@ import (
 var (
 	ValidIP     = regexp.MustCompile(`\b(?:(?:2(?:[0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9])\.){3}(?:(?:2([0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9]))\b`)
 	ValidMAC    = regexp.MustCompile(`([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})`)
-	MsgPatterns = struct {
-		Common *regexp.Regexp
-		IR     *regexp.Regexp
-		BT     *regexp.Regexp
-		DG     *regexp.Regexp
-	}{
-		Common: regexp.MustCompile(fmt.Sprintf(`^%s,%s`, ValidIP, ValidMAC)),
-		IR:     regexp.MustCompile(fmt.Sprintf(`^addr:%s`, ValidIP)),
-		BT:     regexp.MustCompile(fmt.Sprintf(`^IP:%sMAC:%s`, ValidIP, ValidMAC)),
-		DG:     regexp.MustCompile(`^DG_IPREPORT_ONLY`),
+	MsgPatterns = map[string]*regexp.Regexp{
+		"Common": regexp.MustCompile(fmt.Sprintf(`^%s,%s`, ValidIP, ValidMAC)),
+		"IR":     regexp.MustCompile(fmt.Sprintf(`^addr:%s`, ValidIP)),
+		"BT":     regexp.MustCompile(fmt.Sprintf(`^IP:%sMAC:%s`, ValidIP, ValidMAC)),
+		"DG":     regexp.MustCompile(`^DG_IPREPORT_ONLY`),
 	}
 )
 
-type GoldshellIPReport struct {
+// IPReportGoldshell represents the JSON payload of IP report packet for Goldshell miners.
+type IPReportGoldshell struct {
 	Version     string          `json:"version"`
 	IPAddress   string          `json:"ip"`
 	DHCP        string          `json:"dhcp"`
@@ -39,26 +36,26 @@ type GoldshellIPReport struct {
 	LEDStatus   bool            `json:"ledstatus"`
 }
 
-type SMBoardInfo struct {
+type SealMinerBoard struct {
 	Serial     string `json:"SN"`
 	BinVersion int    `json:"BinVer"`
 	BinNumber  int    `json:"BinNum"`
 }
 
-type SMMinerInfo struct {
-	MACAddress     string        `json:"MAC"`
-	Type           string        `json:"Type"`
-	Firmware       string        `json:"Firmware"`
-	CtrlBoard      string        `json:"CtrlBoardVersion"`
-	InterfaceCount int           `json:"NetInterfaceCnt"`
-	Upgrade        int           `json:"UpgradeStatus"`
-	CtrlBoardSN    string        `json:"MainBoardSN"`
-	RatedPower     int           `json:"RatedInputPower"`
-	PowerLimit     int           `json:"InputPowerLimit"`
-	Boards         []SMBoardInfo `json:"BoardSNArray"`
+type SealMinerInfo struct {
+	MACAddress     string           `json:"MAC"`
+	Type           string           `json:"Type"`
+	Firmware       string           `json:"Firmware"`
+	CtrlBoard      string           `json:"CtrlBoardVersion"`
+	InterfaceCount int              `json:"NetInterfaceCnt"`
+	Upgrade        int              `json:"UpgradeStatus"`
+	CtrlBoardSN    string           `json:"MainBoardSN"`
+	RatedPower     int              `json:"RatedInputPower"`
+	PowerLimit     int              `json:"InputPowerLimit"`
+	Boards         []SealMinerBoard `json:"BoardSNArray"`
 }
 
-type SMInterface struct {
+type SealMinerInterface struct {
 	Interface  string `json:"Interface"`
 	Active     bool   `json:"Active"`
 	DHCP       bool   `json:"DHCP"`
@@ -70,13 +67,14 @@ type SMInterface struct {
 	AutoReboot bool   `json:"AutoReboot"`
 }
 
-type SealminerIPReport struct {
-	Info       SMMinerInfo
-	Interfaces []SMInterface
+// IPReportSealminer represents the JSON payload of IP Report packet for SealMiners
+type IPReportSealminer struct {
+	Info       SealMinerInfo
+	Interfaces []SealMinerInterface
 }
 
-func (s *SealminerIPReport) getMinerInfo(data []interface{}) (*SMMinerInfo, error) {
-	var sminfo *SMMinerInfo
+func (i *IPReportSealminer) getMinerInfo(data []interface{}) (*SealMinerInfo, error) {
+	var sminfo *SealMinerInfo
 	info_data, err := json.Marshal(data[1])
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal miner info: %W", err)
@@ -87,8 +85,8 @@ func (s *SealminerIPReport) getMinerInfo(data []interface{}) (*SMMinerInfo, erro
 	return sminfo, nil
 }
 
-func (s *SealminerIPReport) getInterfaces(data []interface{}) (*[]SMInterface, error) {
-	var sminterfaces *[]SMInterface
+func (i *IPReportSealminer) getInterfaces(data []interface{}) (*[]SealMinerInterface, error) {
+	var sminterfaces *[]SealMinerInterface
 	interface_data, err := json.Marshal(data[2:4])
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal interfaces: %W", err)
@@ -117,17 +115,17 @@ func (i *IPReportSealminer) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("expected 7 elements in array, got %d", len(temp))
 	}
 
-	sminfo, err := s.getMinerInfo(temp)
+	sminfo, err := i.getMinerInfo(temp)
 	if err != nil {
 		return err
 	}
-	s.Info = *sminfo
+	i.Info = *sminfo
 
-	sminterfaces, err := s.getInterfaces(temp)
+	sminterfaces, err := i.getInterfaces(temp)
 	if err != nil {
 		return err
 	}
-	s.Interfaces = *sminterfaces
+	i.Interfaces = *sminterfaces
 
 	return nil
 }
