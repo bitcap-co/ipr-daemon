@@ -4,46 +4,22 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strings"
 
 	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/pcap"
 )
 
-type flagSlice []string
-
-func (f *flagSlice) String() string {
-	return fmt.Sprintf("%v", *f)
-}
-
-func (f *flagSlice) Set(value string) error {
-	*f = append(*f, value)
-	return nil
-}
-
-// var defaultPortConfig = []string{
-// 	"14235", // bitmain-common
-// 	"11503", // iceriver
-// 	"8888",  // whatsminer
-// 	"18650", // sealminer
-// 	"1314",  // goldshell
-// 	"9999",  // elphapex
-// }
-
-// logger
-var iprlog = iprd.NewLogger()
-
-// broadcast msg channel
-var broadcastCh = make(chan []byte)
+var (
+	iprlog      = iprd.NewLogger()
+	broadcastCh = make(chan []byte)
+)
 
 func main() {
 	// flags
 	var flAutoFind bool
 	flag.BoolVar(&flAutoFind, "a", false, "switch to toggle to try and auto find interface.")
 	var flInterface = flag.String("i", "", "name of network interface to listen on.")
-	var flPortConfig flagSlice
-	flag.Var(&flPortConfig, "f", "list of UDP ports for BPF filter.")
 	var flTCPForwardPort = flag.Int("p", 7788, "tcp port to forward packet data. Default: :7788")
 	flag.Parse()
 
@@ -121,18 +97,6 @@ func autoFindLANInterface() *iprd.IPRInterface {
 	}
 	return iface
 }
-
-// func getBPFFilterFromConfig(ports []string) string {
-// 	var filter strings.Builder
-// 	for _, port := range ports {
-// 		sep := "or"
-// 		if ports[len(ports)-1] == port {
-// 			sep = ""
-// 		}
-// 		filter.WriteString(fmt.Sprintf("udp port %s %s ", port, sep))
-// 	}
-// 	return filter.String()
-// }
 
 func listen(iface, filter string) error {
 	handle, err := pcap.OpenLive(iface, int32(1600), true, pcap.BlockForever)
