@@ -88,7 +88,9 @@ func IsValidIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, bool) {
 		}
 	}
 	if !bytes.Contains(udp.Payload, []byte(ip.SrcIP.String())) {
-		return nil, false
+		if !MsgPatterns.DG.Match(udp.Payload) {
+			return nil, false
+		}
 	}
 
 	return &IPRReportPacket{
