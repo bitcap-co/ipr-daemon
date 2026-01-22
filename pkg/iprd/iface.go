@@ -36,6 +36,7 @@ func (i *IPRInterface) IsUp() bool {
 	return false
 }
 
+// LocalNet returns the first two octets of the network portion in Addr.
 func (i *IPRInterface) LocalNet() string {
 	return strings.Join(strings.Split(i.Addr.String(), ".")[0:2], ".")
 }
