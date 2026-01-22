@@ -1,0 +1,125 @@
+package iprd
+
+import (
+	"fmt"
+	"regexp"
+
+	"github.com/goccy/go-json"
+)
+
+var (
+	ValidIP     = regexp.MustCompile(`\b(?:(?:2(?:[0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9])\.){3}(?:(?:2([0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9]))\b`)
+	ValidMAC    = regexp.MustCompile(`([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})`)
+	MsgPatterns = struct {
+		Common *regexp.Regexp
+		IR     *regexp.Regexp
+		BT     *regexp.Regexp
+		DG     *regexp.Regexp
+	}{
+		Common: regexp.MustCompile(fmt.Sprintf(`^%s,%s`, ValidIP, ValidMAC)),
+		IR:     regexp.MustCompile(fmt.Sprintf(`^addr:%s`, ValidIP)),
+		BT:     regexp.MustCompile(fmt.Sprintf(`^IP:%sMAC:%s`, ValidIP, ValidMAC)),
+		DG:     regexp.MustCompile(`^DG_IPREPORT_ONLY`),
+	}
+)
+
+type GoldshellIPReport struct {
+	Version     string          `json:"version"`
+	IPAddress   string          `json:"ip"`
+	DHCP        string          `json:"dhcp"`
+	Model       string          `json:"model"`
+	CtrlBoardSN string          `json:"ctrlsn"`
+	MACAddress  string          `json:"mac"`
+	Netmask     string          `json:"mask"`
+	Gateway     string          `json:"gateway"`
+	BoardSNs    json.RawMessage `json:"cpbsn"`
+	DNS         json.RawMessage `json:"dns"`
+	Serial      string          `json:"boxsn"`
+	Time        string          `json:"time"`
+	LEDStatus   bool            `json:"ledstatus"`
+}
+
+type SMBoardInfo struct {
+	Serial     string `json:"SN"`
+	BinVersion int    `json:"BinVer"`
+	BinNumber  int    `json:"BinNum"`
+}
+
+type SMMinerInfo struct {
+	MACAddress     string        `json:"MAC"`
+	Type           string        `json:"Type"`
+	Firmware       string        `json:"Firmware"`
+	CtrlBoard      string        `json:"CtrlBoardVersion"`
+	InterfaceCount int           `json:"NetInterfaceCnt"`
+	Upgrade        int           `json:"UpgradeStatus"`
+	CtrlBoardSN    string        `json:"MainBoardSN"`
+	RatedPower     int           `json:"RatedInputPower"`
+	PowerLimit     int           `json:"InputPowerLimit"`
+	Boards         []SMBoardInfo `json:"BoardSNArray"`
+}
+
+type SMInterface struct {
+	Interface  string `json:"Interface"`
+	Active     bool   `json:"Active"`
+	DHCP       bool   `json:"DHCP"`
+	IPAddress  string `json:"IPV4"`
+	Netmask    string `json:"Netmask"`
+	Gateway    string `json:"Gateway"`
+	DNS1       string `json:"DNS1"`
+	DNS2       string `json:"DNS2"`
+	AutoReboot bool   `json:"AutoReboot"`
+}
+
+type SealminerIPReport struct {
+	Info       SMMinerInfo
+	Interfaces []SMInterface
+}
+
+func (s *SealminerIPReport) getMinerInfo(data []interface{}) (*SMMinerInfo, error) {
+	var sminfo *SMMinerInfo
+	info_data, err := json.Marshal(data[1])
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal miner info: %W", err)
+	}
+	if err := json.Unmarshal(info_data, &sminfo); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal miner info: %W", err)
+	}
+	return sminfo, nil
+}
+
+func (s *SealminerIPReport) getInterfaces(data []interface{}) (*[]SMInterface, error) {
+	var sminterfaces *[]SMInterface
+	interface_data, err := json.Marshal(data[2:4])
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal interfaces: %W", err)
+	}
+	if err := json.Unmarshal(interface_data, &sminterfaces); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal interfaces: %W", err)
+	}
+	return sminterfaces, nil
+}
+
+func (s *SealminerIPReport) UnmarshalJSON(data []byte) error {
+	var temp []interface{}
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return fmt.Errorf("failed to unmarshal payload: %W", err)
+	}
+
+	if len(temp) != 7 {
+		return fmt.Errorf("expected 7 elements in array, got %d", len(temp))
+	}
+
+	sminfo, err := s.getMinerInfo(temp)
+	if err != nil {
+		return err
+	}
+	s.Info = *sminfo
+
+	sminterfaces, err := s.getInterfaces(temp)
+	if err != nil {
+		return err
+	}
+	s.Interfaces = *sminterfaces
+
+	return nil
+}

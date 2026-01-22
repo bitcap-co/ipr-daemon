@@ -36,6 +36,10 @@ func (i *IPRInterface) IsUp() bool {
 	return false
 }
 
+func (i *IPRInterface) LocalNet() string {
+	return strings.Join(strings.Split(i.Addr.String(), ".")[0:2], ".")
+}
+
 func getAllInterfaces() ([]IPRInterface, error) {
 	interfaces := make([]IPRInterface, 0)
 	ifaces, err := pcap.FindAllDevs()

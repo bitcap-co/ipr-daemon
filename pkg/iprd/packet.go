@@ -3,10 +3,10 @@ package iprd
 import (
 	"bytes"
 	"compress/zlib"
-	"encoding/json"
 	"sync"
 	"unicode/utf8"
 
+	"github.com/goccy/go-json"
 	"github.com/google/gopacket"
 	"github.com/google/gopacket/layers"
 	"github.com/google/uuid"
@@ -84,6 +84,11 @@ func IsValidIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, bool) {
 				return nil, false
 			}
 		} else {
+			return nil, false
+		}
+	}
+	if !bytes.Contains(udp.Payload, []byte(ip.SrcIP.String())) {
+		if !MsgPatterns.DG.Match(udp.Payload) {
 			return nil, false
 		}
 	}

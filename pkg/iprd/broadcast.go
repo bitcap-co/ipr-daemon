@@ -3,12 +3,13 @@ package iprd
 
 import (
 	"bufio"
-	"encoding/json"
 	"fmt"
 	"math"
 	"net"
 	"sync"
 	"time"
+
+	"github.com/goccy/go-json"
 )
 
 type tcpBroadcaster struct {
