@@ -3,6 +3,7 @@ package iprd
 import (
 	"bytes"
 	"compress/zlib"
+	"io"
 	"sync"
 	"unicode/utf8"
 
@@ -43,6 +44,7 @@ var (
 		18650: "sealminer",
 		9999:  "elphapex",
 	}
+	smHeaderOffset int64 = 8
 )
 
 // IsValidIPReportPacket checks if packet is a valid IP Report packet. Returns a IPRReportPacket if valid.
@@ -74,21 +76,34 @@ func IsValidIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, bool) {
 		return nil, false
 	}
 
+	data := bytes.Clone(udp.Payload)
+	b := bytes.NewReader(data)
+
 	// check for valid datagram
-	if !utf8.Valid(udp.Payload) {
-		b := bytes.NewReader(udp.Payload)
-		// sealminer data is compressed with standard zlib compression
-		if bytes.Contains(udp.Payload, zlibDefaultMagic) {
-			_, err := zlib.NewReader(b)
+	if !utf8.Valid(data) {
+		// check for magic header
+		headerBuffer := make([]byte, 2)
+		_, err := b.ReadAt(headerBuffer, smHeaderOffset)
+		if err != nil {
+			return nil, false
+		}
+		if bytes.Equal(headerBuffer, zlibDefaultMagic) {
+			if _, err := b.Seek(smHeaderOffset, io.SeekStart); err != nil {
+				return nil, false
+			}
+			r, err := zlib.NewReader(b)
 			if err != nil {
 				return nil, false
 			}
-		} else {
-			return nil, false
+			defer r.Close()
+			data, err = io.ReadAll(r)
+			if err != nil {
+				return nil, false
+			}
 		}
 	}
-	if !bytes.Contains(udp.Payload, []byte(ip.SrcIP.String())) {
-		if !MsgPatterns["DG"].Match(udp.Payload) {
+	if !bytes.Contains(data, []byte(ip.SrcIP.String())) {
+		if !MsgPatterns["DG"].Match(data) {
 			return nil, false
 		}
 	}
@@ -100,7 +115,7 @@ func IsValidIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, bool) {
 		DstMAC:   eth.DstMAC.String(),
 		SrcPort:  int(udp.SrcPort),
 		DstPort:  int(udp.DstPort),
-		Datagram: udp.Payload,
+		Datagram: data,
 	}, true
 }
 
