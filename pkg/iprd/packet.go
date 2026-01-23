@@ -13,6 +13,22 @@ import (
 	"github.com/google/uuid"
 )
 
+const smHeaderOffset int64 = 8
+
+var (
+	mutex sync.Mutex
+
+	zlibDefaultMagic = []byte{0x78, 0x9c}
+	knownMinerTypes  = map[int]string{
+		14235: "bitmain-common",
+		11503: "iceriver",
+		8888:  "whatsminer",
+		1314:  "goldshell",
+		18650: "sealminer",
+		9999:  "elphapex",
+	}
+)
+
 // IPRReportPacket defines the structure of a IP Report packet.
 type IPRReportPacket struct {
 	SrcIP    string
@@ -31,21 +47,6 @@ type IPRBroadcastMessage struct {
 	MACAddr   string `json:"mac_addr"`
 	MinerType string `json:"miner_type"`
 }
-
-var (
-	mutex sync.Mutex
-
-	zlibDefaultMagic = []byte{0x78, 0x9c}
-	knownMinerTypes  = map[int]string{
-		14235: "bitmain-common",
-		11503: "iceriver",
-		8888:  "whatsminer",
-		1314:  "goldshell",
-		18650: "sealminer",
-		9999:  "elphapex",
-	}
-	smHeaderOffset int64 = 8
-)
 
 // IsValidIPReportPacket checks if packet is a valid IP Report packet. Returns a IPRReportPacket if valid.
 // Ignores packet if datagram is empty.
