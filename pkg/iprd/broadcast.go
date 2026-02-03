@@ -1,4 +1,3 @@
-// https://github.com/magicpool-co/pool/blob/dev/cmd/proxy/server.go
 package iprd
 
 import (
@@ -13,7 +12,7 @@ import (
 )
 
 type tcpBroadcaster struct {
-	logger   *IPRLogger
+	logger   *iprdLogger
 	listener net.Listener
 	counter  uint64
 	mu       sync.RWMutex
@@ -22,8 +21,8 @@ type tcpBroadcaster struct {
 	Errs     chan error
 }
 
-// IPRTcpCommand describes the tcp message command format {"command": "COMMAND"}
-type IPRTcpCommand struct {
+// TCPCommand describes a tcp command.
+type TCPCommand struct {
 	Command string `json:"command"`
 }
 
@@ -35,7 +34,7 @@ func NewBroadcaster(port int) (*tcpBroadcaster, error) {
 	}
 
 	b := &tcpBroadcaster{
-		logger:   NewLogger(),
+		logger:   NewIPRDLogger(),
 		listener: listener,
 		clients:  make(map[uint64]net.Conn),
 		Msgs:     make(chan []byte),
@@ -113,7 +112,7 @@ func (b *tcpBroadcaster) Listen() {
 					continue
 				}
 				msg := scanner.Bytes()
-				var cmd IPRTcpCommand
+				var cmd TCPCommand
 				if err := json.Unmarshal(msg, &cmd); err == nil {
 					if cmd.Command == "iprd_subscribe" {
 						conn.SetReadDeadline(time.Time{})

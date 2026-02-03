@@ -11,14 +11,32 @@ const (
 	errorColor = "\033[1;31m%s\033[0m"
 )
 
-type IPRLogger struct {
+type iprdLogger struct {
 	*log.Logger
 }
 
-func NewLogger() *IPRLogger {
-	return &IPRLogger{
+func NewIPRDLogger() *iprdLogger {
+	return &iprdLogger{
 		log.New(os.Stdout, "iprd: ", log.LstdFlags),
 	}
+}
+
+func (l *iprdLogger) Debug(msg string) {
+	l.Printf(debugColor, msg)
+}
+
+func (l *iprdLogger) Info(raw string) {
+	if msg, ok := sanitizeMessage(raw); ok {
+		l.Printf(infoColor, msg)
+	}
+}
+
+func (l *iprdLogger) Error(err error) {
+	l.Printf(errorColor, err)
+}
+
+func (l *iprdLogger) Panic(err error) {
+	l.Panicf(errorColor, err)
 }
 
 func sanitizeMessage(msg string) (string, bool) {
@@ -31,26 +49,4 @@ func sanitizeMessage(msg string) (string, bool) {
 
 		return msg, true
 	}
-}
-
-func (l *IPRLogger) SetPrefix(prefix string) {
-	l.SetPrefix(prefix)
-}
-
-func (l *IPRLogger) Info(raw string) {
-	if msg, ok := sanitizeMessage(raw); ok {
-		l.Printf(infoColor, msg)
-	}
-}
-
-func (l *IPRLogger) Debug(msg string) {
-	l.Printf(debugColor, msg)
-}
-
-func (l *IPRLogger) Error(err error) {
-	l.Printf(errorColor, err)
-}
-
-func (l *IPRLogger) Panic(err error) {
-	l.Panicf(errorColor, err)
 }

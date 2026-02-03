@@ -29,7 +29,7 @@ var (
 	}
 )
 
-// IPRReportPacket defines the structure of a IP Report packet.
+// IPRReportPacket describes the structure of a IP Report packet.
 type IPRReportPacket struct {
 	SrcIP    string
 	DstIP    string
@@ -40,12 +40,40 @@ type IPRReportPacket struct {
 	Datagram []byte
 }
 
-// IPRBroadcastMessage defines the structure of a TCP broadcast message.
+// IPRBroadcastMessage describes the structure of a TCP broadcast message.
 type IPRBroadcastMessage struct {
-	ID        string `json:"id"`
-	IPAddr    string `json:"ip_addr"`
-	MACAddr   string `json:"mac_addr"`
+	PacketID  string `json:"id"`
+	SrcIP     string `json:"src_ip"`
+	SrcMAC    string `json:"src_mac"`
 	MinerType string `json:"miner_type"`
+}
+
+// GetMinerType returns known miner type.
+func (r *IPRReportPacket) GetMinerType() string {
+	minerType, ok := knownMinerTypes[r.DstPort]
+	if !ok {
+		return "Unknown"
+	}
+	return minerType
+}
+
+// ToBroadcastMessage returns  the IP Report packet data marshalled into IPRBroadcastMessage struct.
+func (r *IPRReportPacket) ToBroadcastMessage() ([]byte, error) {
+	packetID, err := uuid.NewV7()
+	if err != nil {
+		return nil, err
+	}
+	jsonObj := IPRBroadcastMessage{
+		PacketID:  packetID.String(),
+		SrcIP:     r.SrcIP,
+		SrcMAC:    r.SrcMAC,
+		MinerType: r.GetMinerType(),
+	}
+	data, err := json.Marshal(jsonObj)
+	if err != nil {
+		return nil, err
+	}
+	return data, nil
 }
 
 // IsValidIPReportPacket checks if packet is a valid IP Report packet. Returns a IPRReportPacket if valid.
@@ -118,32 +146,4 @@ func IsValidIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, bool) {
 		DstPort:  int(udp.DstPort),
 		Datagram: data,
 	}, true
-}
-
-// GetMinerType returns known miner type.
-func (r *IPRReportPacket) GetMinerType() string {
-	minerType, ok := knownMinerTypes[r.DstPort]
-	if !ok {
-		return "Unknown"
-	}
-	return minerType
-}
-
-// ToJson marshals the IP Report packet data into IPRBroadcastMessage struct.
-func (r *IPRReportPacket) ToJson() ([]byte, error) {
-	packetID, err := uuid.NewV7()
-	if err != nil {
-		return nil, err
-	}
-	jsonObj := IPRBroadcastMessage{
-		ID:        packetID.String(),
-		IPAddr:    r.SrcIP,
-		MACAddr:   r.SrcMAC,
-		MinerType: r.GetMinerType(),
-	}
-	data, err := json.Marshal(jsonObj)
-	if err != nil {
-		return nil, err
-	}
-	return data, nil
 }

@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	iprlog      = iprd.NewLogger()
+	iprlog      = iprd.NewIPRDLogger()
 	broadcastCh = make(chan []byte)
 )
 
@@ -42,12 +42,12 @@ func main() {
 		iface = autoFindLANInterface()
 	}
 	if !iface.IsUp() {
-		iprlog.Error(fmt.Errorf("interface %s is not marked at up", iface.Name))
+		iprlog.Error(fmt.Errorf("interface %s is not marked as up", iface.Name))
 		os.Exit(1)
 	}
 	iprlog.Info(fmt.Sprintf("set interface: %s", iface.Name))
 
-	bpf := fmt.Sprintf("src host %s and (dst net 255 or dst net %s) and udp dst portrange 1024-49151", iface.LocalNet(), iface.LocalNet())
+	bpf := fmt.Sprintf("src host %s and (dst net 255 or dst net %s) and udp dst portrange 1024-49151", iface.NetworkPrefix(), iface.NetworkPrefix())
 	iprlog.Info(fmt.Sprintf("set BPF filter: %s", bpf))
 
 	broadcaster, err := iprd.NewBroadcaster(*flTCPForwardPort)
@@ -115,7 +115,7 @@ func listen(iface, filter string) error {
 			ipr.SrcIP, ipr.DstIP,
 			ipr.SrcMAC, ipr.DstMAC,
 			ipr.SrcPort, ipr.DstPort))
-		msg, err := ipr.ToJson()
+		msg, err := ipr.ToBroadcastMessage()
 		if err != nil {
 			iprlog.Error(fmt.Errorf("failed to marshal packet to JSON: %v", err))
 			continue

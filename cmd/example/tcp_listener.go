@@ -24,7 +24,7 @@ func main() {
 	defer conn.Close()
 
 	log.Println("Sending subscribe command...")
-	var subCmd = iprd.IPRTcpCommand{
+	var subCmd = iprd.TCPCommand{
 		Command: "iprd_subscribe",
 	}
 	subscribeMsg, err := json.Marshal(subCmd)
@@ -50,6 +50,6 @@ func main() {
 		if err != nil {
 			log.Println("error unmarshalling json:", err)
 		}
-		log.Printf("Receieved: [%s] -- TYPE:%s,IP:%s,MAC:%s", obj.ID, obj.MinerType, obj.IPAddr, obj.MACAddr)
+		log.Printf("Receieved: [%s] -- TYPE:%s,IP:%s,MAC:%s", obj.PacketID, obj.MinerType, obj.SrcIP, obj.SrcMAC)
 	}
 }
