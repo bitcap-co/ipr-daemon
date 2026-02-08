@@ -166,5 +166,6 @@ func IsValidIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, bool) {
 		SrcPort:  int(udp.SrcPort),
 		DstPort:  int(udp.DstPort),
 		Datagram: data,
+		Metadata: packet.Metadata(),
 	}, true
 }
