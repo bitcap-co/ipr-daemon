@@ -51,29 +51,27 @@ func (i *IPRInterface) IsLAN() bool {
 	return match
 }
 
-// IsUp checks if IPRInterface is marked as up.
-func (i *IPRInterface) IsUp() bool {
-	if strings.Contains(i.Flags.String(), "up") {
-		return true
+func getIPv4AddrFromInterface(i pcap.Interface) net.IP {
+	for _, addr := range i.Addresses {
+		if addr.IP != nil && addr.IP.To4() != nil && addr.IP.IsPrivate() {
+			return addr.IP
+		}
 	}
-	return false
+	return nil
 }
 
-func getAllInterfaces() ([]IPRInterface, error) {
+func getInterfaces() ([]IPRInterface, error) {
 	interfaces := make([]IPRInterface, 0)
-	ifaces, err := pcap.FindAllDevs()
+	availInterfaces, err := pcap.FindAllDevs()
 	if err != nil {
 		return nil, err
 	}
 
-	var addr net.IP
-	for _, iface := range ifaces {
-		for _, address := range iface.Addresses {
-			// Get first IPv4 address
-			if address.IP != nil && address.IP.To4() != nil && !address.IP.IsLoopback() {
-				addr = address.IP
-				break
-			}
+	var ipv4 net.IP
+	for _, iface := range availInterfaces {
+		ipv4 = getIPv4AddrFromInterface(iface)
+		if ipv4 == nil {
+			continue
 		}
 		netInterface, err := net.InterfaceByName(iface.Name)
 		if err != nil {
@@ -84,7 +82,7 @@ func getAllInterfaces() ([]IPRInterface, error) {
 			Index:        netInterface.Index,
 			Name:         iface.Name,
 			Description:  iface.Description,
-			Addr:         addr,
+			IPv4:         ipv4,
 			HardwareAddr: netInterface.HardwareAddr,
 			Flags:        netInterface.Flags,
 		})
