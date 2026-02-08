@@ -73,8 +73,15 @@ func getInterfaces() ([]IPRInterface, error) {
 		if ipv4 == nil {
 			continue
 		}
+
+		// get info from std net
 		netInterface, err := net.InterfaceByName(iface.Name)
 		if err != nil {
+			continue
+		}
+
+		// ensure flags RUNNING/LOWER_UP, BROADCAST
+		if netInterface.Flags&net.FlagRunning == 0 || netInterface.Flags&net.FlagBroadcast == 0 {
 			continue
 		}
 
