@@ -5,6 +5,7 @@ import (
 	"compress/zlib"
 	"io"
 	"sync"
+	"time"
 	"unicode/utf8"
 
 	"github.com/goccy/go-json"
@@ -29,6 +30,14 @@ var (
 	}
 )
 
+// IPRBroadcastMessage describes a TCP JSON message for broadcasting.
+type IPRBroadcastMessage struct {
+	PacketID  string        `json:"id"`
+	SrcIP     string        `json:"src_ip"`
+	SrcMAC    string        `json:"src_mac"`
+	MinerType MinerTypeHint `json:"miner_type"`
+}
+
 // IPRReportPacket describes the structure of a IP Report packet.
 type IPRReportPacket struct {
 	SrcIP    string
@@ -38,23 +47,41 @@ type IPRReportPacket struct {
 	SrcPort  int
 	DstPort  int
 	Datagram []byte
+	Metadata *gopacket.PacketMetadata
 }
 
-// IPRBroadcastMessage describes the structure of a TCP broadcast message.
-type IPRBroadcastMessage struct {
-	PacketID  string `json:"id"`
-	SrcIP     string `json:"src_ip"`
-	SrcMAC    string `json:"src_mac"`
-	MinerType string `json:"miner_type"`
+// Timestamp exposes timestamp of IPRReportPacket Metadata.
+func (r *IPRReportPacket) Timestamp() time.Time {
+	return r.Metadata.Timestamp
 }
 
-// GetMinerType returns known miner type.
-func (r *IPRReportPacket) GetMinerType() string {
-	minerType, ok := knownMinerTypes[r.DstPort]
+// CaptureLength exposes the capture length of IPRReportPacket Metadata.
+func (r *IPRReportPacket) CaptureLength() int {
+	return r.Metadata.CaptureLength
+}
+
+// Length exposes the length of IPRReportPacket Metadata.
+func (r *IPRReportPacket) Length() int {
+	return r.Metadata.Length
+}
+
+// InterfaceIndex exposes the interface index of IPRReportPacket Metadata.
+func (r *IPRReportPacket) InterfaceIndex() int {
+	return r.Metadata.InterfaceIndex
+}
+
+// Payload returns Datagram as string.
+func (r *IPRReportPacket) Payload() string {
+	return string(r.Datagram)
+}
+
+// MinerType returns MinerTypeHint based off of DstPort.
+func (r *IPRReportPacket) MinerType() MinerTypeHint {
+	hint, ok := minerPorts[r.DstPort]
 	if !ok {
-		return "Unknown"
+		return UnknownType
 	}
-	return minerType
+	return hint
 }
 
 // ToBroadcastMessage returns  the IP Report packet data marshalled into IPRBroadcastMessage struct.
@@ -63,17 +90,17 @@ func (r *IPRReportPacket) ToBroadcastMessage() ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	jsonObj := IPRBroadcastMessage{
+	broadcastData := IPRBroadcastMessage{
 		PacketID:  packetID.String(),
 		SrcIP:     r.SrcIP,
 		SrcMAC:    r.SrcMAC,
-		MinerType: r.GetMinerType(),
+		MinerType: r.MinerType(),
 	}
-	data, err := json.Marshal(jsonObj)
+	msg, err := json.Marshal(broadcastData)
 	if err != nil {
 		return nil, err
 	}
-	return data, nil
+	return msg, nil
 }
 
 // IsValidIPReportPacket checks if packet is a valid IP Report packet. Returns a IPRReportPacket if valid.
