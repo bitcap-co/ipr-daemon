@@ -97,9 +97,12 @@ func getInterfaces() ([]IPRInterface, error) {
 	return interfaces, nil
 }
 
-// GetInterfaceByName returns IPRInterface matching name.
+// GetInterfaceByName returns the IPRInterface matching name.
 func GetInterfaceByName(name string) (*IPRInterface, error) {
-	ifaces, err := getAllInterfaces()
+	if name == "" {
+		return nil, errInvalidInterfaceName
+	}
+	ifaces, err := getInterfaces()
 	if err != nil {
 		return nil, err
 	}
@@ -113,14 +116,14 @@ func GetInterfaceByName(name string) (*IPRInterface, error) {
 
 // FindLANInterface returns the first IPRInterface marked as LAN, if any.
 func FindLANInterface() (*IPRInterface, error) {
-	ifaces, err := getAllInterfaces()
+	ifaces, err := getInterfaces()
 	if err != nil {
 		return nil, err
 	}
 	for _, iface := range ifaces {
-		if iface.IsLan() {
+		if iface.IsLAN() {
 			return &iface, nil
 		}
 	}
-	return nil, fmt.Errorf("interface not found: could not find LAN interface")
+	return nil, errInterfaceNotFound
 }
