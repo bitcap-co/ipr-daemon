@@ -14,13 +14,10 @@ import (
 	"github.com/google/uuid"
 )
 
-const smHeaderOffset int64 = 8
-
 var (
 	mutex sync.Mutex
 
-	zlibDefaultMagic = []byte{0x78, 0x9c}
-	minerPorts       = map[int]MinerTypeHint{
+	minerPorts = map[int]MinerTypeHint{
 		14235: BitmainCommon,
 		11503: Iceriver,
 		8888:  Whatsminer,
@@ -84,7 +81,7 @@ func (r *IPRReportPacket) MinerType() MinerTypeHint {
 	return hint
 }
 
-// ToBroadcastMessage returns  the IP Report packet data marshalled into IPRBroadcastMessage struct.
+// ToBroadcastMessage returns the IPRReportPacket data marshalled into IPRBroadcastMessage.
 func (r *IPRReportPacket) ToBroadcastMessage() ([]byte, error) {
 	packetID, err := uuid.NewV7()
 	if err != nil {
@@ -103,8 +100,7 @@ func (r *IPRReportPacket) ToBroadcastMessage() ([]byte, error) {
 	return msg, nil
 }
 
-// IsValidIPReportPacket checks if packet is a valid IP Report packet. Returns a IPRReportPacket if valid.
-// Ignores packet if datagram is empty.
+// IsValidIPReportPacket returns IPRReportPacket if packet is a valid IP Report packet.
 func IsValidIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, bool) {
 	mutex.Lock()
 	defer mutex.Unlock()
@@ -137,25 +133,23 @@ func IsValidIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, bool) {
 
 	// check for valid datagram
 	if !utf8.Valid(data) {
-		// check for magic header
-		headerBuffer := make([]byte, 2)
-		_, err := b.ReadAt(headerBuffer, smHeaderOffset)
+		r, err := zlib.NewReader(b)
 		if err != nil {
+			if err == zlib.ErrHeader {
+				// try finding at static offsets
+				// sealminer
+				if matchHeaderAtOffset(b, smHeaderOffset) {
+					r, _ = zlibReaderAtOffset(b, smHeaderOffset)
+				}
+			}
+		}
+		if r == nil {
 			return nil, false
 		}
-		if bytes.Equal(headerBuffer, zlibDefaultMagic) {
-			if _, err := b.Seek(smHeaderOffset, io.SeekStart); err != nil {
-				return nil, false
-			}
-			r, err := zlib.NewReader(b)
-			if err != nil {
-				return nil, false
-			}
-			defer r.Close()
-			data, err = io.ReadAll(r)
-			if err != nil {
-				return nil, false
-			}
+		defer r.Close()
+		data, err = io.ReadAll(r)
+		if err != nil {
+			return nil, false
 		}
 	}
 	if !bytes.Contains(data, []byte(ip.SrcIP.String())) {
