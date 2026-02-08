@@ -14,23 +14,41 @@ type IPRInterface struct {
 	Index        int
 	Name         string
 	Description  string
-	Addr         net.IP
+	IPv4         net.IP
 	HardwareAddr net.HardwareAddr
 	Flags        net.Flags
 }
 
-// NetworkPrefix returns the first two octlets of Addr.
-func (i *IPRInterface) NetworkPrefix() string {
-	return strings.Join(strings.Split(i.Addr.String(), ".")[0:2], ".")
+// IPAddr returns IPv4 as string.
+func (i *IPRInterface) IPAddr() string {
+	return i.IPv4.String()
 }
 
-// IsLan checks if IPRInterface is marked as LAN interface.
-func (i *IPRInterface) IsLan() bool {
+// MACAddr returns HardwareAddr as string.
+func (i *IPRInterface) MACAddr() string {
+	return i.HardwareAddr.String()
+}
+
+// NetworkPrefix returns the network prefix(leading two octets) of IPv4
+func (i *IPRInterface) NetworkPrefix() string {
+	return strings.Join(strings.Split(i.IPv4.String(), ".")[0:2], ".")
+}
+
+// IsUp returns bool for if IPRInterface is marked as UP.
+func (i *IPRInterface) IsUp() bool {
+	if i.Flags&net.FlagUp != 0 {
+		return true
+	}
+	return false
+}
+
+// IsLAN returns bool for if IPRInterface is marked as LAN interface.
+func (i *IPRInterface) IsLAN() bool {
 	if i.Description == "" {
 		return false
 	}
-	matched, _ := regexp.MatchString(`lan|LAN`, i.Description)
-	return matched
+	match, _ := regexp.MatchString(`^lan|^LAN`, i.Description)
+	return match
 }
 
 // IsUp checks if IPRInterface is marked as up.
