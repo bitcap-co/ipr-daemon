@@ -19,13 +19,13 @@ var (
 	mutex sync.Mutex
 
 	zlibDefaultMagic = []byte{0x78, 0x9c}
-	knownMinerTypes  = map[int]string{
-		14235: "bitmain-common",
-		11503: "iceriver",
-		8888:  "whatsminer",
-		1314:  "goldshell",
-		18650: "sealminer",
-		9999:  "elphapex",
+	minerPorts       = map[int]MinerTypeHint{
+		14235: BitmainCommon,
+		11503: Iceriver,
+		8888:  Whatsminer,
+		1314:  Goldshell,
+		18650: Sealminer,
+		9999:  Elphapex,
 	}
 )
 

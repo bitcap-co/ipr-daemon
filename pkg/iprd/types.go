@@ -8,6 +8,18 @@ import (
 	"github.com/goccy/go-json"
 )
 
+type MinerTypeHint string
+
+const (
+	UnknownType   MinerTypeHint = "unknown"
+	BitmainCommon MinerTypeHint = "bitmain-common"
+	Iceriver      MinerTypeHint = "iceriver"
+	Whatsminer    MinerTypeHint = "whatsminer"
+	Goldshell     MinerTypeHint = "goldshell"
+	Sealminer     MinerTypeHint = "sealminer"
+	Elphapex      MinerTypeHint = "elphapex"
+)
+
 var (
 	ValidIP     = regexp.MustCompile(`\b(?:(?:2(?:[0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9])\.){3}(?:(?:2([0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9]))\b`)
 	ValidMAC    = regexp.MustCompile(`([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})`)
