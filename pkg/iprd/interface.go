@@ -1,7 +1,7 @@
 package iprd
 
 import (
-	"fmt"
+	"errors"
 	"net"
 	"regexp"
 	"strings"
@@ -9,7 +9,13 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
-// IPRInterface describes a system network interface.
+var (
+	errInvalidInterfaceName = errors.New("invalid interface name")
+	errInterfaceNotFound    = errors.New("interface not found")
+	errNoValidInterfaces    = errors.New("no valid interfaces to listen on")
+)
+
+// IPRInterface describes a network interface supported for IP Report listening.
 type IPRInterface struct {
 	Index        int
 	Name         string
@@ -94,6 +100,9 @@ func getInterfaces() ([]IPRInterface, error) {
 			Flags:        netInterface.Flags,
 		})
 	}
+	if len(interfaces) == 0 {
+		return nil, errNoValidInterfaces
+	}
 	return interfaces, nil
 }
 
@@ -111,7 +120,7 @@ func GetInterfaceByName(name string) (*IPRInterface, error) {
 			return &iface, nil
 		}
 	}
-	return nil, fmt.Errorf("interface not found: %s", name)
+	return nil, errInterfaceNotFound
 }
 
 // FindLANInterface returns the first IPRInterface marked as LAN, if any.
