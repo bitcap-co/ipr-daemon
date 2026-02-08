@@ -111,10 +111,12 @@ func listen(iface, filter string) error {
 			continue
 		}
 		iprlog.Info("received IP Report packet.")
-		iprlog.Debug(fmt.Sprintf("IP: %s -> %s, MAC: %s -> %s, UDP: %d -> %d",
+		iprlog.Debug(fmt.Sprintf("IP: %s -> %s, MAC: %s -> %s, UDP: %d -> %d, Len: %d, Hint: %s",
 			ipr.SrcIP, ipr.DstIP,
 			ipr.SrcMAC, ipr.DstMAC,
-			ipr.SrcPort, ipr.DstPort))
+			ipr.SrcPort, ipr.DstPort,
+			ipr.CaptureLength(), ipr.MinerType()))
+		iprlog.Debug(fmt.Sprintf("Received UDP Payload (%d) -> %s", len(ipr.Datagram), ipr.Payload()))
 		msg, err := ipr.ToBroadcastMessage()
 		if err != nil {
 			iprlog.Error(fmt.Errorf("failed to marshal packet to JSON: %v", err))
