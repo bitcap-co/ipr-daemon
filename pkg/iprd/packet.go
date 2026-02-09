@@ -3,6 +3,7 @@ package iprd
 import (
 	"bytes"
 	"compress/zlib"
+	"fmt"
 	"io"
 	"sync"
 	"time"
@@ -100,32 +101,32 @@ func (r *IPRReportPacket) ToBroadcastMessage() ([]byte, error) {
 	return msg, nil
 }
 
-// IsValidIPReportPacket returns IPRReportPacket if packet is a valid IP Report packet.
-func IsValidIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, bool) {
+// ParseIPReportPacket returns IPRReportPacket if packet is a IP Report packet.
+func ParseIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, error) {
 	mutex.Lock()
 	defer mutex.Unlock()
 
 	ethLayer := packet.Layer(layers.LayerTypeEthernet)
 	if ethLayer == nil {
-		return nil, false
+		return nil, fmt.Errorf("invalid layer: Ethernet")
 	}
 	eth, _ := ethLayer.(*layers.Ethernet)
 
 	ipLayer := packet.Layer(layers.LayerTypeIPv4)
 	if ipLayer == nil {
-		return nil, false
+		return nil, fmt.Errorf("invalid layer: IPv4")
 	}
 	ip, _ := ipLayer.(*layers.IPv4)
 
 	udpLayer := packet.Layer(layers.LayerTypeUDP)
 	if udpLayer == nil {
-		return nil, false
+		return nil, fmt.Errorf("invalid layer: UDP")
 	}
 	udp, _ := udpLayer.(*layers.UDP)
 
 	// Check for empty datagram/paylaod
 	if len(udp.Payload) == 0 {
-		return nil, false
+		return nil, fmt.Errorf("empty UDP payload")
 	}
 
 	data := bytes.Clone(udp.Payload)
@@ -139,22 +140,22 @@ func IsValidIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, bool) {
 				// try finding at static offsets
 				// sealminer
 				if matchHeaderAtOffset(b, smHeaderOffset) {
-					r, _ = zlibReaderAtOffset(b, smHeaderOffset)
+					r, err = zlibReaderAtOffset(b, smHeaderOffset)
 				}
 			}
 		}
-		if r == nil {
-			return nil, false
+		if err != nil {
+			return nil, fmt.Errorf("failed to decompress payload - %v", err)
 		}
 		defer r.Close()
 		data, err = io.ReadAll(r)
 		if err != nil {
-			return nil, false
+			return nil, err
 		}
 	}
 	if !bytes.Contains(data, []byte(ip.SrcIP.String())) {
 		if !MsgPatterns["DG"].Match(data) {
-			return nil, false
+			return nil, fmt.Errorf("no source IP found")
 		}
 	}
 
@@ -167,5 +168,5 @@ func IsValidIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, bool) {
 		DstPort:  int(udp.DstPort),
 		Datagram: data,
 		Metadata: packet.Metadata(),
-	}, true
+	}, nil
 }

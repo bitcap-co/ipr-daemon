@@ -106,8 +106,9 @@ func listen(iface, filter string) error {
 
 	source := gopacket.NewPacketSource(handle, handle.LinkType())
 	for packet := range source.Packets() {
-		ipr, ok := iprd.IsValidIPReportPacket(packet)
-		if !ok {
+		ipr, err := iprd.ParseIPReportPacket(packet)
+		if err != nil {
+			iprlog.Error(err)
 			continue
 		}
 		iprlog.Info("received IP Report packet.")
