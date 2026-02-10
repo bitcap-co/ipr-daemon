@@ -11,48 +11,37 @@ import (
 )
 
 var (
-	iprlog      = iprd.NewIPRDLogger()
+	iprl = iprd.NewIPRDLogger()
+
 	broadcastCh = make(chan []byte)
+
+	// flags
+	flInterface = flag.String("i", "eth0", "interface name to read packets from")
+	flAuto      = flag.Bool("a", false, "automatically find and use the defined LAN interface on system, overrides -i")
+	flPort      = flag.Int("p", 7788, "tcp port to forward packet data to. defaults to :7788")
 )
 
 func main() {
-	// flags
-	var flAutoFind bool
-	flag.BoolVar(&flAutoFind, "a", false, "switch to toggle to try and auto find interface.")
-	var flInterface = flag.String("i", "", "name of network interface to listen on.")
-	var flTCPForwardPort = flag.Int("p", 7788, "tcp port to forward packet data. Default: :7788")
+	iprl.Info("start IP Reporter daemon...")
 	flag.Parse()
-
-	iprlog.Info("start ipr daemon...")
-
-	if flAutoFind && *flInterface != "" {
-		iprlog.Error(fmt.Errorf("argurment error: -i and -a are mutually exclusive"))
-		os.Exit(1)
-	}
-
-	if !flAutoFind && *flInterface == "" {
-		iprlog.Error(fmt.Errorf("argurment error: must include -i or -a"))
-		os.Exit(1)
-	}
-
 	var iface *iprd.IPRInterface
-	if !flAutoFind {
-		iface = getInterfaceFromFlag(*flInterface)
-	} else {
+	if *flAuto {
 		iface = autoFindLANInterface()
+	} else {
+		iface = getInterfaceFromFlag(*flInterface)
 	}
 	if !iface.IsUp() {
-		iprlog.Error(fmt.Errorf("interface %s is not marked as up", iface.Name))
+		iprl.Error(fmt.Errorf("interface %s is not marked as up", iface.Name))
 		os.Exit(1)
 	}
-	iprlog.Info(fmt.Sprintf("set interface: %s", iface.Name))
+	iprl.Info(fmt.Sprintf("set interface: %s", iface.Name))
 
-	bpf := fmt.Sprintf("src host %s and (dst net 255 or dst net %s) and udp dst portrange 1024-49151", iface.NetworkPrefix(), iface.NetworkPrefix())
-	iprlog.Info(fmt.Sprintf("set BPF filter: %s", bpf))
+	bpfExpr := fmt.Sprintf("src host %s and (dst net 255 or dst net %s) and udp dst portrange 1024-49151", iface.NetworkPrefix(), iface.NetworkPrefix())
+	iprl.Info(fmt.Sprintf("set BPF filter expression: %s", bpfExpr))
 
-	broadcaster, err := iprd.NewBroadcaster(*flTCPForwardPort)
+	broadcaster, err := iprd.NewBroadcaster(*flPort)
 	if err != nil {
-		iprlog.Fatalln(err)
+		iprl.Fatalln(err)
 	}
 	go broadcaster.Listen()
 	go func() {
@@ -61,16 +50,16 @@ func main() {
 			case msg := <-broadcastCh:
 				broadcaster.Msgs <- msg
 			case err := <-broadcaster.Errs:
-				iprlog.Error(err)
+				iprl.Error(err)
 			}
 		}
 	}()
-	iprlog.Info(fmt.Sprintf("set tcp forwarding -> :%d", *flTCPForwardPort))
-	iprlog.Info("successfully started iprd!")
+	iprl.Info(fmt.Sprintf("set tcp forwarding -> :%d", *flPort))
+	iprl.Info("successfully started iprd!")
 
-	iprlog.Info("start listen...")
-	if err := listen(iface.Name, bpf); err != nil {
-		iprlog.Error(fmt.Errorf("listen error: %v", err))
+	iprl.Info("start listen...")
+	if err := listen(iface.Name, bpfExpr); err != nil {
+		iprl.Error(fmt.Errorf("listen error: %v", err))
 		os.Exit(1)
 	}
 }
@@ -78,7 +67,7 @@ func main() {
 func getInterfaceFromFlag(name string) *iprd.IPRInterface {
 	iface, err := iprd.GetInterfaceByName(name)
 	if err != nil {
-		iprlog.Error(err)
+		iprl.Error(err)
 		os.Exit(1)
 	}
 	return iface
@@ -87,7 +76,7 @@ func getInterfaceFromFlag(name string) *iprd.IPRInterface {
 func autoFindLANInterface() *iprd.IPRInterface {
 	iface, err := iprd.FindLANInterface()
 	if err != nil {
-		iprlog.Error(err)
+		iprl.Error(err)
 		os.Exit(1)
 	}
 	return iface
@@ -108,19 +97,18 @@ func listen(iface, filter string) error {
 	for packet := range source.Packets() {
 		ipr, err := iprd.ParseIPReportPacket(packet)
 		if err != nil {
-			iprlog.Error(err)
 			continue
 		}
-		iprlog.Info("received IP Report packet.")
-		iprlog.Debug(fmt.Sprintf("IP: %s -> %s, MAC: %s -> %s, UDP: %d -> %d, Len: %d, Hint: %s",
+		iprl.Info("received IP Report packet.")
+		iprl.Debug(fmt.Sprintf("IP: %s -> %s, MAC: %s -> %s, UDP: %d -> %d, Len: %d, Hint: %s",
 			ipr.SrcIP, ipr.DstIP,
 			ipr.SrcMAC, ipr.DstMAC,
 			ipr.SrcPort, ipr.DstPort,
 			ipr.CaptureLength, ipr.MinerType))
-		iprlog.Debug(fmt.Sprintf("Received UDP Payload (%d) -> %s", len(ipr.Datagram), ipr.Payload))
+		iprl.Debug(fmt.Sprintf("Received UDP Payload (%d) -> %s", len(ipr.Datagram), ipr.Payload))
 		msg, err := ipr.ToBroadcastMessage()
 		if err != nil {
-			iprlog.Error(fmt.Errorf("failed to marshal packet to JSON: %v", err))
+			iprl.Error(fmt.Errorf("failed to marshal packet to JSON: %v", err))
 			continue
 		}
 		// send msg to be broadcasted
