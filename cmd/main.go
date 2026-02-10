@@ -38,10 +38,28 @@ func main() {
 
 	bpfExpr := fmt.Sprintf("src host %s and (dst net 255 or dst net %s) and udp dst portrange 1024-49151", iface.NetworkPrefix(), iface.NetworkPrefix())
 	iprl.Info(fmt.Sprintf("set BPF filter expression: %s", bpfExpr))
+	// create handle
+	handle, err := pcap.OpenLive(iface.Name, int32(1600), true, pcap.BlockForever)
+	if err != nil {
+		iprl.Error(fmt.Errorf("failed to create handle on %s: %w", iface.Name, err))
+		os.Exit(1)
+	}
+	// compile bpfExpr from active handle
+	bpf, err := handle.CompileBPFFilter(bpfExpr)
+	if err != nil {
+		iprl.Error(fmt.Errorf("failed to compile BPF expression: %w", err))
+		os.Exit(1)
+	}
+	// set bpf instructions on active handle
+	if err := handle.SetBPFInstructionFilter(bpf); err != nil {
+		iprl.Error(fmt.Errorf("failed to set BPF instructions: %w", err))
+		os.Exit(1)
+	}
 
 	broadcaster, err := iprd.NewBroadcaster(*flPort)
 	if err != nil {
-		iprl.Fatalln(err)
+		iprl.Error(err)
+		os.Exit(1)
 	}
 	go broadcaster.Listen()
 	go func() {
@@ -58,7 +76,7 @@ func main() {
 	iprl.Info("successfully started iprd!")
 
 	iprl.Info("start listen...")
-	if err := listen(iface.Name, bpfExpr); err != nil {
+	if err := listen(handle); err != nil {
 		iprl.Error(fmt.Errorf("listen error: %v", err))
 		os.Exit(1)
 	}
@@ -82,16 +100,8 @@ func autoFindLANInterface() *iprd.IPRInterface {
 	return iface
 }
 
-func listen(iface, filter string) error {
-	handle, err := pcap.OpenLive(iface, int32(1600), true, pcap.BlockForever)
-	if err != nil {
-		return fmt.Errorf("failed to open handle for interface %s", iface)
-	}
+func listen(handle *pcap.Handle) error {
 	defer handle.Close()
-	err = handle.SetBPFFilter(filter)
-	if err != nil {
-		return fmt.Errorf("failed to set BPF filter.")
-	}
 
 	source := gopacket.NewPacketSource(handle, handle.LinkType())
 	for packet := range source.Packets() {
