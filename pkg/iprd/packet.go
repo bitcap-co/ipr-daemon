@@ -5,7 +5,6 @@ import (
 	"compress/zlib"
 	"fmt"
 	"io"
-	"sync"
 	"time"
 	"unicode/utf8"
 
@@ -16,8 +15,6 @@ import (
 )
 
 var (
-	mutex sync.Mutex
-
 	minerPorts = map[int]MinerTypeHint{
 		14235: BitmainCommon,
 		11503: Iceriver,
@@ -103,9 +100,7 @@ func (r *IPRReportPacket) ToBroadcastMessage() ([]byte, error) {
 
 // ParseIPReportPacket returns IPRReportPacket if packet is a IP Report packet.
 func ParseIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, error) {
-	mutex.Lock()
-	defer mutex.Unlock()
-
+	// decode layers
 	ethLayer := packet.Layer(layers.LayerTypeEthernet)
 	if ethLayer == nil {
 		return nil, fmt.Errorf("invalid layer: Ethernet")
