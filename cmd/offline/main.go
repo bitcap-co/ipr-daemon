@@ -67,8 +67,8 @@ func dumpPcap(fd string, debug bool) error {
 					ipr.SrcIP, ipr.DstIP,
 					ipr.SrcMAC, ipr.DstMAC,
 					ipr.SrcPort, ipr.DstPort,
-					ipr.CaptureLength(), ipr.MinerType()))
-				iprl.Debug(fmt.Sprintf("Received UDP Payload (%d) -> %s", len(ipr.Datagram), ipr.Payload()))
+					ipr.CaptureLength, ipr.MinerType))
+				iprl.Debug(fmt.Sprintf("Received UDP Payload (%d) -> %s", len(ipr.Datagram), ipr.Payload))
 			}
 		}
 	}
