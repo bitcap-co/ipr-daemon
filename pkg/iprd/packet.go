@@ -14,8 +14,13 @@ import (
 	"github.com/google/uuid"
 )
 
+const (
+	zlibSealMinerOffset int = 8
+)
+
 var (
-	minerPorts = map[int]MinerTypeHint{
+	zlibOffsets = []int{0, zlibSealMinerOffset}
+	minerPorts  = map[int]MinerTypeHint{
 		14235: BitmainCommon,
 		11503: Iceriver,
 		8888:  Whatsminer,
@@ -124,32 +129,36 @@ func ParseIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, error) {
 		return nil, fmt.Errorf("empty UDP payload")
 	}
 
-	data := bytes.Clone(udp.Payload)
-	b := bytes.NewReader(data)
-
 	// check for valid datagram
-	if !utf8.Valid(data) {
-		r, err := zlib.NewReader(b)
-		if err != nil {
-			if err == zlib.ErrHeader {
-				// try finding at static offsets
-				// sealminer
-				if matchHeaderAtOffset(b, smHeaderOffset) {
-					r, err = zlibReaderAtOffset(b, smHeaderOffset)
+	if !utf8.Valid(udp.Payload) {
+		// look for start of zlib payload
+		var zlibStart int
+		zlibStart = -1
+		for _, offset := range zlibOffsets {
+			if offset <= len(udp.Payload) {
+				if udp.Payload[offset] == byte(0x78) {
+					zlibStart = offset
+					break
 				}
 			}
 		}
+		if zlibStart == -1 {
+			return nil, fmt.Errorf("failed to decode payload - invalid utf8.")
+		}
+		b := bytes.NewReader(udp.Payload[zlibStart:])
+		r, err := zlib.NewReader(b)
 		if err != nil {
 			return nil, fmt.Errorf("failed to decompress payload - %v", err)
 		}
 		defer r.Close()
-		data, err = io.ReadAll(r)
+		udp.Payload, err = io.ReadAll(r)
 		if err != nil {
 			return nil, err
 		}
 	}
-	if !bytes.Contains(data, []byte(ip.SrcIP.String())) {
-		if !MsgPatterns["DG"].Match(data) {
+
+	if !bytes.Contains(udp.Payload, []byte(ip.SrcIP.String())) {
+		if !MsgPatterns["DG"].Match(udp.Payload) {
 			return nil, fmt.Errorf("no source IP found")
 		}
 	}
@@ -161,7 +170,7 @@ func ParseIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, error) {
 		DstMAC:   eth.DstMAC.String(),
 		SrcPort:  int(udp.SrcPort),
 		DstPort:  int(udp.DstPort),
-		Datagram: data,
+		Datagram: udp.Payload,
 		Metadata: packet.Metadata(),
 	}, nil
 }
