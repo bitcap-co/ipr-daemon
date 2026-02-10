@@ -40,48 +40,19 @@ type IPRBroadcastMessage struct {
 
 // IPRReportPacket describes the structure of a IP Report packet.
 type IPRReportPacket struct {
-	SrcIP    string
-	DstIP    string
-	SrcMAC   string
-	DstMAC   string
-	SrcPort  int
-	DstPort  int
-	Datagram []byte
-	Metadata *gopacket.PacketMetadata
-}
-
-// Timestamp exposes timestamp of IPRReportPacket Metadata.
-func (r *IPRReportPacket) Timestamp() time.Time {
-	return r.Metadata.Timestamp
-}
-
-// CaptureLength exposes the capture length of IPRReportPacket Metadata.
-func (r *IPRReportPacket) CaptureLength() int {
-	return r.Metadata.CaptureLength
-}
-
-// Length exposes the length of IPRReportPacket Metadata.
-func (r *IPRReportPacket) Length() int {
-	return r.Metadata.Length
-}
-
-// InterfaceIndex exposes the interface index of IPRReportPacket Metadata.
-func (r *IPRReportPacket) InterfaceIndex() int {
-	return r.Metadata.InterfaceIndex
-}
-
-// Payload returns Datagram as string.
-func (r *IPRReportPacket) Payload() string {
-	return string(r.Datagram)
-}
-
-// MinerType returns MinerTypeHint based off of DstPort.
-func (r *IPRReportPacket) MinerType() MinerTypeHint {
-	hint, ok := minerPorts[r.DstPort]
-	if !ok {
-		return UnknownType
-	}
-	return hint
+	Timestamp      time.Time
+	Length         int
+	CaptureLength  int
+	InterfaceIndex int
+	SrcIP          string
+	DstIP          string
+	SrcMAC         string
+	DstMAC         string
+	SrcPort        int
+	DstPort        int
+	MinerType      MinerTypeHint
+	Datagram       []byte
+	Payload        string
 }
 
 // ToBroadcastMessage returns the IPRReportPacket data marshalled into IPRBroadcastMessage.
@@ -94,7 +65,7 @@ func (r *IPRReportPacket) ToBroadcastMessage() ([]byte, error) {
 		PacketID:  packetID.String(),
 		SrcIP:     r.SrcIP,
 		SrcMAC:    r.SrcMAC,
-		MinerType: r.MinerType(),
+		MinerType: r.MinerType,
 	}
 	msg, err := json.Marshal(broadcastData)
 	if err != nil {
@@ -163,14 +134,25 @@ func ParseIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, error) {
 		}
 	}
 
+	// try and retreive miner type
+	minerType, ok := minerPorts[int(udp.DstPort)]
+	if !ok {
+		minerType = UnknownType
+	}
+
 	return &IPRReportPacket{
-		SrcIP:    ip.SrcIP.String(),
-		DstIP:    ip.DstIP.String(),
-		SrcMAC:   eth.SrcMAC.String(),
-		DstMAC:   eth.DstMAC.String(),
-		SrcPort:  int(udp.SrcPort),
-		DstPort:  int(udp.DstPort),
-		Datagram: udp.Payload,
-		Metadata: packet.Metadata(),
+		Timestamp:      packet.Metadata().Timestamp,
+		Length:         packet.Metadata().Length,
+		CaptureLength:  packet.Metadata().CaptureLength,
+		InterfaceIndex: packet.Metadata().InterfaceIndex,
+		SrcIP:          ip.SrcIP.String(),
+		DstIP:          ip.DstIP.String(),
+		SrcMAC:         eth.SrcMAC.String(),
+		DstMAC:         eth.DstMAC.String(),
+		SrcPort:        int(udp.SrcPort),
+		DstPort:        int(udp.DstPort),
+		MinerType:      minerType,
+		Datagram:       udp.Payload,
+		Payload:        string(udp.Payload),
 	}, nil
 }
