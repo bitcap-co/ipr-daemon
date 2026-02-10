@@ -10,6 +10,8 @@ import (
 )
 
 var (
+	lanRegex = regexp.MustCompile(`^lan|^LAN`)
+
 	errInvalidInterfaceName = errors.New("invalid interface name")
 	errInterfaceNotFound    = errors.New("interface not found")
 	errNoValidInterfaces    = errors.New("no valid interfaces to listen on")
@@ -53,7 +55,7 @@ func (i *IPRInterface) IsLAN() bool {
 	if i.Description == "" {
 		return false
 	}
-	match, _ := regexp.MatchString(`^lan|^LAN`, i.Description)
+	match := lanRegex.MatchString(i.Description)
 	return match
 }
 
