@@ -55,6 +55,14 @@ type IPRReportPacket struct {
 	MinerType      MinerTypeHint
 }
 
+func (r IPRReportPacket) String() string {
+	return fmt.Sprintf("IP: %s -> %s, MAC: %s -> %s, UDP: %d -> %d, Len: %d, Hint: %s",
+		r.SrcIP, r.DstIP,
+		r.SrcMAC, r.DstMAC,
+		r.SrcPort, r.DstPort,
+		r.CaptureLength, r.MinerType)
+}
+
 // ToBroadcastMessage returns the IPRReportPacket data marshalled into IPRBroadcastMessage.
 func (r *IPRReportPacket) ToBroadcastMessage() ([]byte, error) {
 	packetID, err := uuid.NewV7()
