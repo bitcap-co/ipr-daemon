@@ -38,7 +38,7 @@ func main() {
 	}
 	iprl.Info(fmt.Sprintf("set interface: %s", iface.Name))
 
-	bpfExpr := fmt.Sprintf("src host %s and (dst net 255 or dst net %s) and udp dst portrange 1024-49151", iface.NetworkPrefix(), iface.NetworkPrefix())
+	bpfExpr := fmt.Sprintf("src host %s and (dst net 255 or dst net %s) and udp src portrange 1024-65535 and udp dst portrange 1024-49151", iface.NetworkPrefix(), iface.NetworkPrefix())
 	iprl.Info(fmt.Sprintf("set BPF filter expression: %s", bpfExpr))
 	// create handle
 	handle, err := pcap.OpenLive(iface.Name, int32(1600), true, pcap.BlockForever)
