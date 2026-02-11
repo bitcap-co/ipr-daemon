@@ -19,11 +19,13 @@ var (
 	flInterface = flag.String("i", "eth0", "interface name to read packets from")
 	flAuto      = flag.Bool("a", false, "automatically find and use the defined LAN interface on system, overrides -i")
 	flPort      = flag.Int("p", 7788, "tcp port to forward packet data to. defaults to :7788")
+	flDebug     = flag.Bool("d", false, "enable debug packet logging")
 )
 
 func main() {
 	iprl.Info("start IP Reporter daemon...")
 	flag.Parse()
+
 	var iface *iprd.IPRInterface
 	if *flAuto {
 		iface = autoFindLANInterface()
@@ -74,7 +76,9 @@ func main() {
 	}()
 	iprl.Info(fmt.Sprintf("set tcp forwarding -> :%d", *flPort))
 	iprl.Info("successfully started iprd!")
-
+	if *flDebug {
+		iprl.Debug("--- DEBUG MODE SET ---")
+	}
 	iprl.Info("start listen...")
 	if err := listen(handle); err != nil {
 		iprl.Error(fmt.Errorf("listen error: %v", err))
@@ -113,11 +117,16 @@ func listen(handle *pcap.Handle) error {
 		if err := iprd.IsValidIPRReportPacket(ipr); err != nil {
 			iprl.Error(fmt.Errorf("%s - Not valid: %w",
 				ipr.String(), err))
+			if *flDebug {
+				iprl.Debug(fmt.Sprintf("%s\n", packet.Dump()))
+			}
 			continue
 		}
 		iprl.Info("received IP Report packet.")
 		iprl.Debug(ipr.String())
-		iprl.Debug(fmt.Sprintf("Received UDP Payload (%d) -> %s", len(ipr.Datagram), ipr.Payload))
+		if *flDebug {
+			iprl.Debug(fmt.Sprintf("Received UDP Payload (%d) -> %s", len(ipr.Datagram), ipr.Payload))
+		}
 
 		msg, err := ipr.ToBroadcastMessage()
 		if err != nil {
