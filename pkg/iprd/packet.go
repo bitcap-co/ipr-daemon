@@ -50,9 +50,9 @@ type IPRReportPacket struct {
 	DstMAC         string
 	SrcPort        int
 	DstPort        int
-	MinerType      MinerTypeHint
 	Datagram       []byte
 	Payload        string
+	MinerType      MinerTypeHint
 }
 
 // ToBroadcastMessage returns the IPRReportPacket data marshalled into IPRBroadcastMessage.
@@ -74,70 +74,30 @@ func (r *IPRReportPacket) ToBroadcastMessage() ([]byte, error) {
 	return msg, nil
 }
 
-// ParseIPReportPacket returns IPRReportPacket if packet is a IP Report packet.
-func ParseIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, error) {
+// NewIPRReportPacket initializes packet as IPRReportPacket if able to decode.
+func NewIPRReportPacket(packet gopacket.Packet) *IPRReportPacket {
 	// decode layers
 	ethLayer := packet.Layer(layers.LayerTypeEthernet)
 	if ethLayer == nil {
-		return nil, fmt.Errorf("invalid layer: Ethernet")
+		return nil
 	}
-	eth, _ := ethLayer.(*layers.Ethernet)
+	eth := ethLayer.(*layers.Ethernet)
 
-	ipLayer := packet.Layer(layers.LayerTypeIPv4)
-	if ipLayer == nil {
-		return nil, fmt.Errorf("invalid layer: IPv4")
+	ip4Layer := packet.Layer(layers.LayerTypeIPv4)
+	if ip4Layer == nil {
+		return nil
 	}
-	ip, _ := ipLayer.(*layers.IPv4)
+	ip := ip4Layer.(*layers.IPv4)
 
 	udpLayer := packet.Layer(layers.LayerTypeUDP)
 	if udpLayer == nil {
-		return nil, fmt.Errorf("invalid layer: UDP")
+		return nil
 	}
-	udp, _ := udpLayer.(*layers.UDP)
+	udp := udpLayer.(*layers.UDP)
 
-	// Check for empty datagram/paylaod
+	// check for empty payload
 	if len(udp.Payload) == 0 {
-		return nil, fmt.Errorf("empty UDP payload")
-	}
-
-	// check for valid datagram
-	if !utf8.Valid(udp.Payload) {
-		// look for start of zlib payload
-		var zlibStart int
-		zlibStart = -1
-		for _, offset := range zlibOffsets {
-			if offset <= len(udp.Payload) {
-				if udp.Payload[offset] == byte(0x78) {
-					zlibStart = offset
-					break
-				}
-			}
-		}
-		if zlibStart == -1 {
-			return nil, fmt.Errorf("failed to decode payload - invalid utf8.")
-		}
-		b := bytes.NewReader(udp.Payload[zlibStart:])
-		r, err := zlib.NewReader(b)
-		if err != nil {
-			return nil, fmt.Errorf("failed to decompress payload - %v", err)
-		}
-		defer r.Close()
-		udp.Payload, err = io.ReadAll(r)
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if !bytes.Contains(udp.Payload, []byte(ip.SrcIP.String())) {
-		if !MsgPatterns["DG"].Match(udp.Payload) {
-			return nil, fmt.Errorf("no source IP found")
-		}
-	}
-
-	// try and retreive miner type
-	minerType, ok := minerPorts[int(udp.DstPort)]
-	if !ok {
-		minerType = UnknownType
+		return nil
 	}
 
 	return &IPRReportPacket{
@@ -151,8 +111,55 @@ func ParseIPReportPacket(packet gopacket.Packet) (*IPRReportPacket, error) {
 		DstMAC:         eth.DstMAC.String(),
 		SrcPort:        int(udp.SrcPort),
 		DstPort:        int(udp.DstPort),
-		MinerType:      minerType,
 		Datagram:       udp.Payload,
 		Payload:        string(udp.Payload),
-	}, nil
+		MinerType:      UnknownType,
+	}
+}
+
+// IsValidIPRReportPacket returns nil if packet is a valid IPRReportPacket, otherwise error.
+func IsValidIPRReportPacket(packet *IPRReportPacket) error {
+	// start datagram analysis
+	if !utf8.Valid(packet.Datagram) {
+		// look for start of zlib payload
+		var zlibStart int
+		zlibStart = -1
+		for _, offset := range zlibOffsets {
+			if offset < len(packet.Datagram) {
+				if packet.Datagram[offset] == byte(0x78) {
+					zlibStart = offset
+					break
+				}
+			}
+		}
+		if zlibStart == -1 {
+			return fmt.Errorf("failed to decode payload - invalid utf8")
+		}
+		b := bytes.NewReader(packet.Datagram[zlibStart:])
+		r, err := zlib.NewReader(b)
+		if err != nil {
+			return fmt.Errorf("failed to decompress payload - %w", err)
+		}
+		defer r.Close()
+		packet.Datagram, err = io.ReadAll(r)
+		if err != nil {
+			return fmt.Errorf("failed to read from zlib reader - %w", err)
+		}
+	}
+
+	if !bytes.Contains(packet.Datagram, []byte(packet.SrcIP)) {
+		// elphapex doesn't contain source IP
+		if !MsgPatterns["DG"].Match(packet.Datagram) {
+			return fmt.Errorf("no source IP found in datagram")
+		}
+	}
+
+	// try and retreive miner type
+	minerType, ok := minerPorts[packet.DstPort]
+	if !ok {
+		minerType = UnknownType
+	}
+	packet.MinerType = minerType
+
+	return nil
 }
