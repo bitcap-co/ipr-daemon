@@ -154,7 +154,7 @@ func IsValidIPRReportPacket(packet *IPRReportPacket) error {
 			return fmt.Errorf("failed to read from zlib reader - %w", err)
 		}
 	}
-
+	packet.Payload = string(packet.Datagram)
 	if !bytes.Contains(packet.Datagram, []byte(packet.SrcIP)) {
 		// elphapex doesn't contain source IP
 		if !MsgPatterns["DG"].Match(packet.Datagram) {
