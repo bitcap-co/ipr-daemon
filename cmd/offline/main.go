@@ -55,21 +55,23 @@ func dumpPcap(fd string, debug bool) error {
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	for packet := range packetSource.Packets() {
 		if debug {
-			iprl.Debug(fmt.Sprintf("%s", packet.Dump()))
+			iprl.Debug("--- Dumped Packet ---")
+			iprl.Debug(fmt.Sprintf("%s\n", packet.Dump()))
 		}
-		ipr, err := iprd.ParseIPReportPacket(packet)
-		if err != nil {
-			iprl.Error(err)
-		} else {
-			iprl.Info("Valid IP Report!")
-			if debug {
-				iprl.Debug(fmt.Sprintf("IP: %s -> %s, MAC: %s -> %s, UDP: %d -> %d, Len: %d, Hint: %s",
-					ipr.SrcIP, ipr.DstIP,
-					ipr.SrcMAC, ipr.DstMAC,
-					ipr.SrcPort, ipr.DstPort,
-					ipr.CaptureLength, ipr.MinerType))
-				iprl.Debug(fmt.Sprintf("Received UDP Payload (%d) -> %s", len(ipr.Datagram), ipr.Payload))
-			}
+		ipr := iprd.NewIPRReportPacket(packet)
+		if ipr == nil {
+			iprl.Error(fmt.Errorf("failed to decode packet"))
+			continue
+		}
+		if err := iprd.IsValidIPRReportPacket(ipr); err != nil {
+			iprl.Error(fmt.Errorf("%s - Not valid: %w",
+				ipr.String(), err))
+			continue
+		}
+		iprl.Info("Valid IP Report!")
+		if debug {
+			iprl.Debug(ipr.String())
+			iprl.Debug(fmt.Sprintf("Received UDP Payload (%d) -> %s", len(ipr.Datagram), ipr.Payload))
 		}
 	}
 	return nil
