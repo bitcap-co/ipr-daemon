@@ -105,17 +105,20 @@ func listen(handle *pcap.Handle) error {
 
 	source := gopacket.NewPacketSource(handle, handle.LinkType())
 	for packet := range source.Packets() {
-		ipr, err := iprd.ParseIPReportPacket(packet)
-		if err != nil {
+		ipr := iprd.NewIPRReportPacket(packet)
+		if ipr == nil {
+			// malformed or empty UDP payload; ignore
+			continue
+		}
+		if err := iprd.IsValidIPRReportPacket(ipr); err != nil {
+			iprl.Error(fmt.Errorf("%s - Not valid: %w",
+				ipr.String(), err))
 			continue
 		}
 		iprl.Info("received IP Report packet.")
-		iprl.Debug(fmt.Sprintf("IP: %s -> %s, MAC: %s -> %s, UDP: %d -> %d, Len: %d, Hint: %s",
-			ipr.SrcIP, ipr.DstIP,
-			ipr.SrcMAC, ipr.DstMAC,
-			ipr.SrcPort, ipr.DstPort,
-			ipr.CaptureLength, ipr.MinerType))
+		iprl.Debug(ipr.String())
 		iprl.Debug(fmt.Sprintf("Received UDP Payload (%d) -> %s", len(ipr.Datagram), ipr.Payload))
+
 		msg, err := ipr.ToBroadcastMessage()
 		if err != nil {
 			iprl.Error(fmt.Errorf("failed to marshal packet to JSON: %v", err))
