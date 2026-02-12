@@ -77,7 +77,7 @@ func main() {
 	iprl.Info(fmt.Sprintf("set tcp forwarding -> :%d", *flPort))
 	iprl.Info("successfully started iprd!")
 	if *flDebug {
-		iprl.Debug("--- DEBUG MODE SET ---")
+		iprl.Debug("--- DEBUG ON ---")
 	}
 	iprl.Info("start listen...")
 	if err := listen(handle); err != nil {
@@ -109,28 +109,27 @@ func listen(handle *pcap.Handle) error {
 
 	source := gopacket.NewPacketSource(handle, handle.LinkType())
 	for packet := range source.Packets() {
-		ipr := iprd.NewIPRReportPacket(packet)
-		if ipr == nil {
+		r, _ := iprd.NewIPRReportPacket(packet)
+		if r == nil {
 			// malformed or empty UDP payload; ignore
 			continue
 		}
-		if err := iprd.IsValidIPRReportPacket(ipr); err != nil {
-			iprl.Error(fmt.Errorf("%s - Not valid: %w",
-				ipr.String(), err))
+		if err := iprd.IsValidIPRReportPacket(r); err != nil {
 			if *flDebug {
+				iprl.Error(fmt.Errorf("%s - not valid: %w", r.String(), err))
+				iprl.Debug("--- PACKET DUMP --")
 				iprl.Debug(fmt.Sprintf("%s\n", packet.Dump()))
 			}
 			continue
 		}
-		iprl.Info("received IP Report packet.")
-		iprl.Debug(ipr.String())
+		iprl.Info(fmt.Sprintf("received %s", r.String()))
 		if *flDebug {
-			iprl.Debug(fmt.Sprintf("Received UDP Payload (%d) -> %s", len(ipr.Datagram), ipr.Payload))
+			iprl.Debug(fmt.Sprintf("UDP Payload (%d) -> %s", r.CaptureLength, r.Payload))
 		}
 
-		msg, err := ipr.ToBroadcastMessage()
+		msg, err := r.ToBroadcastMessage()
 		if err != nil {
-			iprl.Error(fmt.Errorf("failed to marshal packet to JSON: %v", err))
+			iprl.Error(fmt.Errorf("failed to marshal msg: %v", err))
 			continue
 		}
 		// send msg to be broadcasted
