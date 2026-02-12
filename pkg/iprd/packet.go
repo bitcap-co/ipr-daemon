@@ -85,29 +85,29 @@ func (r *IPRReportPacket) ToBroadcastMessage() ([]byte, error) {
 }
 
 // NewIPRReportPacket initializes packet as IPRReportPacket if able to decode.
-func NewIPRReportPacket(packet gopacket.Packet) *IPRReportPacket {
+func NewIPRReportPacket(packet gopacket.Packet) (*IPRReportPacket, error) {
 	// decode layers
 	ethLayer := packet.Layer(layers.LayerTypeEthernet)
 	if ethLayer == nil {
-		return nil
+		return nil, fmt.Errorf("invalid layer - Ethernet")
 	}
 	eth := ethLayer.(*layers.Ethernet)
 
 	ip4Layer := packet.Layer(layers.LayerTypeIPv4)
 	if ip4Layer == nil {
-		return nil
+		return nil, fmt.Errorf("invalid layer - IPv4")
 	}
 	ip := ip4Layer.(*layers.IPv4)
 
 	udpLayer := packet.Layer(layers.LayerTypeUDP)
 	if udpLayer == nil {
-		return nil
+		return nil, fmt.Errorf("invalid layer - UDP")
 	}
 	udp := udpLayer.(*layers.UDP)
 
 	// check for empty payload
 	if len(udp.Payload) == 0 {
-		return nil
+		return nil, fmt.Errorf("empty payload")
 	}
 
 	return &IPRReportPacket{
@@ -122,9 +122,8 @@ func NewIPRReportPacket(packet gopacket.Packet) *IPRReportPacket {
 		SrcPort:        int(udp.SrcPort),
 		DstPort:        int(udp.DstPort),
 		Datagram:       udp.Payload,
-		Payload:        string(udp.Payload),
 		MinerType:      UnknownType,
-	}
+	}, nil
 }
 
 // IsValidIPRReportPacket returns nil if packet is a valid IPRReportPacket, otherwise error.
@@ -166,10 +165,9 @@ func IsValidIPRReportPacket(packet *IPRReportPacket) error {
 
 	// try and retreive miner type
 	minerType, ok := minerPorts[packet.DstPort]
-	if !ok {
-		minerType = UnknownType
+	if ok {
+		packet.MinerType = minerType
 	}
-	packet.MinerType = minerType
 
 	return nil
 }
