@@ -32,9 +32,10 @@ var (
 
 // IPRBroadcastMessage describes a TCP JSON message for broadcasting.
 type IPRBroadcastMessage struct {
+	Timestamp int64         `json:"timestamp"`
 	PacketID  string        `json:"id"`
-	SrcIP     string        `json:"src_ip"`
-	SrcMAC    string        `json:"src_mac"`
+	SrcIP     string        `json:"ip"`
+	SrcMAC    string        `json:"mac"`
 	MinerType MinerTypeHint `json:"miner_type"`
 }
 
@@ -70,6 +71,7 @@ func (r *IPRReportPacket) ToBroadcastMessage() ([]byte, error) {
 		return nil, err
 	}
 	broadcastData := IPRBroadcastMessage{
+		Timestamp: r.Timestamp.UnixMilli(),
 		PacketID:  packetID.String(),
 		SrcIP:     r.SrcIP,
 		SrcMAC:    r.SrcMAC,
