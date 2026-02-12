@@ -58,7 +58,7 @@ func dumpPcap(fd string, debug bool) error {
 			iprl.Debug("--- Dumped Packet ---")
 			iprl.Debug(fmt.Sprintf("%s\n", packet.Dump()))
 		}
-		ipr := iprd.NewIPRReportPacket(packet)
+		ipr, _ := iprd.NewIPRReportPacket(packet)
 		if ipr == nil {
 			iprl.Error(fmt.Errorf("failed to decode packet"))
 			continue
