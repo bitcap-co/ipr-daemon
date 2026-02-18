@@ -6,7 +6,6 @@ import (
 	"log"
 	"path/filepath"
 	"strings"
-	"sync"
 
 	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
 	"github.com/google/gopacket"
@@ -14,8 +13,7 @@ import (
 )
 
 var (
-	mutux sync.Mutex
-	iprl  = iprd.NewIPRDLogger()
+	iprl = iprd.NewIPRDLogger()
 )
 
 func main() {
