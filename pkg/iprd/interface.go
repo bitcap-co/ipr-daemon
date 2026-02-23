@@ -2,11 +2,14 @@ package iprd
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"regexp"
 	"strings"
+	"unsafe"
 
 	"github.com/google/gopacket/pcap"
+	"golang.org/x/sys/windows"
 )
 
 var (
@@ -21,6 +24,7 @@ var (
 type IPRInterface struct {
 	Index        int
 	Name         string
+	FriendlyName string
 	Description  string
 	IPv4         net.IP
 	HardwareAddr net.HardwareAddr
@@ -68,6 +72,34 @@ func getIPv4AddrFromInterface(i pcap.Interface) net.IP {
 	return nil
 }
 
+// getWindowsAdapterAddressFriendlyName resolves the FriendlyName for a pcap
+// interface name of the form "\Device\NPF_{GUID}" using GetAdaptersAddresses.
+func getWindowsAdapterAddressesFriendlyName(name string) (string, error) {
+	// Extract the GUID portion after "\Device\NPF_"
+	guid := strings.TrimPrefix(name, `\Device\NPF_`)
+
+	var size uint32
+	// First call to determine the required buffer size.
+	err := windows.GetAdaptersAddresses(windows.AF_UNSPEC, 0, 0, nil, &size)
+	if err != windows.ERROR_BUFFER_OVERFLOW {
+		return "", fmt.Errorf("failed to get adapter addresses: %s\n", err.Error())
+	}
+
+	buf := make([]byte, size)
+	addrs := (*windows.IpAdapterAddresses)(unsafe.Pointer(&buf[0]))
+	if err = windows.GetAdaptersAddresses(windows.AF_UNSPEC, 0, 0, addrs, &size); err != nil {
+		return "", fmt.Errorf("failed to get adapter addresses: %s\n", err.Error())
+	}
+
+	for a := addrs; a != nil; a = a.Next {
+		adapterName := windows.BytePtrToString(a.AdapterName)
+		if strings.EqualFold(adapterName, guid) {
+			return windows.UTF16PtrToString(a.FriendlyName), nil
+		}
+	}
+	return "", fmt.Errorf("failed to find friendly name")
+}
+
 func getInterfaces() ([]IPRInterface, error) {
 	interfaces := make([]IPRInterface, 0)
 	availInterfaces, err := pcap.FindAllDevs()
@@ -76,14 +108,24 @@ func getInterfaces() ([]IPRInterface, error) {
 	}
 
 	var ipv4 net.IP
+	var friendlyName string
 	for _, iface := range availInterfaces {
+		friendlyName = iface.Name
 		ipv4 = getIPv4AddrFromInterface(iface)
 		if ipv4 == nil {
 			continue
 		}
 
+		// handle windows interfaces
+		if strings.HasPrefix(iface.Name, `\Device\NPF_`) {
+			friendlyName, err = getWindowsAdapterAddressesFriendlyName(iface.Name)
+			if err != nil {
+				continue
+			}
+		}
+
 		// get info from std net
-		netInterface, err := net.InterfaceByName(iface.Name)
+		netInterface, err := net.InterfaceByName(friendlyName)
 		if err != nil {
 			continue
 		}
@@ -96,6 +138,7 @@ func getInterfaces() ([]IPRInterface, error) {
 		interfaces = append(interfaces, IPRInterface{
 			Index:        netInterface.Index,
 			Name:         iface.Name,
+			FriendlyName: friendlyName,
 			Description:  iface.Description,
 			IPv4:         ipv4,
 			HardwareAddr: netInterface.HardwareAddr,
@@ -118,7 +161,7 @@ func GetInterfaceByName(name string) (*IPRInterface, error) {
 		return nil, err
 	}
 	for _, iface := range ifaces {
-		if name == iface.Name {
+		if name == iface.Name || name == iface.FriendlyName {
 			return &iface, nil
 		}
 	}

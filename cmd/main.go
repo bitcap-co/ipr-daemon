@@ -46,14 +46,8 @@ func main() {
 		iprl.Error(fmt.Errorf("failed to create handle on %s: %w", iface.Name, err))
 		os.Exit(1)
 	}
-	// compile bpfExpr from active handle
-	bpf, err := handle.CompileBPFFilter(bpfExpr)
-	if err != nil {
-		iprl.Error(fmt.Errorf("failed to compile BPF expression: %w", err))
-		os.Exit(1)
-	}
-	// set bpf instructions on active handle
-	if err := handle.SetBPFInstructionFilter(bpf); err != nil {
+
+	if err := handle.SetBPFFilter(bpfExpr); err != nil {
 		iprl.Error(fmt.Errorf("failed to set BPF instructions: %w", err))
 		os.Exit(1)
 	}
