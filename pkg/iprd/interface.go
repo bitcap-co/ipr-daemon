@@ -72,23 +72,24 @@ func getIPv4AddrFromInterface(i pcap.Interface) net.IP {
 	return nil
 }
 
-// getWindowsAdapterAddressFriendlyName resolves the FriendlyName for a pcap
+// getWin32FriendlyName resolves the FriendlyName for a pcap
 // interface name of the form "\Device\NPF_{GUID}" using GetAdaptersAddresses.
-func getWindowsAdapterAddressesFriendlyName(name string) (string, error) {
+// https://learn.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersaddresses
+func getWin32FriendlyName(name string) (string, error) {
 	// Extract the GUID portion after "\Device\NPF_"
-	guid := strings.TrimPrefix(name, `\Device\NPF_`)
+	guid := strings.TrimPrefix(name, "\\Device\\NPF_")
 
 	var size uint32
 	// First call to determine the required buffer size.
-	err := windows.GetAdaptersAddresses(windows.AF_UNSPEC, 0, 0, nil, &size)
+	err := windows.GetAdaptersAddresses(windows.AF_INET, 0, 0, nil, &size)
 	if err != windows.ERROR_BUFFER_OVERFLOW {
-		return "", fmt.Errorf("failed to get adapter addresses: %s\n", err.Error())
+		return "", fmt.Errorf("getadaptersaddresses: %s\n", err)
 	}
 
 	buf := make([]byte, size)
 	addrs := (*windows.IpAdapterAddresses)(unsafe.Pointer(&buf[0]))
-	if err = windows.GetAdaptersAddresses(windows.AF_UNSPEC, 0, 0, addrs, &size); err != nil {
-		return "", fmt.Errorf("failed to get adapter addresses: %s\n", err.Error())
+	if err = windows.GetAdaptersAddresses(windows.AF_INET, 0, 0, addrs, &size); err != nil {
+		return "", fmt.Errorf("getadaptersaddresses: %s\n", err)
 	}
 
 	for a := addrs; a != nil; a = a.Next {
@@ -97,7 +98,7 @@ func getWindowsAdapterAddressesFriendlyName(name string) (string, error) {
 			return windows.UTF16PtrToString(a.FriendlyName), nil
 		}
 	}
-	return "", fmt.Errorf("failed to find friendly name")
+	return "", fmt.Errorf("failed to get freindly name for %s", name)
 }
 
 func getInterfaces() ([]IPRInterface, error) {
@@ -116,9 +117,9 @@ func getInterfaces() ([]IPRInterface, error) {
 			continue
 		}
 
-		// handle windows interfaces
-		if strings.HasPrefix(iface.Name, `\Device\NPF_`) {
-			friendlyName, err = getWindowsAdapterAddressesFriendlyName(iface.Name)
+		// try and get freindly name of win32 interfaces for net
+		if strings.HasPrefix(iface.Name, "\\Device\\NPF_") {
+			friendlyName, err = getWin32FriendlyName(iface.Name)
 			if err != nil {
 				continue
 			}
