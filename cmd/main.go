@@ -36,7 +36,7 @@ func main() {
 		iprl.Error(fmt.Errorf("interface %s is not marked as up", iface.Name))
 		os.Exit(1)
 	}
-	iprl.Info(fmt.Sprintf("set interface: %s", iface.Name))
+	iprl.Info(fmt.Sprintf("set interface: %s (%s)", iface.FriendlyName, iface.HardwareAddr.String()))
 
 	bpfExpr := fmt.Sprintf("src host %s and (dst net 255 or dst net %s) and udp src portrange 1024-65535 and udp dst portrange 1024-49151", iface.NetworkPrefix(), iface.NetworkPrefix())
 	iprl.Info(fmt.Sprintf("set BPF filter expression: %s", bpfExpr))
