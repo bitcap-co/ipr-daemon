@@ -2,14 +2,9 @@ package iprd
 
 import (
 	"errors"
-	"fmt"
 	"net"
 	"regexp"
 	"strings"
-	"unsafe"
-
-	"github.com/google/gopacket/pcap"
-	"golang.org/x/sys/windows"
 )
 
 var (
@@ -61,95 +56,6 @@ func (i *IPRInterface) IsLAN() bool {
 	}
 	match := lanRegex.MatchString(i.Description)
 	return match
-}
-
-func getIPv4AddrFromInterface(i pcap.Interface) net.IP {
-	for _, addr := range i.Addresses {
-		if addr.IP != nil && addr.IP.To4() != nil && addr.IP.IsPrivate() {
-			return addr.IP
-		}
-	}
-	return nil
-}
-
-// getWin32FriendlyName resolves the FriendlyName for a pcap
-// interface name of the form "\Device\NPF_{GUID}" using GetAdaptersAddresses.
-// https://learn.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersaddresses
-func getWin32FriendlyName(name string) (string, error) {
-	// Extract the GUID portion after "\Device\NPF_"
-	guid := strings.TrimPrefix(name, "\\Device\\NPF_")
-
-	var size uint32
-	// First call to determine the required buffer size.
-	err := windows.GetAdaptersAddresses(windows.AF_INET, 0, 0, nil, &size)
-	if err != windows.ERROR_BUFFER_OVERFLOW {
-		return "", fmt.Errorf("getadaptersaddresses: %s\n", err)
-	}
-
-	buf := make([]byte, size)
-	addrs := (*windows.IpAdapterAddresses)(unsafe.Pointer(&buf[0]))
-	if err = windows.GetAdaptersAddresses(windows.AF_INET, 0, 0, addrs, &size); err != nil {
-		return "", fmt.Errorf("getadaptersaddresses: %s\n", err)
-	}
-
-	for a := addrs; a != nil; a = a.Next {
-		adapterName := windows.BytePtrToString(a.AdapterName)
-		if strings.EqualFold(adapterName, guid) {
-			return windows.UTF16PtrToString(a.FriendlyName), nil
-		}
-	}
-	return "", fmt.Errorf("failed to get freindly name for %s", name)
-}
-
-func getInterfaces() ([]IPRInterface, error) {
-	interfaces := make([]IPRInterface, 0)
-	availInterfaces, err := pcap.FindAllDevs()
-	if err != nil {
-		return nil, err
-	}
-
-	var ipv4 net.IP
-	var friendlyName string
-	for _, iface := range availInterfaces {
-		friendlyName = iface.Name
-		ipv4 = getIPv4AddrFromInterface(iface)
-		if ipv4 == nil {
-			continue
-		}
-
-		// try and get freindly name of win32 interfaces for net
-		if strings.HasPrefix(iface.Name, "\\Device\\NPF_") {
-			friendlyName, err = getWin32FriendlyName(iface.Name)
-			if err != nil {
-				continue
-			}
-		}
-
-		// get info from std net
-		netInterface, err := net.InterfaceByName(friendlyName)
-		if err != nil {
-			continue
-		}
-
-		// ensure flags RUNNING/LOWER_UP, BROADCAST
-		if netInterface.Flags&net.FlagRunning == 0 || netInterface.Flags&net.FlagBroadcast == 0 {
-			continue
-		}
-
-		interfaces = append(interfaces, IPRInterface{
-			Index:        netInterface.Index,
-			Name:         iface.Name,
-			FriendlyName: friendlyName,
-			Description:  iface.Description,
-			IPv4:         ipv4,
-			HardwareAddr: netInterface.HardwareAddr,
-			Flags:        netInterface.Flags,
-		})
-	}
-	if len(interfaces) == 0 {
-		return nil, errNoValidInterfaces
-	}
-	return interfaces, nil
 }
 
 // GetInterfaceByName returns the IPRInterface matching name.
