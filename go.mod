@@ -6,6 +6,5 @@ require (
 	github.com/goccy/go-json v0.10.5
 	github.com/google/gopacket v1.1.19
 	github.com/google/uuid v1.6.0
+	golang.org/x/sys v0.41.0
 )
-
-require golang.org/x/sys v0.0.0-20190412213103-97732733099d // indirect

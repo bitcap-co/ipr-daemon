@@ -5,8 +5,6 @@ import (
 	"net"
 	"regexp"
 	"strings"
-
-	"github.com/google/gopacket/pcap"
 )
 
 var (
@@ -21,6 +19,7 @@ var (
 type IPRInterface struct {
 	Index        int
 	Name         string
+	FriendlyName string
 	Description  string
 	IPv4         net.IP
 	HardwareAddr net.HardwareAddr
@@ -59,55 +58,6 @@ func (i *IPRInterface) IsLAN() bool {
 	return match
 }
 
-func getIPv4AddrFromInterface(i pcap.Interface) net.IP {
-	for _, addr := range i.Addresses {
-		if addr.IP != nil && addr.IP.To4() != nil && addr.IP.IsPrivate() {
-			return addr.IP
-		}
-	}
-	return nil
-}
-
-func getInterfaces() ([]IPRInterface, error) {
-	interfaces := make([]IPRInterface, 0)
-	availInterfaces, err := pcap.FindAllDevs()
-	if err != nil {
-		return nil, err
-	}
-
-	var ipv4 net.IP
-	for _, iface := range availInterfaces {
-		ipv4 = getIPv4AddrFromInterface(iface)
-		if ipv4 == nil {
-			continue
-		}
-
-		// get info from std net
-		netInterface, err := net.InterfaceByName(iface.Name)
-		if err != nil {
-			continue
-		}
-
-		// ensure flags RUNNING/LOWER_UP, BROADCAST
-		if netInterface.Flags&net.FlagRunning == 0 || netInterface.Flags&net.FlagBroadcast == 0 {
-			continue
-		}
-
-		interfaces = append(interfaces, IPRInterface{
-			Index:        netInterface.Index,
-			Name:         iface.Name,
-			Description:  iface.Description,
-			IPv4:         ipv4,
-			HardwareAddr: netInterface.HardwareAddr,
-			Flags:        netInterface.Flags,
-		})
-	}
-	if len(interfaces) == 0 {
-		return nil, errNoValidInterfaces
-	}
-	return interfaces, nil
-}
-
 // GetInterfaceByName returns the IPRInterface matching name.
 func GetInterfaceByName(name string) (*IPRInterface, error) {
 	if name == "" {
@@ -118,7 +68,7 @@ func GetInterfaceByName(name string) (*IPRInterface, error) {
 		return nil, err
 	}
 	for _, iface := range ifaces {
-		if name == iface.Name {
+		if name == iface.Name || name == iface.FriendlyName {
 			return &iface, nil
 		}
 	}

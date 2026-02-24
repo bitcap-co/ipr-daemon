@@ -57,7 +57,7 @@ type IPRReportPacket struct {
 }
 
 func (r IPRReportPacket) String() string {
-	return fmt.Sprintf("IP: %s -> %s, MAC: %s -> %s, UDP: %d -> %d, Len: %d, Hint: %s",
+	return fmt.Sprintf("[IP: %s -> %s, MAC: %s -> %s, UDP: %d -> %d, Len: %d, Hint: %s]",
 		r.SrcIP, r.DstIP,
 		r.SrcMAC, r.DstMAC,
 		r.SrcPort, r.DstPort,
