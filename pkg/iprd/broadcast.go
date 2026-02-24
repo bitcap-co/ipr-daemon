@@ -74,14 +74,11 @@ func (b *tcpBroadcaster) broadcast(msg []byte) []error {
 // Listen accepts incoming clients and subscribes them for broadcasted messages.
 func (b *tcpBroadcaster) Listen() {
 	go func() {
-		for {
-			select {
-			case msg := <-b.Msgs:
-				errs := b.broadcast(msg)
-				for _, err := range errs {
-					if err != nil {
-						b.Errs <- err
-					}
+		for msg := range b.Msgs {
+			errs := b.broadcast(msg)
+			for _, err := range errs {
+				if err != nil {
+					b.Errs <- err
 				}
 			}
 		}
