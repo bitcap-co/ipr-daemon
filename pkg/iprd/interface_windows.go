@@ -61,8 +61,7 @@ func getInterfaces() ([]IPRInterface, error) {
 		}
 
 		// get friendly name for std net
-		friendlyName := iface.Name
-		friendlyName, err = getWin32FriendlyName(iface.Name)
+		friendlyName, err := getWin32FriendlyName(iface.Name)
 		if err != nil {
 			continue
 		}
