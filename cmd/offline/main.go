@@ -61,7 +61,7 @@ func dumpPcap(fd string, debug bool) error {
 			iprl.Error(fmt.Errorf("failed to decode packet"))
 			continue
 		}
-		if err := iprd.IsValidIPRReportPacket(ipr); err != nil {
+		if err := iprd.ParseIPRReportPacket(ipr); err != nil {
 			iprl.Error(fmt.Errorf("%s - Not valid: %w",
 				ipr.String(), err))
 			continue
