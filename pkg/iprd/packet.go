@@ -15,7 +15,8 @@ import (
 )
 
 const (
-	zlibSealMinerOffset int = 8
+	zlibSealMinerOffset int   = 8
+	recordMinAge        int64 = 10_000
 )
 
 var (
@@ -28,6 +29,7 @@ var (
 		18650: Sealminer,
 		9999:  Elphapex,
 	}
+	record = NewRecord(10)
 )
 
 // IPRBroadcastMessage describes a TCP JSON message for broadcasting.
@@ -126,8 +128,25 @@ func NewIPRReportPacket(packet gopacket.Packet) (*IPRReportPacket, error) {
 	}, nil
 }
 
-// IsValidIPRReportPacket returns nil if packet is a valid IPRReportPacket, otherwise error.
-func IsValidIPRReportPacket(packet *IPRReportPacket) error {
+// ParseIPRReportPacket returns nil if packet is a valid IPRReportPacket, otherwise error.
+func ParseIPRReportPacket(packet *IPRReportPacket) error {
+	// try and retreive miner type
+	minerType, ok := minerPorts[packet.DstPort]
+	if ok {
+		packet.MinerType = minerType
+	}
+
+	// check if packet is duplicate
+	if record.Contains(packet.SrcIP) {
+		ent := record.Get(packet.SrcIP)
+		if ent.SrcMAC == packet.SrcMAC && ent.MinerType == packet.MinerType {
+			// match found, check record age
+			if time.Now().UnixMilli()-ent.UpdatedAt <= recordMinAge {
+				return fmt.Errorf("duplicate packet")
+			}
+		}
+	}
+
 	// start datagram analysis
 	if !utf8.Valid(packet.Datagram) {
 		// look for start of zlib payload
@@ -162,12 +181,7 @@ func IsValidIPRReportPacket(packet *IPRReportPacket) error {
 			return fmt.Errorf("no source IP found in datagram")
 		}
 	}
-
-	// try and retreive miner type
-	minerType, ok := minerPorts[packet.DstPort]
-	if ok {
-		packet.MinerType = minerType
-	}
-
+	// update record
+	record.Add(packet.SrcIP, RecordEntry{SrcIP: packet.SrcIP, SrcMAC: packet.SrcMAC, MinerType: packet.MinerType, CreatedAt: packet.Timestamp.UnixMilli()})
 	return nil
 }
