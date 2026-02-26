@@ -8,6 +8,7 @@ import (
 const (
 	debugColor = "\033[0;36m%s\033[0m"
 	infoColor  = "\033[1;33m%s\033[0m"
+	warnColor  = "\033[0;37m%s\033[0m"
 	errorColor = "\033[1;31m%s\033[0m"
 )
 
@@ -28,6 +29,12 @@ func (l *iprdLogger) Debug(msg string) {
 func (l *iprdLogger) Info(raw string) {
 	if msg, ok := sanitizeMessage(raw); ok {
 		l.Printf(infoColor, msg)
+	}
+}
+
+func (l *iprdLogger) Warn(raw string) {
+	if msg, ok := sanitizeMessage(raw); ok {
+		l.Printf(warnColor, msg)
 	}
 }
 
