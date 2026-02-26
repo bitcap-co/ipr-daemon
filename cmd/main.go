@@ -91,7 +91,10 @@ func listen(handle *pcap.Handle) {
 			// invalid layer or empty UDP paylaod. ignore
 			continue
 		}
-		if err := iprd.IsValidIPRReportPacket(r); err != nil {
+		if err := iprd.ParseIPRReportPacket(r); err != nil {
+			if err.Error() == "duplicate packet" {
+				iprl.Warn(fmt.Sprintf("%s - %s", r.String(), err))
+			}
 			if *flDebug {
 				iprl.Error(fmt.Errorf("%s - not valid: %w", r.String(), err))
 				iprl.Debug("--- PACKET DUMP ---")
