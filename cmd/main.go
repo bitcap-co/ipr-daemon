@@ -104,7 +104,7 @@ func listen(handle *pcap.Handle) {
 			iprl.Debug(fmt.Sprintf("UDP Paylaod (%d) -> %s", r.CaptureLength, r.Payload))
 		}
 
-		msg, err := r.ToBroadcastMessage()
+		msg, err := r.Marshall()
 		if err != nil {
 			iprl.Error(fmt.Errorf("failed to marshal packet: %w", err))
 			continue

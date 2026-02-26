@@ -64,8 +64,8 @@ func (r IPRReportPacket) String() string {
 		r.CaptureLength, r.MinerType)
 }
 
-// ToBroadcastMessage returns the IPRReportPacket data marshalled into IPRBroadcastMessage.
-func (r *IPRReportPacket) ToBroadcastMessage() ([]byte, error) {
+// Marshall returns the IPRReportPacket data marshalled into IPRBroadcastMessage.
+func (r *IPRReportPacket) Marshall() ([]byte, error) {
 	packetID, err := uuid.NewV7()
 	if err != nil {
 		return nil, err
