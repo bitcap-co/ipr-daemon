@@ -1,25 +1,23 @@
 ## iprd
-This package serves as the core lib for the IP Reporter daemon (iprd).
+This package serves as the core library for the IP Reporter daemon (iprd). It provides all the necessary tooling to sniff IP Report packets from ASIC miners on a local network.
 
-## Stucture
-### `interface.go`
-This defines the `IPRInterface` type and provides functions to enumerate over the system's network interfaces to find valid interfaces to attach to.
-The two main functions that it provides are `GetInterfaceByName` and `FindLANInterface`.
+#### Documentation
+Run `go doc -http` for more information on what is included.
 
-### `packet.go`
-This defines the `IPRReportPacket` type and analyzes the incoming packets on the wire for IP Report packets. An IP Report packet is simply defined as a UDP packet that contains its own source IP address within the datagram.
-
-Using `IsValidIPReportPacket` will return an IPRReportPacket if packet is deemed a IP Report packet. 
-
-### `broadcast.go`
-This handles the broadcasting logic, allowing clients to subscribe using the JSON formatted command `{"command": "iprd_subscribe"}`.
-Once a packet is received, all subscribed clients will be sent the packet data marshalled as `IPRBroadcastMessage`:
-```
-type IPRBroadcastMessage struct {
-	PacketID  string        `json:"id"`
-	SrcIP     string        `json:"src_ip"`
-	SrcMAC    string        `json:"src_mac"`
-	MinerType MinerTypeHint `json:"miner_type"`
+#### Example Usage
+```go
+func main() {
+	// getting a network interface
+	iface, err := iprd.GetInterfaceByName("eth0")
+	if err != nil {
+			log.Fatal(err)
+	}
+	// initializing and activating a IPRListener on iface
+	listener := iprd.NewIPRListener(nil, false, iface)
+	if err := listener.Activate(); err != nil {
+			log.Fatal(err)
+	}
+	// start listening
+	listener.Listen()
 }
 ```
-Each packet gets a UUID (`id`).
