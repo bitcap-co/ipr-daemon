@@ -1,0 +1,111 @@
+package iprd
+
+import (
+	"fmt"
+
+	"github.com/google/gopacket"
+	"github.com/google/gopacket/pcap"
+)
+
+const (
+	bpfTemplate string = "src host %s and (dst net 255 or dst net %s) and udp src portrange 1024-65535 and udp dst portrange 1024-49151"
+)
+
+type IPRListener struct {
+	debug    bool
+	log      *IPRLogger
+	iface    *IPRInterface
+	inactive *pcap.InactiveHandle
+	handle   *pcap.Handle
+	ch       chan []byte
+}
+
+// NewIPRListener returns a new IP Report listener.
+// If logger is nil, a new IPRDLogger is created.
+// Setting logDebug to true, enables debug packet logging.
+func NewIPRListener(logger *IPRLogger, logDebug bool, iface *IPRInterface) *IPRListener {
+	if logger == nil {
+		logger = InitIPRLogger()
+	}
+	inactive, _ := pcap.NewInactiveHandle(iface.Name)
+	return &IPRListener{
+		debug:    logDebug,
+		log:      logger,
+		iface:    iface,
+		inactive: inactive,
+		ch:       make(chan []byte),
+	}
+}
+
+// Broadcast returns the tcp broadcast channel.
+func (l *IPRListener) Broadcast() chan []byte {
+	return l.ch
+}
+
+// Activate sets a new active pcap handle on iface. This must be called once before Listen().
+func (l *IPRListener) Activate() error {
+	if l.inactive == nil {
+		return fmt.Errorf("failed to create handle: %w", l.inactive.Error())
+	}
+	defer l.inactive.CleanUp()
+
+	// configure handle
+	var err error
+	if err = l.inactive.SetSnapLen(1600); err != nil {
+		return fmt.Errorf("could not set snap len: %w", err)
+	} else if err = l.inactive.SetPromisc(true); err != nil {
+		return fmt.Errorf("could not set promisc: %w", err)
+	} else if err = l.inactive.SetTimeout(pcap.BlockForever); err != nil {
+		return fmt.Errorf("could not set timeout: %w", err)
+	}
+	if l.handle, err = l.inactive.Activate(); err != nil {
+		return fmt.Errorf("failed to activate handle: %w", err)
+	}
+	l.log.Info(fmt.Sprintf("activate handle on interface: %s (%s)", l.iface.FriendlyName, l.iface.MACAddr()))
+
+	// set bpf
+	bpfExpr := fmt.Sprintf(bpfTemplate, l.iface.NetworkPrefix(), l.iface.NetworkPrefix())
+	if err = l.handle.SetBPFFilter(bpfExpr); err != nil {
+		return fmt.Errorf("failed to set BPF expression: %w", err)
+	}
+	l.log.Info(fmt.Sprintf("set BPF filter expression: %s", bpfExpr))
+	return nil
+}
+
+// Listen will start reading packets from the active handle and analyze for IP Report packets.
+// Logs output using logger and sends marshalled IPRReportPackets to Broadcast().
+func (l *IPRListener) Listen() {
+	defer l.handle.Close()
+	l.log.Info("start listen...")
+
+	source := gopacket.NewPacketSource(l.handle, l.handle.LinkType())
+	for packet := range source.Packets() {
+		r, _ := NewIPRReportPacket(packet)
+		if r == nil {
+			// invalid layer or empty UDP paylaod. ignore
+			continue
+		}
+		if err := ParseIPRReportPacket(r); err != nil {
+			if err.Error() == "duplicate packet" {
+				l.log.Warn(fmt.Sprintf("[%s] - %s", r.String(), err))
+			}
+			if l.debug {
+				l.log.Error(fmt.Errorf("[%s] - not valid: %w", r.String(), err))
+				l.log.Debug("--- PACKET DUMP ---")
+				l.log.Debug(fmt.Sprintf("%s\n", packet.Dump()))
+			}
+			continue
+		}
+		l.log.Info(fmt.Sprintf("received IP Report [%s]", r.String()))
+		if l.debug {
+			l.log.Debug(fmt.Sprintf("UDP Payload (%d) -> %s", r.CaptureLength, r.Payload))
+		}
+
+		msg, err := r.Marshall()
+		if err != nil {
+			l.log.Error(fmt.Errorf("failed to marshal packet: %w", err))
+			continue
+		}
+		l.ch <- msg
+	}
+}
