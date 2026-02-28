@@ -11,7 +11,12 @@ import (
 	"github.com/goccy/go-json"
 )
 
-type tcpBroadcaster struct {
+// TCPCommand describes a tcp command.
+type TCPCommand struct {
+	Command string `json:"command"`
+}
+
+type IPRBroadcast struct {
 	logger   *IPRLogger
 	listener net.Listener
 	counter  uint64
@@ -21,13 +26,8 @@ type tcpBroadcaster struct {
 	Errs     chan error
 }
 
-// TCPCommand describes a tcp command.
-type TCPCommand struct {
-	Command string `json:"command"`
-}
-
-// NewBroadcaster returns a new tcpBroadcaster at specified port.
-func NewBroadcaster(logger *IPRLogger, port int) (*tcpBroadcaster, error) {
+// NewBroadcaster returns a new IPRBroadcast at specified port.
+func NewIPRBroadcast(logger *IPRLogger, port int) (*IPRBroadcast, error) {
 	if logger == nil {
 		logger = InitIPRLogger()
 	}
@@ -36,7 +36,7 @@ func NewBroadcaster(logger *IPRLogger, port int) (*tcpBroadcaster, error) {
 		return nil, err
 	}
 
-	b := &tcpBroadcaster{
+	b := &IPRBroadcast{
 		logger:   logger,
 		listener: listener,
 		clients:  make(map[uint64]net.Conn),
@@ -46,7 +46,7 @@ func NewBroadcaster(logger *IPRLogger, port int) (*tcpBroadcaster, error) {
 	return b, nil
 }
 
-func (b *tcpBroadcaster) incrementCounter() uint64 {
+func (b *IPRBroadcast) incrementCounter() uint64 {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 
@@ -57,7 +57,7 @@ func (b *tcpBroadcaster) incrementCounter() uint64 {
 	return b.counter
 }
 
-func (b *tcpBroadcaster) broadcast(msg []byte) []error {
+func (b *IPRBroadcast) broadcast(msg []byte) []error {
 	b.mu.RLock()
 	defer b.mu.RUnlock()
 
@@ -75,7 +75,7 @@ func (b *tcpBroadcaster) broadcast(msg []byte) []error {
 }
 
 // Listen accepts incoming clients and subscribes them for broadcasted messages.
-func (b *tcpBroadcaster) Listen() {
+func (b *IPRBroadcast) Listen() {
 	go func() {
 		for msg := range b.Msgs {
 			errs := b.broadcast(msg)
