@@ -31,7 +31,6 @@ func main() {
 	if !iface.IsUp() {
 		log.Fatal(fmt.Errorf("interface %s is not marked as up", iface.FriendlyName))
 	}
-	log.Info(fmt.Sprintf("set interface: %s (%s)", iface.FriendlyName, iface.MACAddr()))
 
 	listener := iprd.NewIPRListener(log, false, iface)
 	if err := listener.Activate(); err != nil {
@@ -60,7 +59,6 @@ func main() {
 	if *flDebug {
 		log.Debug("--- DEBUG ON ---")
 	}
-	log.Info("start listen...")
 	listener.Listen()
 }
 
