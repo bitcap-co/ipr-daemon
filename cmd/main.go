@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	iprl = iprd.NewIPRDLogger()
+	iprl = iprd.InitIPRLogger()
 
 	// flags
 	flDebug     = flag.Bool("d", false, "enable debug packet logging")

@@ -13,7 +13,7 @@ import (
 )
 
 var (
-	iprl = iprd.NewIPRDLogger()
+	iprl = iprd.InitIPRLogger()
 )
 
 func main() {

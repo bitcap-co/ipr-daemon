@@ -12,7 +12,7 @@ import (
 )
 
 type tcpBroadcaster struct {
-	logger   *iprdLogger
+	logger   *IPRLogger
 	listener net.Listener
 	counter  uint64
 	mu       sync.RWMutex

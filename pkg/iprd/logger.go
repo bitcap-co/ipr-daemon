@@ -12,37 +12,43 @@ const (
 	errorColor = "\033[1;31m%s\033[0m"
 )
 
-type iprdLogger struct {
+type IPRLogger struct {
 	*log.Logger
 }
 
-func NewIPRDLogger() *iprdLogger {
-	return &iprdLogger{
+// InitIPRLogger returns a new IPRLogger to stdout.
+func InitIPRLogger() *IPRLogger {
+	return &IPRLogger{
 		log.New(os.Stdout, "iprd: ", log.LstdFlags),
 	}
 }
 
-func (l *iprdLogger) Debug(msg string) {
+func (l *IPRLogger) Debug(msg string) {
 	l.Printf(debugColor, msg)
 }
 
-func (l *iprdLogger) Info(raw string) {
+func (l *IPRLogger) Info(raw string) {
 	if msg, ok := sanitizeMessage(raw); ok {
 		l.Printf(infoColor, msg)
 	}
 }
 
-func (l *iprdLogger) Warn(raw string) {
+func (l *IPRLogger) Warn(raw string) {
 	if msg, ok := sanitizeMessage(raw); ok {
 		l.Printf(warnColor, msg)
 	}
 }
 
-func (l *iprdLogger) Error(err error) {
+func (l *IPRLogger) Error(err error) {
 	l.Printf(errorColor, err)
 }
 
-func (l *iprdLogger) Panic(err error) {
+func (l *IPRLogger) Fatal(err error) {
+	l.Printf(errorColor, err)
+	os.Exit(1)
+}
+
+func (l *IPRLogger) Panic(err error) {
 	l.Panicf(errorColor, err)
 }
 
