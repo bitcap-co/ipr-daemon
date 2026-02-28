@@ -56,7 +56,7 @@ func main() {
 	}
 
 	// open tcp broadcaster
-	broadcaster, err := iprd.NewBroadcaster(*flPort)
+	broadcaster, err := iprd.NewBroadcaster(iprl, *flPort)
 	if err != nil {
 		exitWithError(err)
 	}

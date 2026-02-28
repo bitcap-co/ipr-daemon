@@ -27,14 +27,17 @@ type TCPCommand struct {
 }
 
 // NewBroadcaster returns a new tcpBroadcaster at specified port.
-func NewBroadcaster(port int) (*tcpBroadcaster, error) {
+func NewBroadcaster(logger *IPRLogger, port int) (*tcpBroadcaster, error) {
+	if logger == nil {
+		logger = InitIPRLogger()
+	}
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {
 		return nil, err
 	}
 
 	b := &tcpBroadcaster{
-		logger:   NewIPRDLogger(),
+		logger:   logger,
 		listener: listener,
 		clients:  make(map[uint64]net.Conn),
 		Msgs:     make(chan []byte),
