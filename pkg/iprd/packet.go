@@ -182,6 +182,10 @@ func ParseIPRReportPacket(packet *IPRReportPacket) error {
 		}
 	}
 	// update record
-	record.Add(packet.SrcIP, RecordEntry{SrcIP: packet.SrcIP, SrcMAC: packet.SrcMAC, MinerType: packet.MinerType, CreatedAt: packet.Timestamp.UnixMilli()})
+	record.Add(packet.SrcIP, RecordEntry{
+		SrcIP:     packet.SrcIP,
+		SrcMAC:    packet.SrcMAC,
+		MinerType: packet.MinerType,
+		CreatedAt: packet.Timestamp.UnixMilli()})
 	return nil
 }

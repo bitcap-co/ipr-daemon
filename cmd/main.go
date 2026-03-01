@@ -42,7 +42,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	// listen for clients
 	go broadcast.Listen()
+	// handle channels
 	go func() {
 		for {
 			select {
@@ -59,6 +61,7 @@ func main() {
 	if *flDebug {
 		log.Debug("--- DEBUG ON ---")
 	}
+	// start packet listener
 	listener.Listen()
 }
 
