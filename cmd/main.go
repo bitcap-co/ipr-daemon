@@ -32,7 +32,7 @@ func main() {
 		log.Fatal(fmt.Errorf("interface %s is not marked as up", iface.FriendlyName))
 	}
 
-	listener := iprd.NewIPRListener(log, false, iface)
+	listener := iprd.NewIPRListener(log, *flDebug, iface)
 	if err := listener.Activate(); err != nil {
 		log.Fatal(err)
 	}
