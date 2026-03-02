@@ -11,13 +11,13 @@ import (
 type MinerTypeHint string
 
 const (
-	UnknownType   MinerTypeHint = "unknown"
-	BitmainCommon MinerTypeHint = "bitmain-common"
-	Iceriver      MinerTypeHint = "iceriver"
-	Whatsminer    MinerTypeHint = "whatsminer"
-	Goldshell     MinerTypeHint = "goldshell"
-	Sealminer     MinerTypeHint = "sealminer"
-	Elphapex      MinerTypeHint = "elphapex"
+	UnknownType MinerTypeHint = "unknown"
+	Antminer    MinerTypeHint = "antminer"
+	Iceriver    MinerTypeHint = "iceriver"
+	Whatsminer  MinerTypeHint = "whatsminer"
+	Goldshell   MinerTypeHint = "goldshell"
+	Sealminer   MinerTypeHint = "sealminer"
+	Elphapex    MinerTypeHint = "elphapex"
 )
 
 var (

@@ -22,7 +22,7 @@ const (
 var (
 	zlibOffsets = []int{0, zlibSealMinerOffset}
 	minerPorts  = map[int]MinerTypeHint{
-		14235: BitmainCommon,
+		14235: Antminer,
 		11503: Iceriver,
 		8888:  Whatsminer,
 		1314:  Goldshell,
