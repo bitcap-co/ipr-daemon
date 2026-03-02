@@ -17,7 +17,7 @@ type Record struct {
 type RecordEntry struct {
 	SrcIP     string
 	SrcMAC    string
-	MinerType MinerTypeHint
+	MinerHint MinerTypeHint
 	CreatedAt int64
 	UpdatedAt int64
 }

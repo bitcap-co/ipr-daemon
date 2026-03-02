@@ -50,6 +50,6 @@ func main() {
 		if err != nil {
 			log.Println("error unmarshalling json:", err)
 		}
-		log.Printf("Received: [%s] -- TYPE:%s,IP:%s,MAC:%s", obj.PacketID, obj.MinerType, obj.SrcIP, obj.SrcMAC)
+		log.Printf("Received: [%s] -- TYPE:%s,IP:%s,MAC:%s", obj.PacketID, obj.MinerHint, obj.SrcIP, obj.SrcMAC)
 	}
 }

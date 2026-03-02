@@ -35,10 +35,11 @@ var (
 // IPRBroadcastMessage describes a TCP JSON message for broadcasting.
 type IPRBroadcastMessage struct {
 	Timestamp int64         `json:"timestamp"`
-	PacketID  string        `json:"id"`
-	SrcIP     string        `json:"ip"`
-	SrcMAC    string        `json:"mac"`
-	MinerType MinerTypeHint `json:"miner_type"`
+	PacketID  string        `json:"packet_id"`
+	DstPort   int           `json:"dst_port"`
+	SrcIP     string        `json:"src_ip"`
+	SrcMAC    string        `json:"src_mac"`
+	MinerHint MinerTypeHint `json:"miner_hint"`
 }
 
 // IPRReportPacket describes the structure of a IP Report packet.
@@ -55,7 +56,7 @@ type IPRReportPacket struct {
 	DstPort        int
 	Datagram       []byte
 	Payload        string
-	MinerType      MinerTypeHint
+	MinerHint      MinerTypeHint
 }
 
 func (r IPRReportPacket) String() string {
@@ -63,7 +64,7 @@ func (r IPRReportPacket) String() string {
 		r.SrcIP, r.DstIP,
 		r.SrcMAC, r.DstMAC,
 		r.SrcPort, r.DstPort,
-		r.CaptureLength, r.MinerType)
+		r.CaptureLength, r.MinerHint)
 }
 
 // Marshall returns the IPRReportPacket data marshalled into IPRBroadcastMessage.
@@ -75,9 +76,10 @@ func (r *IPRReportPacket) Marshall() ([]byte, error) {
 	broadcastData := IPRBroadcastMessage{
 		Timestamp: r.Timestamp.UnixMilli(),
 		PacketID:  packetID.String(),
+		DstPort:   r.DstPort,
 		SrcIP:     r.SrcIP,
 		SrcMAC:    r.SrcMAC,
-		MinerType: r.MinerType,
+		MinerHint: r.MinerHint,
 	}
 	msg, err := json.Marshal(broadcastData)
 	if err != nil {
@@ -124,22 +126,22 @@ func NewIPRReportPacket(packet gopacket.Packet) (*IPRReportPacket, error) {
 		SrcPort:        int(udp.SrcPort),
 		DstPort:        int(udp.DstPort),
 		Datagram:       udp.Payload,
-		MinerType:      UnknownType,
+		MinerHint:      UnknownType,
 	}, nil
 }
 
 // ParseIPRReportPacket returns nil if packet is a valid IPRReportPacket, otherwise error.
 func ParseIPRReportPacket(packet *IPRReportPacket) error {
-	// try and retreive miner type
-	minerType, ok := minerPorts[packet.DstPort]
+	// try and retreive miner hint
+	minerHint, ok := minerPorts[packet.DstPort]
 	if ok {
-		packet.MinerType = minerType
+		packet.MinerHint = minerHint
 	}
 
 	// check if packet is duplicate
 	if record.Contains(packet.SrcIP) {
 		ent := record.Get(packet.SrcIP)
-		if ent.SrcMAC == packet.SrcMAC && ent.MinerType == packet.MinerType {
+		if ent.SrcMAC == packet.SrcMAC && ent.MinerHint == packet.MinerHint {
 			// match found, check record age
 			if time.Now().UnixMilli()-ent.UpdatedAt <= recordMinAge {
 				return fmt.Errorf("duplicate packet")
@@ -185,7 +187,7 @@ func ParseIPRReportPacket(packet *IPRReportPacket) error {
 	record.Add(packet.SrcIP, RecordEntry{
 		SrcIP:     packet.SrcIP,
 		SrcMAC:    packet.SrcMAC,
-		MinerType: packet.MinerType,
+		MinerHint: packet.MinerHint,
 		CreatedAt: packet.Timestamp.UnixMilli()})
 	return nil
 }
