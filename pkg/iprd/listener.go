@@ -87,16 +87,16 @@ func (l *IPRListener) Listen() {
 		}
 		if err := ParseIPRReportPacket(r); err != nil {
 			if err.Error() == "duplicate packet" {
-				l.log.Warn(fmt.Sprintf("[%s] - %s", r.String(), err))
+				l.log.Warn(fmt.Sprintf("%s - %s", r.String(), err))
 			}
 			if l.debug {
-				l.log.Error(fmt.Errorf("[%s] - not valid: %w", r.String(), err))
+				l.log.Error(fmt.Errorf("%s - not valid: %w", r.String(), err))
 				l.log.Debug("--- PACKET DUMP ---")
 				l.log.Debug(fmt.Sprintf("%s\n", packet.Dump()))
 			}
 			continue
 		}
-		l.log.Info(fmt.Sprintf("received IP Report [%s]", r.String()))
+		l.log.Info(fmt.Sprintf("received IP Report %s", r.String()))
 		if l.debug {
 			l.log.Debug(fmt.Sprintf("UDP Payload (%d) -> %s", r.CaptureLength, r.Payload))
 		}
