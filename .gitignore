@@ -35,4 +35,5 @@ go.work.sum
 
 # binaries
 iprd
+!iprd/
 iprd.exe
