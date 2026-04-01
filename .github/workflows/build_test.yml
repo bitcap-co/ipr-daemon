@@ -3,9 +3,7 @@
 
 name: Build and release iprd binary
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
 
 jobs:
   build:
