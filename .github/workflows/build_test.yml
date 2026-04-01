@@ -56,4 +56,4 @@ jobs:
           draft: true
           prerelease: true
           files: |
-            ${{ github.workspace }}/artifacts/iprd*
+            ${{ github.workspace }}/artifacts/Linux-X64/iprd*
