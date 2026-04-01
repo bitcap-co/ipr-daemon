@@ -19,9 +19,7 @@ jobs:
 
     - name: update apt sources
       shell: bash
-      run: |
-        sudo -i
-        echo "deb http://security.ubuntu.com/ubuntu noble-security main" >> /etc/apt/sources.list 
+      run: sudo apt update
     
     - name: Get build dependencies
       run: sudo apt install libpcap-dev libcap-dev librdmacm-dev libibverbs-dev libsystemd-dev
