@@ -24,7 +24,7 @@ jobs:
       run: go mod download
 
     - name: Build static binary
-      run: CGO_ENABLED=1 go build -tags netgo -ldflags "-linkmode 'external' -extldflags '-static -ldbus-1 -lsystemd -lpcap -lcap -libverbs -lnl-route-3 -lnl-3'" -o iprd-${{ github.ref_name}}-${{ runner.os }}-${{ runner.arch }}
+      run: CGO_ENABLED=1 go build -tags netgo -ldflags "-linkmode 'external' -extldflags '-static -ldbus-1 -lsystemd -lpcap -lcap -libverbs -lnl-route-3 -lnl-3'" -o iprd-${{ github.ref_name}}-${{ runner.os }}-${{ runner.arch }} cmd/main.go
     - name: Upload artifacts
       uses: actions/upload-artifact@v4
       with:
