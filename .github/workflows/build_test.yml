@@ -17,6 +17,9 @@ jobs:
       with:
         go-version: '1.24.5'
 
+    - name: update apt sources
+      run: echo "deb http://security.ubuntu.com/ubuntu noble-security main" >> /etc/apt/sources.list 
+    
     - name: Get build dependencies
       run: sudo apt install libpcap-dev libcap-dev librdmacm-dev libibverbs-dev libsystemd-dev
 
