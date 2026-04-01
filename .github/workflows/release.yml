@@ -1,0 +1,53 @@
+name: iprd release
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v4
+        with:
+          go-version: "1.24.5"
+
+      - name: Apt update
+        run: sudo apt update
+
+      - name: System build dependencies
+        run: sudo apt install libpcap-dev libcap-dev librdmacm-dev libibverbs-dev libsystemd-dev
+
+      - name: Go dependencies
+        run: go mod download
+
+      - name: Build static binary
+        run: go build -tags netgo -ldflags "-linkmode 'external' -extldflags '-static -ldbus-1 -lsystemd -lpcap -lcap -libverbs -lnl-route-3 -lnl-3'" -o iprd-${{ github.ref_name }}-${{ runner.os }}-${{ runner.arch }} cmd/main.go
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ runner.os }}-${{ runner.arch }}
+          path: |
+            iprd*
+  release:
+    name: Create release
+    permissions:
+      contents: write
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Write artifacts to release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: IPR Daemon ${{ github.ref_name }} Release
+          draft: true
+          prerelease: true
+          files: |
+            ${{ github.workspace }}/artifacts/Linux-X64/iprd*
