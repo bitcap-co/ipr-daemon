@@ -28,6 +28,7 @@ var (
 		1314:  Goldshell,
 		18650: Sealminer,
 		9999:  Elphapex,
+		12345: Auradine,
 	}
 	record = NewRecord(10)
 )

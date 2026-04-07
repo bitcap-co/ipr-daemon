@@ -18,6 +18,7 @@ const (
 	Goldshell   MinerTypeHint = "goldshell"
 	Sealminer   MinerTypeHint = "sealminer"
 	Elphapex    MinerTypeHint = "elphapex"
+	Auradine    MinerTypeHint = "auradine"
 )
 
 var (
