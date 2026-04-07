@@ -35,11 +35,11 @@ var (
 // IPRBroadcastMessage describes a TCP JSON message for broadcasting.
 type IPRBroadcastMessage struct {
 	Timestamp int64         `json:"timestamp"`
-	PacketID  string        `json:"packet_id"`
-	DstPort   int           `json:"dst_port"`
-	SrcIP     string        `json:"src_ip"`
-	SrcMAC    string        `json:"src_mac"`
-	MinerHint MinerTypeHint `json:"miner_hint"`
+	PacketID  string        `json:"packetID"`
+	DstPort   int           `json:"dstPort"`
+	SrcIP     string        `json:"srcIP"`
+	SrcMAC    string        `json:"srcMAC"`
+	MinerHint MinerTypeHint `json:"minerHint"`
 }
 
 // IPRReportPacket describes the structure of a IP Report packet.
