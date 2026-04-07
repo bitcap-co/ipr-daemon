@@ -18,8 +18,8 @@ var (
 )
 
 func main() {
-	log.Info("start IP Reporter daemon...")
 	flag.Parse()
+	log.Info("start IP Reporter daemon...")
 
 	// get interface from flags
 	var iface *iprd.IPRInterface
