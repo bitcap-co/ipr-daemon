@@ -46,12 +46,13 @@ sudo ./iprd -i "eth0"
 ```
 where, `-i` is the system interface name that you want to listen on.
 > [!NOTE]
-> On Windows, supply the network device name (i.e. "Ethernet Instance 0"). Can run `ipconfig` in cmd/pwsh to see all interface names.
+> On Windows, supply the network device name (i.e. "Ethernet Instance 0"). Run `ipconfig` in cmd/pwsh to see all interface names.
 
 ## Subscribing to TCP broadcast
 By default, the TCP broadcast listens on port 7788.
 
 To start listening for messages, send the message `{"command": "iprd_subscribe"}` after initial connection to the broadcast.
+
 See `cmd/example/tcp_listener.go` for an example golang implementation or can use netcat `nc`:
 ```bash
 echo '{"command": "iprd_subscribe"}' | nc localhost 7788
