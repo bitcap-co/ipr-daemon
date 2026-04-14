@@ -48,6 +48,11 @@ where, `-i` is the system interface name that you want to listen on.
 > [!NOTE]
 > On Windows, supply the network device name (i.e. "Ethernet Instance 0"). Run `ipconfig` in cmd/pwsh to see all interface names.
 
+To configure the TCP port, use `-p` to supply:
+```
+sudo ./iprd -i "eth0" -p <SOME_PORT>
+```
+
 ## Subscribing to TCP broadcast
 By default, the TCP broadcast listens on port 7788.
 
