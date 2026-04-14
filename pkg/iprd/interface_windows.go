@@ -36,7 +36,7 @@ func getWin32FriendlyName(name string) (string, error) {
 			return windows.UTF16PtrToString(a.FriendlyName), nil
 		}
 	}
-	return "", fmt.Errorf("failed to get freindly name for %s", name)
+	return "", fmt.Errorf("failed to get friendly name for %s", name)
 }
 
 func getInterfaces() ([]IPRInterface, error) {
