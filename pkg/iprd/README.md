@@ -13,7 +13,7 @@ func main() {
 			log.Fatal(err)
 	}
 	// initializing and activating a IPRListener on iface
-	listener := iprd.NewIPRListener(nil, false, iface)
+	listener := iprd.NewListener(nil, false, iface)
 	if err := listener.Activate(); err != nil {
 			log.Fatal(err)
 	}
