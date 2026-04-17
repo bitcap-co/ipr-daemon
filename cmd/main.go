@@ -9,59 +9,62 @@ import (
 
 var (
 	// flags
-	flDebug     = flag.Bool("d", false, "enable debug packet logging")
-	flInterface = flag.String("i", "eth0", "interface name for listening")
-	flAuto      = flag.Bool("a", false, "use the defined LAN interface on system for listening. overrides -i")
-	flPort      = flag.Int("p", 7788, "forward port for tcp broadcasting. default :7788")
+	flDebug     = flag.Bool("d", false, "Switch to enable packet debugging output.")
+	flInterface = flag.String("i", "eth0", "Name of network interface for listening.")
+	flAuto      = flag.Bool("a", false, "Switch to use the defined LAN interface (matching description) for listening. Overrides -i flag.")
+	flTCPPort   = flag.Int("p", 7788, "Forward port for TCP broadcast. Default: 7788.")
 
-	log = iprd.InitIPRLogger()
+	// iprd logger
+	log = iprd.NewLogger()
 )
 
 func main() {
 	flag.Parse()
-	log.Info("start IP Reporter daemon...")
+	log.Info("start IPReporter Daemon...")
 
-	// get interface from flags
+	// get interface from flags.
 	var iface *iprd.IPRInterface
 	if *flAuto {
 		iface = autoFindLANInterface()
 	} else {
 		iface = getInterfaceFromFlag(*flInterface)
 	}
+	// sanity check: make sure that interface is marked as UP.
 	if !iface.IsUp() {
-		log.Fatal(fmt.Errorf("interface %s is not marked as up", iface.FriendlyName))
+		log.Fatal(fmt.Errorf("interface %s is not marked as UP.", iface.FriendlyName))
 	}
 
-	listener := iprd.NewIPRListener(log, *flDebug, iface)
+	// initialize IPRListener handle.
+	listener := iprd.NewListener(log, *flDebug, iface)
 	if err := listener.Activate(); err != nil {
 		log.Fatal(err)
 	}
 
-	// open tcp broadcaster
-	broadcast, err := iprd.NewIPRBroadcast(log, *flPort)
+	// open TCP broadcast.
+	broadcaster, err := iprd.NewBroadcaster(log, *flTCPPort)
 	if err != nil {
 		log.Fatal(err)
 	}
-	// listen for clients
-	go broadcast.Listen()
-	// handle channels
+	// start listening for incoming clients.
+	go broadcaster.Listen()
+	// handle channel messages.
 	go func() {
 		for {
 			select {
 			case msg := <-listener.Broadcast():
-				broadcast.Msgs <- msg
-			case err := <-broadcast.Errs:
+				// send message to subscribed clients.
+				broadcaster.Msgs <- msg
+			case err := <-broadcaster.Errs:
 				log.Error(err)
 			}
 		}
 	}()
-
-	log.Info(fmt.Sprintf("set tcp forwarding -> :%d", *flPort))
+	log.Info(fmt.Sprintf("set tcp forwarding -> :%d", *flTCPPort))
 	log.Info("successfully started iprd!")
 	if *flDebug {
-		log.Debug("--- DEBUG ON ---")
+		log.Debug("--- DEBUG OUTPUT ON ---")
 	}
-	// start packet listener
+	// start listening for packets.
 	listener.Listen()
 }
 

@@ -16,8 +16,8 @@ type IPRLogger struct {
 	*log.Logger
 }
 
-// InitIPRLogger returns a new IPRLogger to stdout.
-func InitIPRLogger() *IPRLogger {
+// NewLogger returns a new IPRLogger to stdout.
+func NewLogger() *IPRLogger {
 	return &IPRLogger{
 		log.New(os.Stdout, "iprd: ", log.LstdFlags),
 	}

@@ -27,9 +27,9 @@ type IPRBroadcast struct {
 }
 
 // NewBroadcaster returns a new IPRBroadcast at specified port.
-func NewIPRBroadcast(logger *IPRLogger, port int) (*IPRBroadcast, error) {
+func NewBroadcaster(logger *IPRLogger, port int) (*IPRBroadcast, error) {
 	if logger == nil {
-		logger = InitIPRLogger()
+		logger = NewLogger()
 	}
 	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
 	if err != nil {

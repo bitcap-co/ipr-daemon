@@ -33,7 +33,7 @@ var (
 	record = NewRecord(10)
 )
 
-// IPRBroadcastMessage describes a TCP JSON message for broadcasting.
+// IPRBroadcastMessage describes the JSON message structure of a IPReportPacket.
 type IPRBroadcastMessage struct {
 	Timestamp int64         `json:"timestamp"`
 	PacketID  string        `json:"packetID"`
@@ -43,8 +43,8 @@ type IPRBroadcastMessage struct {
 	MinerHint MinerTypeHint `json:"minerHint"`
 }
 
-// IPRReportPacket describes the structure of a IP Report packet.
-type IPRReportPacket struct {
+// IPReportPacket represents a IP Report packet.
+type IPReportPacket struct {
 	Timestamp      time.Time
 	Length         int
 	CaptureLength  int
@@ -60,7 +60,8 @@ type IPRReportPacket struct {
 	MinerHint      MinerTypeHint
 }
 
-func (r IPRReportPacket) String() string {
+// String returns relevent IPReportPacket info as a string.
+func (r IPReportPacket) String() string {
 	return fmt.Sprintf("[IP: %s -> %s, MAC: %s -> %s, UDP: %d -> %d, Len: %d, Hint: %s]",
 		r.SrcIP, r.DstIP,
 		r.SrcMAC, r.DstMAC,
@@ -68,8 +69,8 @@ func (r IPRReportPacket) String() string {
 		r.CaptureLength, r.MinerHint)
 }
 
-// Marshall returns the IPRReportPacket data marshalled into IPRBroadcastMessage.
-func (r *IPRReportPacket) Marshall() ([]byte, error) {
+// Marshall returns the IPReportPacket data to marshalled IPRBroadcastMessage.
+func (r *IPReportPacket) Marshall() ([]byte, error) {
 	packetID, err := uuid.NewV7()
 	if err != nil {
 		return nil, err
@@ -89,9 +90,9 @@ func (r *IPRReportPacket) Marshall() ([]byte, error) {
 	return msg, nil
 }
 
-// NewIPRReportPacket initializes packet as IPRReportPacket if able to decode.
-func NewIPRReportPacket(packet gopacket.Packet) (*IPRReportPacket, error) {
-	// decode layers
+// NewIPReportPacket initializes packet into IPReportPacket. Returns an error on failure.
+func NewIPReportPacket(packet gopacket.Packet) (*IPReportPacket, error) {
+	// decode packet layers.
 	ethLayer := packet.Layer(layers.LayerTypeEthernet)
 	if ethLayer == nil {
 		return nil, fmt.Errorf("invalid layer - Ethernet")
@@ -110,12 +111,12 @@ func NewIPRReportPacket(packet gopacket.Packet) (*IPRReportPacket, error) {
 	}
 	udp := udpLayer.(*layers.UDP)
 
-	// check for empty payload
+	// ignore if UDP payload is empty.
 	if len(udp.Payload) == 0 {
 		return nil, fmt.Errorf("empty payload")
 	}
 
-	return &IPRReportPacket{
+	return &IPReportPacket{
 		Timestamp:      packet.Metadata().Timestamp,
 		Length:         packet.Metadata().Length,
 		CaptureLength:  packet.Metadata().CaptureLength,
@@ -131,28 +132,26 @@ func NewIPRReportPacket(packet gopacket.Packet) (*IPRReportPacket, error) {
 	}, nil
 }
 
-// ParseIPRReportPacket returns nil if packet is a valid IPRReportPacket, otherwise error.
-func ParseIPRReportPacket(packet *IPRReportPacket) error {
-	// try and retreive miner hint
+// ParseIPReportPacket analysis packet for valid IP Report packet. Returns an error on failure.
+func ParseIPReportPacket(packet *IPReportPacket) error {
+	// retrieve miner hint from DstPort.
 	minerHint, ok := minerPorts[packet.DstPort]
 	if ok {
 		packet.MinerHint = minerHint
 	}
-
-	// check if packet is duplicate
+	// check for existing record.
 	if record.Contains(packet.SrcIP) {
 		ent := record.Get(packet.SrcIP)
 		if ent.SrcMAC == packet.SrcMAC && ent.MinerHint == packet.MinerHint {
-			// match found, check record age
+			// if record exists and is not over minimun record age, mark as duplicate packet.
 			if time.Now().UnixMilli()-ent.UpdatedAt <= recordMinAge {
 				return fmt.Errorf("duplicate packet")
 			}
 		}
 	}
-
-	// start datagram analysis
+	// if not valid UTF-8, it could be encoded/compressed.
 	if !utf8.Valid(packet.Datagram) {
-		// look for start of zlib payload
+		// check for start of zlib payload given a list of offsets.
 		var zlibStart int
 		zlibStart = -1
 		for _, offset := range zlibOffsets {
@@ -177,14 +176,16 @@ func ParseIPRReportPacket(packet *IPRReportPacket) error {
 			return fmt.Errorf("failed to read from zlib reader - %w", err)
 		}
 	}
+
 	packet.Payload = string(packet.Datagram)
+	// ignore packet if it doesn't contain source IP within UDP datagram.
 	if !bytes.Contains(packet.Datagram, []byte(packet.SrcIP)) {
-		// elphapex doesn't contain source IP
+		// edge case for Elphapex: it sends a static message that doesnt contain source IP.
 		if !MsgPatterns["DG"].Match(packet.Datagram) {
 			return fmt.Errorf("no source IP found in datagram")
 		}
 	}
-	// update record
+	// update record with new packet data.
 	record.Add(packet.SrcIP, RecordEntry{
 		SrcIP:     packet.SrcIP,
 		SrcMAC:    packet.SrcMAC,
