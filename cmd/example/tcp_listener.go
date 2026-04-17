@@ -4,20 +4,25 @@ import (
 	"bufio"
 	"encoding/json"
 	"flag"
-	"fmt"
 	"log"
 	"net"
 
 	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
 )
 
+var (
+	flHost = flag.String("h", "127.0.0.1", "Host address of iprd instance. Default: localhost")
+	flPort = flag.String("p", "7788", "Configured TCP forward port of iprd. Default: 7788")
+)
+
 func main() {
-	var (
-		flHost = flag.String("host", "", "host addr")
-		flPort = flag.Int("port", 7788, "tcp port")
-	)
 	flag.Parse()
-	conn, err := net.Dial("tcp", fmt.Sprintf("%s:%d", *flHost, *flPort))
+	ipAddress := net.ParseIP(*flHost)
+	if ipAddress == nil {
+		log.Fatal("invalid IP address")
+	}
+	socketAddress := net.JoinHostPort(*flHost, *flPort)
+	conn, err := net.Dial("tcp", socketAddress)
 	if err != nil {
 		log.Fatalf("error connecting: %s", err)
 	}
