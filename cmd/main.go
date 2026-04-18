@@ -31,7 +31,7 @@ func main() {
 	}
 	// sanity check: make sure that interface is marked as UP.
 	if !iface.IsUp() {
-		log.Fatal(fmt.Errorf("interface %s is not marked as UP.", iface.FriendlyName))
+		log.Fatal(fmt.Errorf("interface %s is not marked as UP", iface.FriendlyName))
 	}
 
 	// initialize IPRListener handle.

@@ -43,10 +43,7 @@ func (i *IPRInterface) NetworkPrefix() string {
 
 // IsUp returns bool for if IPRInterface is marked as UP.
 func (i *IPRInterface) IsUp() bool {
-	if i.Flags&net.FlagUp != 0 {
-		return true
-	}
-	return false
+	return i.Flags&net.FlagUp != 0
 }
 
 // IsLAN returns bool for if IPRInterface is marked as LAN interface.

@@ -2,7 +2,6 @@ package iprd
 
 import (
 	"container/list"
-	"fmt"
 	"time"
 )
 
@@ -76,10 +75,10 @@ func (r *Record) Length() int {
 	return r.order.Len()
 }
 
-func (r *Record) display() {
-	for e := r.order.Front(); e != nil; e = e.Next() {
-		key := e.Value.(string)
-		fmt.Printf("%s: %+v, ", key, r.items[key])
-	}
-	fmt.Printf("record len: %d", r.Length())
-}
+// func (r *Record) display() {
+// 	for e := r.order.Front(); e != nil; e = e.Next() {
+// 		key := e.Value.(string)
+// 		fmt.Printf("%s: %+v, ", key, r.items[key])
+// 	}
+// 	fmt.Printf("record len: %d", r.Length())
+// }
