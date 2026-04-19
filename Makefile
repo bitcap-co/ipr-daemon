@@ -138,23 +138,12 @@ freebsd-clean:
 	rm -f .vagrant-ssh
 
 ifeq ($(GOOS),freebsd)
-# FreeBSD aarch64 and armv7 targets only work inside of FreeBSD Vagrant VM
 FREEBSD_AMD64_S_NAME := $(DIST_DIR)$(OUTPUT_BINARY)-$(PROJECT_VERSION)-freebsd-amd64
 
 freebsd-binaries: freebsd-amd64
 freebsd-amd64: $(FREEBSD_AMD64_S_NAME)
 
-# Seems to be a bug with CGO & Clang where it always wants to use the host arch
-# linker and it doesn't seem to honor the LD ENV var :(
-.PHONY: .freebsd-amd64-cross
-.freebsd-amd64-cross:
-	@cd /usr/local/bin && \
-		if test -f x86_64-unknown-freebsd$(FREEBSD_VERSION)-ld.bfd.bak ; then \
-			rm x86_64-unknown-freebsd$(FREEBSD_VERSION)-ld.bfd ; \
-			mv x86_64-unknown-freebsd$(FREEBSD_VERSION)-ld.bfd.bak x86_64-unknown-freebsd$(FREEBSD_VERSION)-ld.bfd ;\
-		fi
-
-$(FREEBSD_AMD64_S_NAME): # .freebsd-amd64-cross
+$(FREEBSD_AMD64_S_NAME):
 	GOOS=freebsd GOARCH=amd64 CGO_ENABLED=1 \
 	CGO_LDFLAGS='-libverbs' \
 	go build -ldflags '$(LDFLAGS) -linkmode external -extldflags -static' \
