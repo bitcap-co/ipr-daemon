@@ -34,4 +34,6 @@ go.work.sum
 .debug
 
 # binaries
-iprd.exe
+dist/
+.vagrant/
+.vagrant-ssh
