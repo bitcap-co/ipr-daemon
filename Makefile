@@ -30,6 +30,7 @@ LDFLAGS            += -X "main.COMMIT=$(PROJECT_COMMIT)" -s -w
 OUTPUT_BINARY      := iprd
 OUTPUT_NAME        := $(DIST_DIR)$(OUTPUT_BINARY)-$(GOOS)-$(GOARCH)
 DOCKER_VERSION     := v$(PROJECT_VERSION)
+FREEBSD_VERSION    := 14.3
 
 ALL: $(OUTPUT_NAME)
 
@@ -118,3 +119,45 @@ $(LINUX_AMD64_S_NAME): .prepare
 	CGO_LDFLAGS=$$(pkg-config --libs dbus-1 libsystemd libpcap libcap libibverbs libnl-route-3.0) CGO_ENABLED=1 \
 	    go build -ldflags "$(LDFLAGS) -linkmode 'external' -extldflags '-static'" \
 	        -o $(LINUX_AMD64_S_NAME) ./cmd/main.go
+
+# FreeBSD
+.PHONY: .vagrant-check
+.vagrant-check:
+	@which vagrant >/dev/null || "Please install Vagrant: https://www.vagrantup.com"
+	@which VBoxManage >/dev/null || "Please install VirtualBox: https://www.virtualbox.org"
+
+freebsd: .vagrant-check
+	vagrant provision && vagrant up && vagrant ssh-config >.vagrant-ssh && \
+		scp -F .vagrant-ssh default:$(PROJECT_NAME)/dist/*freebsd* dist/
+
+freebsd-shell:
+	vagrant ssh
+
+freebsd-clean:
+	vagrant destroy -f || true
+	rm -f .vagrant-ssh
+
+ifeq ($(GOOS),freebsd)
+# FreeBSD aarch64 and armv7 targets only work inside of FreeBSD Vagrant VM
+FREEBSD_AMD64_S_NAME := $(DIST_DIR)$(OUTPUT_BINARY)-$(PROJECT_VERSION)-freebsd-amd64
+
+freebsd-binaries: freebsd-amd64
+freebsd-amd64: $(FREEBSD_AMD64_S_NAME)
+
+# Seems to be a bug with CGO & Clang where it always wants to use the host arch
+# linker and it doesn't seem to honor the LD ENV var :(
+.PHONY: .freebsd-amd64-cross
+.freebsd-amd64-cross:
+	@cd /usr/local/bin && \
+		if test -f x86_64-unknown-freebsd$(FREEBSD_VERSION)-ld.bfd.bak ; then \
+			rm x86_64-unknown-freebsd$(FREEBSD_VERSION)-ld.bfd ; \
+			mv x86_64-unknown-freebsd$(FREEBSD_VERSION)-ld.bfd.bak x86_64-unknown-freebsd$(FREEBSD_VERSION)-ld.bfd ;\
+		fi
+
+$(FREEBSD_AMD64_S_NAME): # .freebsd-amd64-cross
+	GOOS=freebsd GOARCH=amd64 CGO_ENABLED=1 \
+	CGO_LDFLAGS='-libverbs' \
+	go build -ldflags '$(LDFLAGS) -linkmode external -extldflags -static' \
+		-o $(FREEBSD_AMD64_S_NAME) ./cmd/main.go
+	@echo "Created: $(FREEBSD_AMD64_S_NAME)"
+endif
