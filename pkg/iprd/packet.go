@@ -69,8 +69,8 @@ func (r IPReportPacket) String() string {
 		r.CaptureLength, r.MinerHint)
 }
 
-// Marshall returns the IPReportPacket data to marshalled IPRBroadcastMessage.
-func (r *IPReportPacket) Marshall() ([]byte, error) {
+// Marshal returns the IPReportPacket data to marshalled IPRBroadcastMessage.
+func (r *IPReportPacket) Marshal() ([]byte, error) {
 	packetID, err := uuid.NewV7()
 	if err != nil {
 		return nil, err

@@ -111,7 +111,7 @@ func (l *IPRListener) Listen() {
 		}
 
 		// prepare new broadcast message.
-		msg, err := r.Marshall()
+		msg, err := r.Marshal()
 		if err != nil {
 			l.log.Error(fmt.Errorf("failed to marshal packet: %w", err))
 			continue
