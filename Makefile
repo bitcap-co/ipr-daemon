@@ -103,7 +103,7 @@ AMD64_IMAGE 	   := $(REPO_ORG)/$(PROJECT_NAME)-builder-amd64:$(DOCKER_VERSION)
 
 .PHONY: linux-amd64
 linux-amd64:
-	docker build -t $(AMD64_IMAGE) -f Dockerfile.amd64 .
+	docker build -t $(AMD64_IMAGE) -f linux-amd64.dockerfile .
 	docker run --rm \
 		--volume $(shell pwd)/dist:/build/$(PROJECT_NAME)/dist \
 		$(AMD64_IMAGE)
@@ -116,9 +116,10 @@ linux-amd64-shell:
 
 .linux-amd64: $(LINUX_AMD64_S_NAME)
 $(LINUX_AMD64_S_NAME): .prepare
-	CGO_LDFLAGS=$$(pkg-config --libs dbus-1 libsystemd libpcap libcap libibverbs libnl-route-3.0) CGO_ENABLED=1 \
+	CGO_LDFLAGS="$$(pkg-config --libs libpcap)" CGO_ENABLED=1 \
 	    go build -ldflags "$(LDFLAGS) -linkmode 'external' -extldflags '-static'" \
 	        -o $(LINUX_AMD64_S_NAME) ./cmd/main.go
+	@echo "Created: $(LINUX_AMD64_S_NAME)"
 
 # FreeBSD
 .PHONY: .vagrant-check
@@ -149,4 +150,18 @@ $(FREEBSD_AMD64_S_NAME):
 	go build -ldflags '$(LDFLAGS) -linkmode external -extldflags -static' \
 		-o $(FREEBSD_AMD64_S_NAME) ./cmd/main.go
 	@echo "Created: $(FREEBSD_AMD64_S_NAME)"
+endif
+
+# macOS/darwin
+ifeq ($(GOOS),darwin)
+DARWIN_S_NAME := $(DIST_DIR)$(OUTPUT_BINARY)-$(PROJECT_VERSION)-darwin-$(GOARCH)
+darwin: $(DARWIN_S_NAME)
+
+$(DARWIN_S_NAME): ./cmd/main.go .prepare
+	LDFLAGS="$$(pkg-config --libs libpcap)" \
+	CFLAGS="$$(pkg-config --cflags libpcap)" \
+	CGO_ENABLED=1\
+	go build -ldflags='$(LDFLAGS)' \
+		-o $(DARWIN_S_NAME) ./cmd/main.go
+	@echo "Created: $(DARWIN_S_NAME)"
 endif
