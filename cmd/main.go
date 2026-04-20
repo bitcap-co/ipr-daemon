@@ -10,6 +10,7 @@ import (
 var (
 	// flags
 	flDebug     = flag.Bool("d", false, "Switch to enable packet debugging output.")
+	flFilter    = flag.Bool("filter", false, "Switch to filter only known ports/miner types. Excludes 'unknown'.")
 	flInterface = flag.String("i", "eth0", "Name of network interface for listening.")
 	flAuto      = flag.Bool("a", false, "Switch to use the defined LAN interface (matching description) for listening. Overrides -i flag.")
 	flTCPPort   = flag.Int("p", 7788, "Forward port for TCP broadcast. Default: 7788.")
@@ -35,7 +36,7 @@ func main() {
 	}
 
 	// initialize IPRListener handle.
-	listener := iprd.NewListener(log, *flDebug, iface)
+	listener := iprd.NewListener(log, *flDebug, *flFilter, iface)
 	if err := listener.Activate(); err != nil {
 		log.Fatal(err)
 	}
@@ -65,6 +66,9 @@ func main() {
 		log.Debug("--- DEBUG OUTPUT ON ---")
 	}
 	// start listening for packets.
+	if *flFilter {
+		log.Info("option -filter set: ignoring 'unknown' miner types.")
+	}
 	listener.Listen()
 }
 
