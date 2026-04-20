@@ -165,3 +165,16 @@ $(DARWIN_S_NAME): ./cmd/main.go .prepare
 		-o $(DARWIN_S_NAME) ./cmd/main.go
 	@echo "Created: $(DARWIN_S_NAME)"
 endif
+
+# windows
+ifeq ($(GOOS),windows)
+WINDOWS_S_NAME := $(DIST_DIR)$(OUTPUT_BINARY)-$(PROJECT_VERSION)-windows-$(GOARCH)
+windows: $(WINDOWS_S_NAME)
+
+$(WINDOWS_S_NAME): ./cmd/main.go .prepare
+	CC="x86_64-w64-mingw32-gcc" \
+	CGO_LDFLAGS="-static" CGO_ENABLED=0 \
+	go build -ldflags='$(LDFLAGS)' \
+		-o $(WINDOWS_S_NAME) ./cmd/main.go
+	@echo "Created: $(WINDOWS_S_NAME)"
+endif
