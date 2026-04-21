@@ -160,7 +160,7 @@ darwin: $(DARWIN_S_NAME)
 $(DARWIN_S_NAME): ./cmd/main.go .prepare
 	LDFLAGS="$$(pkg-config --libs libpcap)" \
 	CFLAGS="$$(pkg-config --cflags libpcap)" \
-	CGO_ENABLED=1\
+	CGO_ENABLED=1 \
 	go build -ldflags='$(LDFLAGS)' \
 		-o $(DARWIN_S_NAME) ./cmd/main.go
 	@echo "Created: $(DARWIN_S_NAME)"
