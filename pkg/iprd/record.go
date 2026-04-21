@@ -9,7 +9,7 @@ type Record struct {
 	items    map[string]RecordEntry
 	elements map[string]*list.Element
 	order    *list.List
-	size     int
+	capacity int
 }
 
 // RecordEntry represents an entry in Record
@@ -21,17 +21,17 @@ type RecordEntry struct {
 	UpdatedAt int64
 }
 
-// NewRecord returns a new ordered map of set size of RecordEntry.
-func NewRecord(size int) *Record {
+// NewRecord returns a new Record with maximum size of cap.
+func NewRecord(cap int) *Record {
 	return &Record{
 		items:    make(map[string]RecordEntry),
 		elements: make(map[string]*list.Element),
 		order:    list.New(),
-		size:     size,
+		capacity: cap,
 	}
 }
 
-// Add creates/updates a RecordEntry in Record. If size is already reached, oldest entry is popped. FIFO order
+// Add creates/updates a RecordEntry in Record. If capacity is reached, entries are removed in FIFO order.
 func (r *Record) Add(key string, record RecordEntry) {
 	if element, ok := r.elements[key]; ok {
 		r.order.MoveToBack(element)
@@ -41,7 +41,7 @@ func (r *Record) Add(key string, record RecordEntry) {
 		return
 	}
 
-	if r.order.Len() > r.size {
+	if r.order.Len() >= r.capacity {
 		oldest := r.order.Front()
 		if oldest != nil {
 			delete(r.elements, oldest.Value.(string))
