@@ -17,23 +17,14 @@ Currently, it supports UNIX-based distros (FreeBSD, Ubuntu, MacOS) and Windows!
 Ubuntu pre-built binaries are available in Releases!
 
 ### Build dependencies
-  - Go (>=1.24.5)
+  - Go (>=1.24.0)
   - make (Optional)
 
 To build locally, simply run
 ```bash
 go build -o iprd cmd/main.go
-```
-
-### Static binaries
-  - FreeBSD
-```bash
-make build-freebsd
-```
- - Debian-based Linux
-```bash
-sudo apt install libpcap-dev libcap-dev librdmacm-dev libibverbs-dev
-make build-debian
+# or
+make
 ```
 
 ## Usage
