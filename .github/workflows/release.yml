@@ -59,7 +59,7 @@ jobs:
       - name: Setup build environment
         run: |
           brew update
-          brew install make pkgconfig
+          brew install make
       - name: Prepare libpcap
         run: |
           export BASEDIR=$(pwd)

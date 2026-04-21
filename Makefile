@@ -158,10 +158,9 @@ DARWIN_S_NAME := $(DIST_DIR)$(OUTPUT_BINARY)-$(PROJECT_VERSION)-darwin-$(GOARCH)
 darwin: $(DARWIN_S_NAME)
 
 $(DARWIN_S_NAME): ./cmd/main.go .prepare
-	LDFLAGS="$$(pkg-config --libs libpcap)" \
-	CFLAGS="$$(pkg-config --cflags libpcap)" \
+	CGO_CFLAGS="$$(pkg-config --cflags libpcap)" \
 	CGO_ENABLED=1 \
-	go build -ldflags='$(LDFLAGS)' \
+	go build -ldflags='$(LDFLAGS) -linkmode external -extldflags "/usr/local/lib/libpcap.a"' \
 		-o $(DARWIN_S_NAME) ./cmd/main.go
 	@echo "Created: $(DARWIN_S_NAME)"
 endif
