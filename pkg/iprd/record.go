@@ -2,6 +2,7 @@ package iprd
 
 import (
 	"container/list"
+	"fmt"
 	"time"
 )
 
@@ -75,10 +76,11 @@ func (r *Record) Length() int {
 	return r.order.Len()
 }
 
-// func (r *Record) display() {
-// 	for e := r.order.Front(); e != nil; e = e.Next() {
-// 		key := e.Value.(string)
-// 		fmt.Printf("%s: %+v, ", key, r.items[key])
-// 	}
-// 	fmt.Printf("record len: %d", r.Length())
-// }
+// Display prints the current RecordEntries and Length of record to stdout. Useful for logging/debugging.
+func (r *Record) Display() {
+	fmt.Printf("Record len: %d\n", r.Length())
+	for e := r.order.Front(); e != nil; e = e.Next() {
+		key := e.Value.(string)
+		fmt.Printf("%s: %+v, ", key, r.items[key])
+	}
+}
