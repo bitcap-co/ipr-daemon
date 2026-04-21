@@ -14,7 +14,7 @@ As it receives IP Report messages, it will send the data over a TCP broadcast/st
 ## Building
 Currently, it supports UNIX-based distros (FreeBSD, Ubuntu, MacOS) and Windows!
 
-Ubuntu pre-built binaries are available in Releases!
+pre-built binaries are available in Releases!
 
 ### Build dependencies
   - Go (>=1.24.0)
