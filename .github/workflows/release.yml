@@ -1,41 +1,117 @@
-name: iprd release
+name: Build/Release IPR Daemon Binaries
 on:
   push:
     tags:
       - "v*"
+env:
+  GO_VERSION: '1.24.0'
+  LIBPCAP_VERSION: 1.10.3
+  FREEBSD_VERSION: 14.3
 
 jobs:
-  build:
-    runs-on: ubuntu-24.04
+  linux-amd64:
+    name: Linux amd64
+    runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v4
+      - uses: actions/checkout@v6
+      - name: Setup build environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget git gcc make flex bison
+      - uses: actions/setup-go@v6
         with:
-          go-version: "1.24.5"
+          go-version: '${{ env.GO_VERSION }}'
 
-      - name: Apt update
-        run: sudo apt update
+      - name: Prepare libpcap
+        run: |
+          export LIBPCAP_VERSION=${{ env.LIBPCAP_VERSION }}
+          wget -qO - https://www.tcpdump.org/release/libpcap-${LIBPCAP_VERSION}.tar.gz | tar zvxf -
+      - name: Build libpcap-${{ env.LIBPCAP_VERSION }} from source
+        run: |
+          cd libpcap-${LIBPCAP_VERSION}
+          ./configure --disable-dbus
+          make
+          sudo make install
+      - name: Build amd64 binary
+        run: |
+          make .linux-amd64
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: iprd-build-${{ runner.os }}-${{ runner.arch }}
+          path: dist/iprd*
 
-      - name: System build dependencies
-        run: sudo apt install libpcap-dev libcap-dev librdmacm-dev libibverbs-dev libsystemd-dev
+  macos:
+    name: MacOS x86/arm64
+    strategy:
+      matrix:
+        include:
+          - os: macos-15-intel
+            arch: x64
+          - os: macos-15
+            arch: arm64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@6
+        with:
+          go-version: '${{ env.GO_VERSION }}'
+      - name: Setup build environment
+        run: |
+          brew update
+          brew install make
+      - name: Prepare libpcap
+        run: |
+          export BASEDIR=$(pwd)
+          export LIBPCAP_VERSION=${{ env.LIBPCAP_VERSION }}
+          wget -qO - https://www.tcpdump.org/release/libpcap-${LIBPCAP_VERSION}.tar.gz | tar zvxf -
 
-      - name: Go dependencies
-        run: go mod download
-
-      - name: Build static binary
-        run: go build -tags netgo -ldflags "-linkmode 'external' -extldflags '-static -ldbus-1 -lsystemd -lpcap -lcap -libverbs -lnl-route-3 -lnl-3'" -o iprd-${{ github.ref_name }}-${{ runner.os }}-${{ runner.arch }} cmd/main.go
+          cd ${BASEDIR}/libpcap-${LIBPCAP_VERSION}
+          ./configure --disable-dbus
+          make
+          sudo make install
+    
+      - name: Build MacOS binary
+        run: |
+          make darwin
 
       - name: Upload artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: ${{ runner.os }}-${{ runner.arch }}
-          path: |
-            iprd*
+          name: iprd-build-${{ runner.os }}-${{ runner.arch }}
+          path: dist/iprd*
+  
+  freebsd:
+    name: FreeBSD amd64
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+      - name: Prepare in FreeBSD virtual machine
+        uses: vmactions/freebsd-vm@v1
+        with:
+          release: '${{ env.FREEBSD_VERSION }}'
+          usesh: true
+          prepare: |
+            pkg install -y git gmake go libpcap amd64-binutils
+          run: |
+            ls -la /usr/local/bin
+            export PATH=/usr/local/bin:$PATH
+            go version
+            git config --global --add safe.directory /home/runner/work/ipr-daemon/ipr-daemon
+            FREEBSD_VERSION=${{ env.FREEBSD_VERSION }} gmake freebsd-binaries
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: iprd-build-freebsd-amd64
+          path: dist/iprd*
+          
+  
   release:
     name: Create release
     permissions:
       contents: write
-    needs: build
+    needs: [linux-amd64, macos, freebsd]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -50,4 +126,4 @@ jobs:
           draft: true
           prerelease: true
           files: |
-            ${{ github.workspace }}/artifacts/Linux-X64/iprd*
+            ${{ github.workspace }}/artifacts/iprd-build-*-*/iprd*
