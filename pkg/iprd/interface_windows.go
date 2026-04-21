@@ -14,22 +14,24 @@ import (
 // interface name of the form "\Device\NPF_{GUID}" using GetAdaptersAddresses.
 // https://learn.microsoft.com/en-us/windows/win32/api/iphlpapi/nf-iphlpapi-getadaptersaddresses
 func getWin32FriendlyName(name string) (string, error) {
-	// extract GUID from name
+	// extract GUID from pcap device name
 	guid := strings.TrimPrefix(name, "\\Device\\NPF_")
 
+	// we first call windows.GetAdapterAddresses to determine the required buffer size
 	var l uint32
-	// first call to determine the required buffer size
 	err := windows.GetAdaptersAddresses(windows.AF_INET, 0, 0, nil, &l)
 	if err != windows.ERROR_BUFFER_OVERFLOW {
 		return "", fmt.Errorf("getadaptersaddresses: %s\n", err)
 	}
 
+	// now that we have the buffer size l, make our final call to get all adapter addresses
 	buf := make([]byte, l)
 	addrs := (*windows.IpAdapterAddresses)(unsafe.Pointer(&buf[0]))
 	if err = windows.GetAdaptersAddresses(windows.AF_INET, 0, 0, addrs, &l); err != nil {
 		return "", fmt.Errorf("getadaptersaddresses: %s\n", err)
 	}
 
+	// loop through our addrs and return the FriendlyName of adapter a matching our extracted GUID
 	for a := addrs; a != nil; a = a.Next {
 		adapterName := windows.BytePtrToString(a.AdapterName)
 		if strings.EqualFold(adapterName, guid) {
@@ -39,15 +41,19 @@ func getWin32FriendlyName(name string) (string, error) {
 	return "", fmt.Errorf("failed to get friendly name for %s", name)
 }
 
+// getInterfaces returns all available IPRInterfaces that we can listen on.
+// Returns error if no valid interfaces found.
 func getInterfaces() ([]IPRInterface, error) {
 	interfaces := make([]IPRInterface, 0)
+	// find all available system interfaces using libpcap
 	availInterfaces, err := pcap.FindAllDevs()
 	if err != nil {
 		return nil, err
 	}
 
 	for _, iface := range availInterfaces {
-		// loop thru interfaces for valid ipv4
+		// anonymous function that loops through all attached addresses
+		// looking for valid local/private IPv4
 		ipv4 := func(i pcap.Interface) net.IP {
 			for _, addr := range i.Addresses {
 				if addr.IP != nil && addr.IP.To4() != nil && addr.IP.IsPrivate() {
@@ -56,22 +62,21 @@ func getInterfaces() ([]IPRInterface, error) {
 			}
 			return nil
 		}(iface)
+		// if we fail to find an valid IPv4 addresses, skip.
 		if ipv4 == nil {
 			continue
 		}
 
-		// get friendly name for std net
+		// get network interface information from std net
 		friendlyName, err := getWin32FriendlyName(iface.Name)
 		if err != nil {
 			continue
 		}
-
-		// get info from std net using friendlyName
 		netInterface, err := net.InterfaceByName(friendlyName)
 		if err != nil {
 			continue
 		}
-		// ensure flags RUNNING/LOWER_UP, BROADCAST are set
+		// ensure RUNNING/LOWER_UP and BROADCAST flags are set
 		if netInterface.Flags&net.FlagRunning == 0 || netInterface.Flags&net.FlagBroadcast == 0 {
 			continue
 		}
