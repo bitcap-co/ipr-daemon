@@ -1,0 +1,13 @@
+[Unit]
+Description=IPR Daemon
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+EnvironmentFile=/etc/iprd.conf
+User=root
+Group=root
+ExecStart=/usr/bin/iprd $ARGS
+
+[Install]
+WantedBy=multi-user.target
