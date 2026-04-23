@@ -170,7 +170,7 @@ CGO_LDFLAGS := -Wl,-rpath,$(HOMEBREW_PREFIX)/lib
 $(DARWIN_S_NAME): ./cmd/main.go .prepare
 	@echo "CFLAGS: $(PCAP_CFLAGS)"
 	CGO_ENABLED=1 CGO_CFLAGS="$(PCAP_CFLAGS)" \
-	CGO_LDFLAGS="$(CGO_LDFLAGS)$(PCAP_LDFLAGS)" \
+	CGO_LDFLAGS="$(CGO_LDFLAGS) $(PCAP_LDFLAGS)" \
 	go build -ldflags='$(LDFLAGS)' \
 		-o $(DARWIN_S_NAME) ./cmd/main.go
 	@echo "Created: $(DARWIN_S_NAME)"
