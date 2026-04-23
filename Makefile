@@ -157,10 +157,21 @@ ifeq ($(GOOS),darwin)
 DARWIN_S_NAME := $(DIST_DIR)$(OUTPUT_BINARY)-$(PROJECT_VERSION)-darwin-$(GOARCH)
 darwin: $(DARWIN_S_NAME)
 
+PCAP_CFLAGS := $(shell pkg-config --cflags libpcap)
+PCAP_LDFLAGS := $(shell pkg-config --libs --static libpcap)
+
+HOMEBREW_PREFIX := $(or $(shell test -d /opt/homebrew && echo /opt/homebrew),$(shell test -d /usr/local && echo /usr/local))
+ifeq ($(PCAP_CFLAGS),)
+PCAP_CFLAGS := -I$(HOMEBREW_PREFIX)/include
+PCAP_LDFLAGS := -L$(HOMEBREW_PREFIX)/lib -lpcap
+endif
+
+CGO_LDFLAGS := -Wl,-rpath,$(HOMEBREW_PREFIX)/lib
 $(DARWIN_S_NAME): ./cmd/main.go .prepare
-	CGO_CFLAGS="$$(pkg-config --cflags libpcap)" \
-	CGO_ENABLED=1 \
-	go build -ldflags='$(LDFLAGS) -linkmode external -extldflags "/usr/local/lib/libpcap.a"' \
+	@echo "CFLAGS: $(PCAP_CFLAGS)"
+	CGO_ENABLED=1 CGO_CFLAGS="$(PCAP_CFLAGS)" \
+	CGO_LDFLAGS="$(CGO_LDFLAGS)$(PCAP_LDFLAGS)" \
+	go build -ldflags='$(LDFLAGS)' \
 		-o $(DARWIN_S_NAME) ./cmd/main.go
 	@echo "Created: $(DARWIN_S_NAME)"
 endif
