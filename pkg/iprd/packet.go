@@ -132,7 +132,7 @@ func NewIPReportPacket(packet gopacket.Packet) (*IPReportPacket, error) {
 	}, nil
 }
 
-// ParseIPReportPacket analysis packet for valid IP Report packet. Returns an error on failure.
+// ParseIPReportPacket analyzes packet for valid IP Report packet. Returns an error on failure.
 func ParseIPReportPacket(packet *IPReportPacket) error {
 	// retrieve miner hint from DstPort.
 	minerHint, ok := minerPorts[packet.DstPort]
@@ -180,7 +180,7 @@ func ParseIPReportPacket(packet *IPReportPacket) error {
 	packet.Payload = string(packet.Datagram)
 	// ignore packet if it doesn't contain source IP within UDP datagram.
 	if !bytes.Contains(packet.Datagram, []byte(packet.SrcIP)) {
-		// edge case for Elphapex: it sends a static message that doesnt contain source IP.
+		// edge case for Elphapex: it sends a static message that doesn't contain source IP.
 		if !MsgPatterns["DG"].Match(packet.Datagram) {
 			return fmt.Errorf("no source IP found in datagram")
 		}
