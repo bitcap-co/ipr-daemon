@@ -33,23 +33,22 @@ make
 ```
 
 ## Usage
-> [!WARNING]
-> This program does require root permissions to run. 
-
-Once built (and marked at executable!), simply run:
+To see the iprd binary in action, simply run:
 ```bash
 sudo ./iprd -i "eth0"
 ```
-where, `-i` is the system interface name that you want to listen on.
+where, `-i` is specifying the system interface name to listen on.
 > [!NOTE]
-> On Windows, supply the network device name (i.e. "Ethernet Instance 0"). Run `ipconfig` in cmd/pwsh to see all interface names.
+> If running on Windows, supply the network device name (i.e. "Ethernet Instance 0"). Run `ipconfig` in cmd/pswh to see all interface names.
 
-To configure the TCP port, use `-p` to supply:
-```
+It also worth noting that `iprd` requires running under the `root` user to run.
+
+To configure the TCP stream port, use `-p` to supply:
+```bash
 sudo ./iprd -i "eth0" -p <SOME_PORT>
 ```
 
-See `iprd -h` for all available options.
+Also see `iprd -h` for a list of all available options.
 
 ## Subscribing to TCP broadcast
 By default, the TCP broadcast listens on port 7788.
@@ -72,12 +71,21 @@ This is designed to be as open-ended as possible to accept any IP Report message
 ### Current list of known miner ports:
 ```go
 minerPorts  = map[int]MinerTypeHint{
-		14235: Antminer, // Assume antminer but could be a multitude of miner types (i.e. Volcminer, Hammer)
-		11503: Iceriver,
-		8888:  Whatsminer,
-		1314:  Goldshell,
-		18650: Sealminer,
-		9999:  Elphapex,
-		12345: Auradine,
+	14235: Antminer, // Assume antminer but could be a multitude of miner types (i.e. Volcminer, Hammer)
+	11503: Iceriver,
+	8888:  Whatsminer,
+	1314:  Goldshell,
+	18650: Sealminer,
+	9999:  Elphapex,
+	12345: Auradine,
 }
+```
+
+## iprd (package)
+The core tooling/functionality of IPR Daemon can be found in `pkg/iprd`.
+See [README](./pkg/iprd/README.md) for more details on how to use within your own programs!
+
+For documentation, see:
+```bash
+go doc -http ./pkg/iprd
 ```
