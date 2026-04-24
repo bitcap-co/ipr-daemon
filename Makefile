@@ -28,6 +28,7 @@ LDFLAGS            := $(LDFLAGS) -X "main.VERSION=$(PROJECT_VERSION)" -X "main.D
 LDFLAGS            += -X "main.BUILDINFO=$(BUILDINFOS)" -X "main.TAG=$(PROJECT_TAG)"
 LDFLAGS            += -X "main.COMMIT=$(PROJECT_COMMIT)" -s -w
 OUTPUT_BINARY      := iprd
+OUTPUT_OFFLINE     := iprd-offline
 OUTPUT_NAME        := $(DIST_DIR)$(OUTPUT_BINARY)-$(GOOS)-$(GOARCH)
 DOCKER_VERSION     := v$(PROJECT_VERSION)
 FREEBSD_VERSION    := 14.3
@@ -95,6 +96,10 @@ $(DIST_DIR):
 
 $(OUTPUT_NAME): ./cmd/main.go .prepare
 	go build -ldflags='$(LDFLAGS)' -o ${OUTPUT_NAME} ./cmd/main.go
+
+.PHONY: offline
+offline: ./cmd/offline/main.go
+	go build -o ${OUTPUT_OFFLINE} ./cmd/offline/main.go
 
 
 # Linux (amd64)
