@@ -35,6 +35,7 @@ FREEBSD_VERSION    := 14.3
 
 ALL: $(OUTPUT_NAME)
 
+## help : prints this output
 .PHONY: help
 help:
 	@echo "Usage: make [target]"
@@ -42,26 +43,32 @@ help:
 	@echo "Targets:"
 	@sed -n 's/^##//p' ${MAKEFILE_LIST} | column -t -s ':' | sed -e 's/^/ /'
 
+## unittest : run go unit tests
 .PHONY: unittest
 unittest:
 	go test ./...
 
+## test-race : run `go test -race`
 .PHONY: test-race
 test-race:
 	@echo checking code for races...
 	go test -race ./...
 
+## vet : run `go vet`
 .PHONY: vet
 vet:
 	@echo checking code is vetted...
 	go vet $(shell go list ./...)
 
+## test : run all tests
 test: vet unittest
 
+## fmt : format code with `go fmt`
 .PHONY: fmt
 fmt:
 	@go fmt ./cmd/...
 
+## test-fmt : test to make sure code is formatted correctly
 .PHONY: test-fmt
 test-fmt: fmt
 	@if test `git diff ./cmd | wc -l` -gt 0; then \
@@ -70,6 +77,7 @@ test-fmt: fmt
 	    exit -1 ; \
 	fi
 
+## test-tidy : test to make sure go.mod is tidy
 .PHONY: test-tidy
 test-tidy:
 	@go mod tidy
@@ -78,16 +86,23 @@ test-tidy:
 	    exit -1 ; \
 	fi
 
+## lint : run `golangci-list`
 lint:
 	golangci-lint run
 
+## precheck : run all checks
 precheck: test test-fmt test-tidy lint
 
+## clean : clear dist/
 clean:
 	rm -f dist/*
 
+## clean-go : clear go cache
 clean-go:
 	go clean -i -r -cache -modcache
+
+## clean-build : clear build environment
+clean-build: vagrant-clean docker-clean clean
 
 .prepare: $(DIST_DIR)
 
@@ -106,6 +121,7 @@ offline: ./cmd/offline/main.go
 LINUX_AMD64_S_NAME := $(DIST_DIR)$(OUTPUT_BINARY)-$(PROJECT_VERSION)-linux-amd64
 AMD64_IMAGE 	   := $(REPO_ORG)/$(PROJECT_NAME)-builder-amd64:$(DOCKER_VERSION)
 
+## linux-amd64 : build static Linux/amd64 binary using Docker
 .PHONY: linux-amd64
 linux-amd64:
 	docker build -t $(AMD64_IMAGE) -f linux-amd64.dockerfile .
@@ -113,6 +129,7 @@ linux-amd64:
 		--volume $(shell pwd)/dist:/build/$(PROJECT_NAME)/dist \
 		$(AMD64_IMAGE)
 
+## linux-amd64-shell : get a shell in Linux/amd64 Docker container
 .PHONY: linux-amd64-shell
 linux-amd64-shell:
 	docker run -it --rm  --entrypoint /bin/bash \
@@ -126,20 +143,27 @@ $(LINUX_AMD64_S_NAME): .prepare
 	        -o $(LINUX_AMD64_S_NAME) ./cmd/main.go
 	@echo "Created: $(LINUX_AMD64_S_NAME)"
 
+## docker-clean : remove Docker containers
+docker-clean:
+	docker image rm ${AMD64_IMAGE} || true
+
 # FreeBSD
 .PHONY: .vagrant-check
 .vagrant-check:
 	@which vagrant >/dev/null || "Please install Vagrant: https://www.vagrantup.com"
 	@which VBoxManage >/dev/null || "Please install VirtualBox: https://www.virtualbox.org"
 
+## freebsd : build static FreeBSD/amd64 binary with Vagrant VM
 freebsd: .vagrant-check
 	vagrant provision && vagrant up && vagrant ssh-config >.vagrant-ssh && \
 		scp -F .vagrant-ssh default:$(PROJECT_NAME)/dist/*freebsd* dist/
 
+## freebsd-shell : get shell in FreeBSD Vagrant VM
 freebsd-shell:
 	vagrant ssh
 
-freebsd-clean:
+## vagrant-clean : destroy Vagrant VM
+vagrant-clean:
 	vagrant destroy -f || true
 	rm -f .vagrant-ssh
 
@@ -160,6 +184,7 @@ endif
 # macOS/darwin
 ifeq ($(GOOS),darwin)
 DARWIN_S_NAME := $(DIST_DIR)$(OUTPUT_BINARY)-$(PROJECT_VERSION)-darwin-$(GOARCH)
+## darwin : build MacOS/amd64 binary
 darwin: $(DARWIN_S_NAME)
 
 PCAP_CFLAGS := $(shell pkg-config --cflags libpcap)
