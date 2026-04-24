@@ -48,6 +48,7 @@ func getInterfaces() ([]IPRInterface, error) {
 		interfaces = append(interfaces, IPRInterface{
 			Index:        netInterface.Index,
 			Name:         iface.Name,
+			Description:  iface.Description,
 			FriendlyName: friendlyName,
 			IPv4:         ipv4,
 			HardwareAddr: netInterface.HardwareAddr,

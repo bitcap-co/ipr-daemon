@@ -95,6 +95,7 @@ func TestGetInterfaces(t *testing.T) {
 		ifaces = append(ifaces, iprd.IPRInterface{
 			Index:        n,
 			Name:         iface.Name,
+			Description:  iface.Description,
 			FriendlyName: iface.Name,
 			IPv4:         ipv4,
 			HardwareAddr: nil,
