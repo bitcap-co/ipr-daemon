@@ -22,26 +22,51 @@ type RecordEntry struct {
 	UpdatedAt int64
 }
 
-// NewRecord returns a new Record with maximum size of cap.
-func NewRecord(cap int) *Record {
+// NewRecord returns a new Record with maximum size of capacity.
+func NewRecord(capacity int) *Record {
 	return &Record{
 		items:    make(map[string]RecordEntry),
 		elements: make(map[string]*list.Element),
 		order:    list.New(),
-		capacity: cap,
+		capacity: capacity,
 	}
 }
 
-// Add creates/updates a RecordEntry in Record. If capacity is reached, entries are removed in FIFO order.
-func (r *Record) Add(key string, record RecordEntry) {
+// Cap returns the capacity set on Record
+func (r *Record) Cap() int {
+	return r.capacity
+}
+
+// Length returns the current length/size of Record
+func (r *Record) Length() int {
+	return r.order.Len()
+}
+
+// Get returns RecordEntry matching key
+func (r *Record) Get(key string) *RecordEntry {
+	if ent, ok := r.items[key]; ok {
+		return &ent
+	}
+	return nil
+}
+
+// Contains returns bool if key exists in Record
+func (r *Record) Contains(key string) bool {
+	_, ok := r.items[key]
+	return ok
+}
+
+// Add creates or updates an element in Record. If Record reaches capacity, elements are automatically removed in FIFO order.
+func (r *Record) Add(key string, entry RecordEntry) {
+	// if key already exists in Record, move to back and update when we saw it
 	if element, ok := r.elements[key]; ok {
 		r.order.MoveToBack(element)
 		element.Value = key
-		record.UpdatedAt = time.Now().UnixMilli()
-		r.items[key] = record
+		entry.UpdatedAt = time.Now().UnixMilli()
+		r.items[key] = entry
 		return
 	}
-
+	// remove in FIFO order if we are at capacity
 	if r.order.Len() >= r.capacity {
 		oldest := r.order.Front()
 		if oldest != nil {
@@ -50,30 +75,29 @@ func (r *Record) Add(key string, record RecordEntry) {
 			r.order.Remove(oldest)
 		}
 	}
-
 	el := r.order.PushBack(key)
 	r.elements[key] = el
-	record.UpdatedAt = time.Now().UnixMilli()
-	r.items[key] = record
+	entry.UpdatedAt = time.Now().UnixMilli()
+	r.items[key] = entry
 }
 
-// Get returns RecordEntry of key.
-func (r *Record) Get(key string) *RecordEntry {
-	if ent, ok := r.items[key]; ok {
-		return &ent
+// Remove deletes element matching key in Record. Returns error if key is not found.
+func (r *Record) Remove(key string) error {
+	el, ok := r.elements[key]
+	if !ok {
+		return fmt.Errorf("key %q not found", key)
 	}
+	delete(r.elements, key)
+	delete(r.items, key)
+	r.order.Remove(el)
 	return nil
 }
 
-// Contains returns bool for if key is present in Record.
-func (r *Record) Contains(key string) bool {
-	_, ok := r.items[key]
-	return ok
-}
-
-// Length returns the length of Record.
-func (r *Record) Length() int {
-	return r.order.Len()
+// Clear removes all elements in Record and resets order.
+func (r *Record) Clear() {
+	r.items = make(map[string]RecordEntry)
+	r.elements = make(map[string]*list.Element)
+	r.order.Init()
 }
 
 // Display prints the current RecordEntries and Length of record to stdout. Useful for logging/debugging.
