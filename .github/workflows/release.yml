@@ -40,6 +40,7 @@ jobs:
         with:
           name: iprd-build-${{ runner.os }}-${{ runner.arch }}
           path: dist/iprd*
+          retention-days: 1
 
   macos:
     name: MacOS x86/arm64
@@ -80,6 +81,7 @@ jobs:
         with:
           name: iprd-build-${{ runner.os }}-${{ runner.arch }}
           path: dist/iprd*
+          retention-days: 1
 
   freebsd:
     name: FreeBSD amd64
@@ -105,6 +107,7 @@ jobs:
         with:
           name: iprd-build-freebsd-X64
           path: dist/iprd*
+          retention-days: 1
 
   release:
     name: Create release
