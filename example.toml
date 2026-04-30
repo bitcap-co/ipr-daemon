@@ -1,0 +1,12 @@
+# debug is a switch to enable packet debugging output.
+debug = false
+# auto is a switch to use the defined LAN interface (matching description of 'lan' or 'LAN') for listening
+auto = false
+# filter is a switch to only broadcast known ports/miner types over forward port. Excludes 'unknown' type.
+filter = false
+# listen_interface is the name of the the desired interface to listen/capture on
+listen_interface = "eth0"
+# forward_port is the TCP stream/broadcast port to forward packet data over
+forward_port = 7788
+# ignored_addrs is a list of MAC addresses to be blacklisted (useful for ignoring packets from specific network devices)
+ignore_addrs = [""]
