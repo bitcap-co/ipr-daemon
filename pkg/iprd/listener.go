@@ -68,6 +68,12 @@ func (l *IPRListener) Activate() error {
 		return fmt.Errorf("failed to set BPF expression: %w", err)
 	}
 	l.log.Info(fmt.Sprintf("set BPF filter expression: %s", bpfExpr))
+	if l.cfg.Debug {
+		l.log.Debug("--- DEBUG OUTPUT ON ---")
+	}
+	if l.cfg.Filter {
+		l.log.Info("filter option is set: only broadcast known ports!")
+	}
 	return nil
 }
 

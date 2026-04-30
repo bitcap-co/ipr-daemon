@@ -79,13 +79,8 @@ func main() {
 	}()
 	log.Info(fmt.Sprintf("set tcp forwarding -> :%d", cfg.ForwardPort))
 	log.Info("successfully started iprd!")
-	if *flDebug {
-		log.Debug("--- DEBUG OUTPUT ON ---")
-	}
-	// start listening for packets.
-	if *flFilter {
-		log.Info("option -filter set: ignoring 'unknown' miner types.")
-	}
+
+	// start listening
 	listener.Listen()
 }
 
