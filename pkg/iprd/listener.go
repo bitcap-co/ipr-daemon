@@ -109,6 +109,19 @@ func (l *IPRListener) Listen() {
 				continue
 			}
 		}
+		if len(l.cfg.IgnoreAddresses) > 0 {
+			isBlacklisted := func(addrs []string) bool {
+				for _, addr := range addrs {
+					if addr == r.SrcMAC {
+						return true
+					}
+				}
+				return false
+			}(l.cfg.IgnoreAddresses)
+			if isBlacklisted {
+				continue
+			}
+		}
 		l.log.Info(fmt.Sprintf("received IP Report %s", r.String()))
 		if l.cfg.Debug {
 			l.log.Debug(fmt.Sprintf("UDP Payload (%d) -> %s", r.CaptureLength, r.Payload))
