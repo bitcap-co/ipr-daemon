@@ -12,8 +12,7 @@ const (
 )
 
 type IPRListener struct {
-	debug    bool
-	filter   bool
+	cfg      *IPRDConfig
 	log      *IPRLogger
 	iface    *IPRInterface
 	inactive *pcap.InactiveHandle
@@ -23,14 +22,13 @@ type IPRListener struct {
 
 // NewListener returns a new IPRListener. If logger is nil, a new IPRLogger is created.
 // Setting logDebug to true enables debug packet logging. Setting filter to true excludes 'unknown' MinerTypeHint.
-func NewListener(logger *IPRLogger, logDebug bool, filter bool, iface *IPRInterface) *IPRListener {
+func NewListener(cfg *IPRDConfig, logger *IPRLogger, iface *IPRInterface) *IPRListener {
 	if logger == nil {
 		logger = NewLogger()
 	}
 	inactive, _ := pcap.NewInactiveHandle(iface.Name)
 	return &IPRListener{
-		debug:    logDebug,
-		filter:   filter,
+		cfg:      cfg,
 		log:      logger,
 		iface:    iface,
 		inactive: inactive,
@@ -92,21 +90,21 @@ func (l *IPRListener) Listen() {
 			if err.Error() == "duplicate packet" {
 				l.log.Warn(fmt.Sprintf("%s - %s", r.String(), err))
 			}
-			if l.debug {
+			if l.cfg.Debug {
 				l.log.Error(fmt.Errorf("%s - not valid: %w", r.String(), err))
 				l.log.Debug("--- PACKET DUMP ---")
 				l.log.Debug(fmt.Sprintf("%s\n", packet.Dump()))
 			}
 			continue
 		}
-		if l.filter {
+		if l.cfg.Filter {
 			if r.MinerHint == UnknownType {
 				l.log.Warn(fmt.Sprintf("received unknown IP Report %s", r.String()))
 				continue
 			}
 		}
 		l.log.Info(fmt.Sprintf("received IP Report %s", r.String()))
-		if l.debug {
+		if l.cfg.Debug {
 			l.log.Debug(fmt.Sprintf("UDP Payload (%d) -> %s", r.CaptureLength, r.Payload))
 		}
 
