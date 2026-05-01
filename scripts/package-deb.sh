@@ -24,7 +24,7 @@ shift $(( OPTIND - 1 ))
 
 # ── locate binary ─────────────────────────────────────────────────────────────
 if [[ -z "$BINARY" ]]; then
-    BINARY="$(ls "$REPO_ROOT"/dist/iprd-linux-* 2>/dev/null | head -1 || true)"
+    BINARY="$(ls "$REPO_ROOT"/dist/iprd-*-linux-* 2>/dev/null | head -1 || true)"
     if [[ -z "$BINARY" ]]; then
         echo "ERROR (No linux binary found in dist/ — build one first or pass as first argument" >&2
         exit 1
@@ -37,7 +37,7 @@ if [[ ! -f "$BINARY" ]]; then
 fi
 
 if [[ -z "$ARCH" ]]; then
-    ARCH="$(basename "$BINARY" | sed -E 's/^iprd-linux-(.+)$/\1/')"
+    ARCH="$(basename "$BINARY" | sed -E 's/^iprd-*-linux-(.+)$/\1/')"
     if [[ -z "$ARCH" ]]; then
         ARCH="$(uname -m | sed -E 's/x86_64/amd64/')"
         echo "No ARCH supplied, using machine architecture: $ARCH" >&2
