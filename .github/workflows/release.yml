@@ -109,11 +109,40 @@ jobs:
           path: dist/iprd*
           retention-days: 1
 
+  windows:
+    name: Windows amd64
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "${{ env.GO_VERSION }}"
+      - name: Setup Npcap SDK
+        run: |
+          Invoke-WebRequest -Uri "https://npcap.com/dist/npcap-sdk-1.13.zip" -OutFile npcap-sdk.zip
+          Expand-Archive -Path npcap-sdk.zip -DestinationPath npcap-sdk
+        shell: pwsh
+      - name: Build Windows amd64 binary
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          $sdk = "$env:GITHUB_WORKSPACE/npcap-sdk"
+          $env:CGO_ENABLED = "1"
+          $env:CGO_CFLAGS = "-I$sdk/Include"
+          $env:CGO_LDFLAGS = "-L$sdk/Lib/x64"
+          go build -ldflags="-s -w" -o "dist/iprd-${{ github.ref_name }}-windows-amd64.exe" ./cmd/main.go
+        shell: pwsh
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: iprd-build-${{ runner.os }}-${{ runner.arch }}
+          path: dist/iprd*
+          retention-days: 1
+
   release:
     name: Create release
     permissions:
       contents: write
-    needs: [linux-amd64, macos, freebsd]
+    needs: [linux-amd64, macos, freebsd, windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
