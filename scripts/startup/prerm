@@ -1,0 +1,6 @@
+#!/bin/sh
+set -e
+if systemctl is-active --quiet iprd.service; then
+    systemctl stop iprd.service
+fi
+systemctl disable iprd.service || true
