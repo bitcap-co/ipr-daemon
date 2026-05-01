@@ -91,7 +91,7 @@ func (l *IPRListener) Listen() {
 			continue
 		}
 		// parse IPReportPacket to validate that it is an IP Report packet.
-		if err := ParseIPReportPacket(r); err != nil {
+		if err := ParseIPReportPacket(r, l.cfg.IgnoreAddresses...); err != nil {
 			// warn on duplicate packet.
 			if err.Error() == "duplicate packet" {
 				l.log.Warn(fmt.Sprintf("%s - %s", r.String(), err))
@@ -106,19 +106,6 @@ func (l *IPRListener) Listen() {
 		if l.cfg.Filter {
 			if r.MinerHint == UnknownType {
 				l.log.Warn(fmt.Sprintf("received unknown IP Report %s", r.String()))
-				continue
-			}
-		}
-		if len(l.cfg.IgnoreAddresses) > 0 {
-			isBlacklisted := func(addrs []string) bool {
-				for _, addr := range addrs {
-					if addr == r.SrcMAC {
-						return true
-					}
-				}
-				return false
-			}(l.cfg.IgnoreAddresses)
-			if isBlacklisted {
 				continue
 			}
 		}
