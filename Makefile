@@ -205,3 +205,24 @@ $(DARWIN_S_NAME): ./cmd/main.go .prepare
 		-o $(DARWIN_S_NAME) ./cmd/main.go
 	@echo "Created: $(DARWIN_S_NAME)"
 endif
+
+DEB_S_NAME := $(DIST_DIR)$(OUTPUT_BINARY)_$(VERSION_PKG)_$(GOARCH).deb
+## deb-package : build .deb package from linux-amd64 binary in dist/
+deb-package: $(DEB_S_NAME)
+
+DEB_STAGING        := $(DIST_DIR)$(OUTPUT_BINARY)_$(VERSION_PKG)_$(GOARCH)
+
+$(DEB_S_NAME): linux-amd64
+	@mkdir -p $(DEB_STAGING)/DEBIAN $(DEB_STAGING)/usr/bin $(DEB_STAGING)/etc/systemd/system
+	@install -m 0755 $(LINUX_AMD64_S_NAME)           $(DEB_STAGING)/usr/bin/iprd
+	@install -m 0644 resources/systemd/iprd.service  $(DEB_STAGING)/etc/systemd/system/iprd.service
+	@install -m 0644 resources/systemd/iprd.conf     $(DEB_STAGING)/etc/iprd.conf
+	@install -m 0755 scripts/startup/postinst        $(DEB_STAGING)/DEBIAN/postinst
+	@install -m 0755 scripts/startup/prerm           $(DEB_STAGING)/DEBIAN/prerm
+	@install -m 0755 scripts/startup/postrm          $(DEB_STAGING)/DEBIAN/postrm
+	@printf '/etc/iprd.conf\n' > $(DEB_STAGING)/DEBIAN/conffiles
+	@printf 'Package: iprd\nVersion: $(VERSION_PKG)\nArchitecture: $(GOARCH)\nMaintainer: MatthewWertman <matt@bitcap.co>\nSection: net\nPriority: optional\nDescription: ASIC Miner IP Report listener\n' \
+	    > $(DEB_STAGING)/DEBIAN/control
+	dpkg-deb --root-owner-group --build $(DEB_STAGING) $(DEB_S_NAME)
+	@rm -rf $(DEB_STAGING)
+	@echo "Created: $(DEB_S_NAME)"
