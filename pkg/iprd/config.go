@@ -8,6 +8,7 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
+// IPRDConfig describes a new IPR Daemon configuration
 type IPRDConfig struct {
 	Debug           bool     `toml:"debug"`
 	Auto            bool     `toml:"auto"`
@@ -17,6 +18,7 @@ type IPRDConfig struct {
 	IgnoreAddresses []string `toml:"ignore_addrs"`
 }
 
+// Validate returns error if IPRDConfig contains invalid values
 func (cfg *IPRDConfig) Validate() error {
 	if cfg.ListenInterface == "" {
 		return fmt.Errorf("ListenInterface must be present")
@@ -27,6 +29,7 @@ func (cfg *IPRDConfig) Validate() error {
 	return nil
 }
 
+// Merge returns a new IPRDConfig from target config
 func (cfg *IPRDConfig) Merge(target *IPRDConfig) *IPRDConfig {
 	result := *cfg
 	if target == nil {
@@ -54,6 +57,7 @@ func (cfg *IPRDConfig) Merge(target *IPRDConfig) *IPRDConfig {
 	return &result
 }
 
+// DefaultIPRDConfig returns a default IPRDConfig
 func DefaultIPRDConfig() *IPRDConfig {
 	return &IPRDConfig{
 		Debug:           false,
@@ -65,11 +69,13 @@ func DefaultIPRDConfig() *IPRDConfig {
 	}
 }
 
+// ParseConfig returns a IPRDConfig along with error from Validate
 func ParseConfig(supplied *IPRDConfig) (*IPRDConfig, error) {
 	cfg := DefaultIPRDConfig().Merge(supplied)
 	return cfg, cfg.Validate()
 }
 
+// NewIPRDConfigFromBytes unmarshals TOML data into IPRDConfig
 func NewIPRDConfigFromBytes(data []byte) (*IPRDConfig, error) {
 	var cfg *IPRDConfig
 	err := toml.Unmarshal(data, &cfg)
@@ -80,6 +86,7 @@ func NewIPRDConfigFromBytes(data []byte) (*IPRDConfig, error) {
 	return ParseConfig(cfg)
 }
 
+// NewIPRDConfigFromFile reads a TOML configuration file at filePath into IPRDConfig
 func NewIPRDConfigFromFile(filePath string) (*IPRDConfig, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
