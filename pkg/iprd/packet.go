@@ -5,6 +5,7 @@ import (
 	"compress/zlib"
 	"fmt"
 	"io"
+	"slices"
 	"time"
 	"unicode/utf8"
 
@@ -137,10 +138,8 @@ func NewIPReportPacket(packet gopacket.Packet) (*IPReportPacket, error) {
 func ParseIPReportPacket(packet *IPReportPacket, ignoredAddrs ...string) error {
 	// optionally passed-in MAC addresses to ignore
 	if len(ignoredAddrs) > 0 {
-		for _, addr := range ignoredAddrs {
-			if addr == packet.SrcMAC {
-				return fmt.Errorf("ignored")
-			}
+		if slices.Contains(ignoredAddrs, packet.SrcMAC) {
+			return fmt.Errorf("ignored")
 		}
 	}
 	// retrieve miner hint from DstPort.
