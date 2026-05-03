@@ -93,3 +93,23 @@ func NewIPRDConfigFromFile(filePath string) (*IPRDConfig, error) {
 	}
 	return NewIPRDConfigFromBytes(data)
 }
+
+// WriteIPRDConfigToFile write TOML configuration of supplied to filePath
+func WriteIPRDConfigToFile(supplied *IPRDConfig, filePath string) error {
+	cfg, err := ParseConfig(supplied)
+	if err != nil {
+		return err
+	}
+
+	file, err := os.Create(filePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	encoder := toml.NewEncoder(file)
+	err = encoder.Encode(cfg)
+	if err != nil {
+		return err
+	}
+	return nil
+}
