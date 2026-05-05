@@ -75,7 +75,7 @@ func (l *IPRListener) Activate() error {
 	if l.cfg.Filter {
 		l.log.Info("filter option is set: only broadcast known ports!")
 	}
-	if len(l.cfg.IgnoreAddresses) > 0 {
+	if len(l.cfg.IgnoreAddresses) > 0 && l.cfg.IgnoreAddresses[0] != "" {
 		l.log.Info(fmt.Sprintf("set ignored addresses: [%s]", strings.Join(l.cfg.IgnoreAddresses, ",")))
 	}
 	return nil
