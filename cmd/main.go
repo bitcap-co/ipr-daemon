@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
@@ -17,7 +18,7 @@ var (
 	flDebug           = flag.Bool("d", false, "Switch to enable packet debugging output.")
 	flAuto            = flag.Bool("a", false, "Switch to use the defined LAN interface (matching description of 'lan' or 'LAN') for listening. Overrides -i flag.")
 	flFilter          = flag.Bool("filter", false, "Switch to only broadcast known ports/miner types over forward port. Excludes 'unknown' type.")
-	flInterface       = flag.String("i", "eth0", "Name of interface to listen/capture on.")
+	flInterface       = flag.String("i", "eth0", "Name or index of interface to listen/capture on.")
 	flForwardPort     = flag.Int("p", 7788, "TCP stream/broadcast port for forwarding packet data.")
 	flList            = flag.Bool("list", false, "List all available system network interfaces to listen on.")
 	flIgnoreAddresses = flag.String("ignore", "", "List of MAC addresses to ignore packets from. Separated by comma.")
@@ -106,7 +107,14 @@ func autoFindLANInterface() *iprd.IPRInterface {
 }
 
 func getInterfaceFromFlag(name string) *iprd.IPRInterface {
-	iface, err := iprd.GetInterfaceByName(name)
+	var err error
+	var iface *iprd.IPRInterface
+	index, err := strconv.Atoi(name)
+	if err == nil {
+		iface, err = iprd.GetInterfaceByIndex(index)
+	} else {
+		iface, err = iprd.GetInterfaceByName(name)
+	}
 	if err != nil {
 		log.Fatal(err)
 	}
