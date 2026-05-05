@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
@@ -18,11 +19,23 @@ var (
 	flFilter          = flag.Bool("filter", false, "Switch to only broadcast known ports/miner types over forward port. Excludes 'unknown' type.")
 	flInterface       = flag.String("i", "eth0", "Name of interface to listen/capture on.")
 	flForwardPort     = flag.Int("p", 7788, "TCP stream/broadcast port for forwarding packet data.")
+	flList            = flag.Bool("list", false, "List all available system network interfaces to listen on.")
 	flIgnoreAddresses = flag.String("ignore", "", "List of MAC addresses to ignore packets from. Separated by comma.")
 )
 
 func main() {
 	flag.Parse()
+	if *flList {
+		ifaces, err := iprd.GetInterfaces()
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, iface := range ifaces {
+			fmt.Println(iface.String())
+		}
+		os.Exit(0)
+	}
+
 	var cfg *iprd.IPRDConfig
 	cfg = &iprd.IPRDConfig{
 		Debug:           *flDebug,
