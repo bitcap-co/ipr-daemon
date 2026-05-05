@@ -107,14 +107,14 @@ func autoFindLANInterface() *iprd.IPRInterface {
 }
 
 func getInterfaceFromFlag(name string) *iprd.IPRInterface {
-	var err error
-	var iface *iprd.IPRInterface
-	index, err := strconv.Atoi(name)
-	if err == nil {
-		iface, err = iprd.GetInterfaceByIndex(index)
-	} else {
-		iface, err = iprd.GetInterfaceByName(name)
+	if index, err := strconv.Atoi(name); err == nil {
+		iface, err := iprd.GetInterfaceByIndex(index)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return iface
 	}
+	iface, err := iprd.GetInterfaceByName(name)
 	if err != nil {
 		log.Fatal(err)
 	}
