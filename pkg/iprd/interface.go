@@ -11,9 +11,10 @@ import (
 var (
 	lanRegex = regexp.MustCompile(`^lan|^LAN`)
 
-	errInvalidInterfaceName = errors.New("invalid interface name")
-	errInterfaceNotFound    = errors.New("interface not found")
-	errNoValidInterfaces    = errors.New("no valid interfaces to listen on")
+	errInvalidInterfaceName  = errors.New("invalid interface name")
+	errInvalidInterfaceIndex = errors.New("invalid interface index")
+	errInterfaceNotFound     = errors.New("interface not found")
+	errNoValidInterfaces     = errors.New("no valid interfaces to listen on")
 )
 
 // IPRInterface describes a network interface supported for IP Report listening.
@@ -73,6 +74,23 @@ func GetInterfaceByName(name string) (*IPRInterface, error) {
 	}
 	for _, iface := range ifaces {
 		if name == iface.Name || name == iface.FriendlyName {
+			return &iface, nil
+		}
+	}
+	return nil, errInterfaceNotFound
+}
+
+// GetInterfaceByIndex returns the IPRInterface matching index.
+func GetInterfaceByIndex(index int) (*IPRInterface, error) {
+	if index <= 0 {
+		return nil, errInvalidInterfaceIndex
+	}
+	ifaces, err := GetInterfaces()
+	if err != nil {
+		return nil, err
+	}
+	for _, iface := range ifaces {
+		if index == iface.Index {
 			return &iface, nil
 		}
 	}
