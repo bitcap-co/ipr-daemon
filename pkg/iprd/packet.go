@@ -5,6 +5,7 @@ import (
 	"compress/zlib"
 	"fmt"
 	"io"
+	"slices"
 	"time"
 	"unicode/utf8"
 
@@ -133,7 +134,14 @@ func NewIPReportPacket(packet gopacket.Packet) (*IPReportPacket, error) {
 }
 
 // ParseIPReportPacket analyzes packet for valid IP Report packet. Returns an error on failure.
-func ParseIPReportPacket(packet *IPReportPacket) error {
+// Optionally can take a series of source MAC addresses to be ignored returning "ignored" error.
+func ParseIPReportPacket(packet *IPReportPacket, ignoredAddrs ...string) error {
+	// optionally passed-in MAC addresses to ignore
+	if len(ignoredAddrs) > 0 {
+		if slices.Contains(ignoredAddrs, packet.SrcMAC) {
+			return fmt.Errorf("ignored")
+		}
+	}
 	// retrieve miner hint from DstPort.
 	minerHint, ok := minerPorts[packet.DstPort]
 	if ok {
