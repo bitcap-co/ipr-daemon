@@ -8,9 +8,9 @@ import (
 	"github.com/google/gopacket/pcap"
 )
 
-// getInterfaces returns all available IPRInterfaces that we can listen on.
+// GetInterfaces returns all available IPRInterfaces that can be listened on.
 // Returns error if no valid interfaces found.
-func getInterfaces() ([]IPRInterface, error) {
+func GetInterfaces() ([]IPRInterface, error) {
 	interfaces := make([]IPRInterface, 0)
 	// find all available system interfaces using libpcap
 	availInterfaces, err := pcap.FindAllDevs()

@@ -36,7 +36,7 @@ func (i *IPRInterface) MACAddr() string {
 	return i.HardwareAddr.String()
 }
 
-// NetworkPrefix returns the network prefix(leading two octets) of IPv4
+// NetworkPrefix returns the network prefix(leading two octets) of IPv4.
 func (i *IPRInterface) NetworkPrefix() string {
 	return strings.Join(strings.Split(i.IPv4.String(), ".")[0:2], ".")
 }
@@ -60,7 +60,7 @@ func GetInterfaceByName(name string) (*IPRInterface, error) {
 	if name == "" {
 		return nil, errInvalidInterfaceName
 	}
-	ifaces, err := getInterfaces()
+	ifaces, err := GetInterfaces()
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +74,7 @@ func GetInterfaceByName(name string) (*IPRInterface, error) {
 
 // FindLANInterface returns the first IPRInterface marked as LAN, if any.
 func FindLANInterface() (*IPRInterface, error) {
-	ifaces, err := getInterfaces()
+	ifaces, err := GetInterfaces()
 	if err != nil {
 		return nil, err
 	}
