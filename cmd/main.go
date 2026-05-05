@@ -14,18 +14,20 @@ var (
 	log = iprd.NewLogger()
 
 	// flags
+	flAuto            = flag.Bool("a", false, "Switch to use the defined LAN interface (matching description of 'lan' or 'LAN') for listening. Overrides -i flag.")
 	flConfig          = flag.String("c", "", "Path to config file. Overrides any other supplied flags.")
 	flDebug           = flag.Bool("d", false, "Switch to enable packet debugging output.")
-	flAuto            = flag.Bool("a", false, "Switch to use the defined LAN interface (matching description of 'lan' or 'LAN') for listening. Overrides -i flag.")
 	flFilter          = flag.Bool("filter", false, "Switch to only broadcast known ports/miner types over forward port. Excludes 'unknown' type.")
 	flInterface       = flag.String("i", "eth0", "Name or index of interface to listen/capture on.")
-	flForwardPort     = flag.Int("p", 7788, "TCP stream/broadcast port for forwarding packet data.")
-	flList            = flag.Bool("list", false, "List all available system network interfaces to listen on.")
 	flIgnoreAddresses = flag.String("ignore", "", "List of MAC addresses to ignore packets from. Separated by comma.")
+	flList            = flag.Bool("list", false, "List all available system network interfaces to listen on.")
+	flForwardPort     = flag.Int("p", 7788, "TCP stream/broadcast port for forwarding packet data.")
 )
 
 func main() {
 	flag.Parse()
+
+	// list interfaces and exit.
 	if *flList {
 		ifaces, err := iprd.GetInterfaces()
 		if err != nil {
@@ -37,6 +39,8 @@ func main() {
 		os.Exit(0)
 	}
 
+	// build/read configuration.
+	var err error
 	var cfg *iprd.IPRDConfig
 	cfg = &iprd.IPRDConfig{
 		Debug:           *flDebug,
@@ -46,7 +50,6 @@ func main() {
 		ForwardPort:     *flForwardPort,
 		IgnoreAddresses: strings.Split(*flIgnoreAddresses, ","),
 	}
-	var err error
 	if *flConfig != "" {
 		cfg, err = iprd.NewIPRDConfigFromFile(*flConfig)
 		if err != nil {
@@ -61,12 +64,12 @@ func main() {
 	} else {
 		iface = getInterfaceFromFlag(cfg.ListenInterface)
 	}
-	// sanity check: make sure that interface is marked as UP.
+	// sanity check to make sure that interface is marked as UP.
 	if !iface.IsUp() {
 		log.Fatal(fmt.Errorf("interface %s is not marked as UP", iface.FriendlyName))
 	}
 	log.Info("start IPReporter Daemon...")
-	// initialize IPRListener handle.
+	// initialize IPRListener handle on iface, passing in cfg.
 	listener := iprd.NewListener(cfg, log, iface)
 	if err := listener.Activate(); err != nil {
 		log.Fatal(err)
