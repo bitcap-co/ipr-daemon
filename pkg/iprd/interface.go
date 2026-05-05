@@ -2,6 +2,7 @@ package iprd
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"regexp"
 	"strings"
@@ -39,6 +40,12 @@ func (i *IPRInterface) MACAddr() string {
 // NetworkPrefix returns the network prefix(leading two octets) of IPv4.
 func (i *IPRInterface) NetworkPrefix() string {
 	return strings.Join(strings.Split(i.IPv4.String(), ".")[0:2], ".")
+}
+
+// String returns IPRInterface as string.
+func (i IPRInterface) String() string {
+	return fmt.Sprintf("%d: %s (%s) Desc:\"%s\"\n   Hardware:%s\n   IPv4:%s",
+		i.Index, i.FriendlyName, i.Name, i.Description, i.HardwareAddr, i.IPv4)
 }
 
 // IsUp returns bool for if IPRInterface is marked as UP.
