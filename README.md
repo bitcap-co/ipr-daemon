@@ -32,14 +32,37 @@ go build -o iprd cmd/main.go
 make
 ```
 
+## Getting started
+The pre-built binaries in Release are statically built whereever possible. meaning that all the needed libraries/dependencies are already included with the binary. However, on some operating systems, static binaries are not supported which means that some dependencies may be required to be installed manually
+
+If using Windows or MacOS/darwin binaries, `libpcap` is required on the system to run succussfully.
+
+### Windows setup
+It recommended to install [Npcap for Windows](https://npcap.com/#download)
+
+### MacOS/darwin setup
+Install `libpcap` via Brew:
+```bash
+brew install libpcap
+```
+
 ## Usage
-To see the iprd binary in action, simply run:
+
+### Finding network interfaces to listen on
+To see all available network interfaces that the daemon can listen on, run with the `-list` argument:
+```
+./iprd -list
+
+# example output
+3: eth0 (eth0) Desc:""
+   Hardware:aa:bb:cc:dd:ee:ff
+   IPv4:192.168.1.xx
+```
+Using the interface index (3) or the name ("eth0"), can specifiy which interface to listen on with the `-i` option
 ```bash
 sudo ./iprd -i "eth0"
 ```
-where, `-i` is specifying the system interface name to listen on.
-> [!NOTE]
-> If running on Windows, supply the network device name (i.e. "Ethernet Instance 0"). Run `ipconfig` in cmd/pswh to see all interface names.
+where, `-i` is specifying the system interface name or index to listen on.
 
 It also worth noting that `iprd` requires running under the `root` user to run.
 
@@ -47,8 +70,13 @@ To configure the TCP stream port, use `-p` to supply:
 ```bash
 sudo ./iprd -i "eth0" -p <SOME_PORT>
 ```
-
 Also see `iprd -h` for a list of all available options.
+
+> [!NOTE]
+> MacOS: if you get a message along the lines of "this application is damaged" or similar, run the following as root to exclude the binary path from the anti-virus:
+> ```bash
+> sudo xattr -dr com.apple.quarantine </path/to/iprd/binary>
+> ```
 
 ## Subscribing to TCP broadcast
 By default, the TCP broadcast listens on port 7788.
@@ -88,4 +116,13 @@ See [README](./pkg/iprd/README.md) for more details on how to use within your ow
 For documentation, see:
 ```bash
 go doc -http ./pkg/iprd
+```
+
+To include into a local project:
+```
+go get github.com/bitcap-co/ipr-daemon
+```
+then to import the `iprd` package, simply import:
+```go
+import "github.com/bitcap-co/ipr-daemon/pkg/iprd"
 ```
