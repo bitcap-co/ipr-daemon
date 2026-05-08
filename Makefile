@@ -6,6 +6,7 @@ BUILDINFOSDET ?=
 # Project metadata
 PROJECT_VERSION    := 0.2.2
 REPO_ORG           := bitcap-co
+DOCKER_REPO        := mattwert
 PROJECT_NAME       := ipr-daemon
 PROJECT_TAG        := $(shell git describe --tags 2>/dev/null $(git rev-list --tags --max-count=1))
 ifeq ($(PROJECT_TAG),)
@@ -226,3 +227,27 @@ $(DEB_S_NAME): linux-amd64
 	dpkg-deb --root-owner-group --build $(DEB_STAGING) $(DEB_S_NAME)
 	@rm -rf $(DEB_STAGING)
 	@echo "Created: $(DEB_S_NAME)"
+
+.PHONY: docker docker_clean .docker
+docker:
+	docker build \
+		-t $(DOCKER_REPO)/$(PROJECT_NAME):$(DOCKER_VERSION) \
+		--build-arg VERSION=$(DOCKER_VERSION) \
+		-f iprd.dockerfile .
+
+.docker:
+	CGO_ENABLED=1 \
+	go build -ldflags '$(LDFLAGS)' -o dist/iprd ./cmd/main.go
+
+docker-shell:
+	docker run --rm -it --network=host \
+	$(DOCKER_REPO)/$(PROJECT_NAME):$(DOCKER_VERSION) \
+	/bin/sh
+
+docker-release:
+	docker buildx build \
+	-t $(DOCKER_REPO)/$(PROJECT_NAME):$(DOCKER_VERSION) \
+	-t $(DOCKER_REPO)/$(PROJECT_NAME):latest \
+	--build-arg VERSION=$(DOCKER_VERSION) \
+	--platform linux/amd64 \
+	--push -f iprd.dockerfile .
