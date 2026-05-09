@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
-	"github.com/google/gopacket/pcap"
+	"github.com/gopacket/gopacket/pcap"
 )
 
 func makeIPRInterface(name, description, ipAddr, macAddr string, flags net.Flags) (*iprd.IPRInterface, error) {

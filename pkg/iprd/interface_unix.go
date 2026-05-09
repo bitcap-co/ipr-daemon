@@ -5,7 +5,7 @@ package iprd
 import (
 	"net"
 
-	"github.com/google/gopacket/pcap"
+	"github.com/gopacket/gopacket/pcap"
 )
 
 // GetInterfaces returns all available IPRInterfaces that can be listened on.

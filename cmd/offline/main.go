@@ -7,8 +7,8 @@ import (
 	"strings"
 
 	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
-	"github.com/google/gopacket"
-	"github.com/google/gopacket/pcap"
+	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/pcap"
 )
 
 var (
