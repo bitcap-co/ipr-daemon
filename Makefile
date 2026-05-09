@@ -144,9 +144,114 @@ $(LINUX_AMD64_S_NAME): .prepare
 	        -o $(LINUX_AMD64_S_NAME) ./cmd/main.go
 	@echo "Created: $(LINUX_AMD64_S_NAME)"
 
+# Linux ARM (aarch64 / armv5 / armv6 / armv7)
+LINUX_ARM64_S_NAME := $(DIST_DIR)$(OUTPUT_BINARY)-$(PROJECT_VERSION)-linux-arm64
+LINUX_ARMV5_S_NAME := $(DIST_DIR)$(OUTPUT_BINARY)-$(PROJECT_VERSION)-linux-armv5
+LINUX_ARMV6_S_NAME := $(DIST_DIR)$(OUTPUT_BINARY)-$(PROJECT_VERSION)-linux-armv6
+LINUX_ARMV7_S_NAME := $(DIST_DIR)$(OUTPUT_BINARY)-$(PROJECT_VERSION)-linux-armv7
+ARM_IMAGE          := $(REPO_ORG)/$(PROJECT_NAME)-builder-arm:$(DOCKER_VERSION)
+AARCH64_SYSROOT    := /build/sysroot/aarch64
+ARMV5_SYSROOT      := /build/sysroot/armv5
+ARMV6_SYSROOT      := /build/sysroot/armv6
+ARMV7_SYSROOT      := /build/sysroot/armv7
+
+## linux-arm64 : build static Linux/arm64 binary using Docker
+.PHONY: linux-arm64
+linux-arm64:
+	docker build -t $(ARM_IMAGE) -f linux-arm.dockerfile .
+	docker run --rm \
+		--volume $(shell pwd)/dist:/build/$(PROJECT_NAME)/dist \
+		$(ARM_IMAGE) .linux-arm64
+
+## linux-armv5 : build static Linux/armv5 binary using Docker
+.PHONY: linux-armv5
+linux-armv5:
+	docker build -t $(ARM_IMAGE) -f linux-arm.dockerfile .
+	docker run --rm \
+		--volume $(shell pwd)/dist:/build/$(PROJECT_NAME)/dist \
+		$(ARM_IMAGE) .linux-armv5
+
+## linux-armv6 : build static Linux/armv6 binary using Docker
+.PHONY: linux-armv6
+linux-armv6:
+	docker build -t $(ARM_IMAGE) -f linux-arm.dockerfile .
+	docker run --rm \
+		--volume $(shell pwd)/dist:/build/$(PROJECT_NAME)/dist \
+		$(ARM_IMAGE) .linux-armv6
+
+## linux-armv7 : build static Linux/armv7 binary using Docker
+.PHONY: linux-armv7
+linux-armv7:
+	docker build -t $(ARM_IMAGE) -f linux-arm.dockerfile .
+	docker run --rm \
+		--volume $(shell pwd)/dist:/build/$(PROJECT_NAME)/dist \
+		$(ARM_IMAGE) .linux-armv7
+
+## linux-arm32 : build all Linux/arm32 variants (armv5/v6/v7) using Docker
+.PHONY: linux-arm32
+linux-arm32:
+	docker build -t $(ARM_IMAGE) -f linux-arm.dockerfile .
+	docker run --rm \
+		--volume $(shell pwd)/dist:/build/$(PROJECT_NAME)/dist \
+		$(ARM_IMAGE) .linux-arm32
+
+## linux-arm-shell : get a shell in Linux/arm Docker container
+.PHONY: linux-arm-shell
+linux-arm-shell:
+	docker run -it --rm  --entrypoint /bin/bash \
+	    --volume $(shell pwd)/dist:/build/$(PROJECT_NAME)/dist \
+	    $(ARM_IMAGE)
+
+.linux-arm64: $(LINUX_ARM64_S_NAME)
+$(LINUX_ARM64_S_NAME): .prepare
+	GOOS=linux GOARCH=arm64 CGO_ENABLED=1 CC=aarch64-linux-gnu-gcc \
+	    CGO_CFLAGS="-I$(AARCH64_SYSROOT)/include" \
+	    CGO_LDFLAGS="-L$(AARCH64_SYSROOT)/lib -lpcap" \
+	    go build -ldflags "$(LDFLAGS) -linkmode 'external' -extldflags '-static'" \
+	        -o $(LINUX_ARM64_S_NAME) ./cmd/main.go
+	@echo "Created: $(LINUX_ARM64_S_NAME)"
+	@file $(LINUX_ARM64_S_NAME)
+	@aarch64-linux-gnu-readelf -d $(LINUX_ARM64_S_NAME)
+
+.PHONY: .linux-arm32
+.linux-arm32: .linux-armv5 .linux-armv6 .linux-armv7
+
+.linux-armv5: $(LINUX_ARMV5_S_NAME)
+$(LINUX_ARMV5_S_NAME): .prepare
+	GOOS=linux GOARCH=arm GOARM=5 CGO_ENABLED=1 CC=arm-linux-gnueabi-gcc \
+	    CGO_CFLAGS="-I$(ARMV5_SYSROOT)/include" \
+	    CGO_LDFLAGS="-L$(ARMV5_SYSROOT)/lib -lpcap" \
+	    go build -ldflags "$(LDFLAGS) -linkmode 'external' -extldflags '-static'" \
+	        -o $(LINUX_ARMV5_S_NAME) ./cmd/main.go
+	@echo "Created: $(LINUX_ARMV5_S_NAME)"
+	@file $(LINUX_ARMV5_S_NAME)
+	@arm-linux-gnueabi-readelf -d $(LINUX_ARMV5_S_NAME)
+
+.linux-armv6: $(LINUX_ARMV6_S_NAME)
+$(LINUX_ARMV6_S_NAME): .prepare
+	GOOS=linux GOARCH=arm GOARM=6 CGO_ENABLED=1 CC=arm-linux-gnueabi-gcc \
+	    CGO_CFLAGS="-I$(ARMV6_SYSROOT)/include" \
+	    CGO_LDFLAGS="-L$(ARMV6_SYSROOT)/lib -lpcap" \
+	    go build -ldflags "$(LDFLAGS) -linkmode 'external' -extldflags '-static'" \
+	        -o $(LINUX_ARMV6_S_NAME) ./cmd/main.go
+	@echo "Created: $(LINUX_ARMV6_S_NAME)"
+	@file $(LINUX_ARMV6_S_NAME)
+	@arm-linux-gnueabi-readelf -d $(LINUX_ARMV6_S_NAME)
+
+.linux-armv7: $(LINUX_ARMV7_S_NAME)
+$(LINUX_ARMV7_S_NAME): .prepare
+	GOOS=linux GOARCH=arm GOARM=7 CGO_ENABLED=1 CC=arm-linux-gnueabi-gcc \
+	    CGO_CFLAGS="-I$(ARMV7_SYSROOT)/include" \
+	    CGO_LDFLAGS="-L$(ARMV7_SYSROOT)/lib -lpcap" \
+	    go build -ldflags "$(LDFLAGS) -linkmode 'external' -extldflags '-static'" \
+	        -o $(LINUX_ARMV7_S_NAME) ./cmd/main.go
+	@echo "Created: $(LINUX_ARMV7_S_NAME)"
+	@file $(LINUX_ARMV7_S_NAME)
+	@arm-linux-gnueabi-readelf -d $(LINUX_ARMV7_S_NAME)
+
 ## docker-clean : remove Docker containers
 docker-clean:
-	docker image rm ${AMD64_IMAGE} || true
+	docker image rm ${AMD64_IMAGE} ${ARM_IMAGE} || true
 
 # FreeBSD
 .PHONY: .vagrant-check
