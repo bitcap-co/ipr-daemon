@@ -17,7 +17,7 @@ jobs:
       - name: Setup build environment
         run: |
           sudo apt-get update
-          sudo apt-get install -y wget git gcc make flex bison
+          sudo apt-get install -y wget git gcc make
       - uses: actions/setup-go@v6
         with:
           go-version: "${{ env.GO_VERSION }}"
@@ -44,6 +44,82 @@ jobs:
         uses: actions/upload-artifact@v7
         with:
           name: iprd-build-${{ runner.os }}-${{ runner.arch }}
+          path: dist/iprd*
+          retention-days: 1
+
+  linux-aarch64:
+    name: Linux ARM64
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - uses: actions/checkout@v6
+      - name: Setup build environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget git gcc make
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "${{ env.GO_VERSION }}"
+
+      - name: Prepare libpcap
+        run: |
+          export LIBPCAP_VERSION=${{ env.LIBPCAP_VERSION }}
+          wget -qO - https://www.tcpdump.org/release/libpcap-${LIBPCAP_VERSION}.tar.gz | tar zvxf -
+      - name: Build libpcap-${{ env.LIBPCAP_VERSION }} from source
+        run: |
+          sudo mkdir -p /build/sysroot/aarch64
+          cd libpcap-${LIBPCAP_VERSION}
+          ./configure --disable-dbus --prefix=/build/sysroot/aarch64
+          make
+          sudo make install
+      - name: Build ARM64 binary
+        run: |
+          make .linux-arm64
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: iprd-build-${{ runner.os }}-${{ runner.arch }}
+          path: dist/iprd*
+          retention-days: 1
+
+  linux-arm32:
+    name: Linux ARM32 (armv5/v6/v7)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Setup build environment
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget git gcc gcc-arm-linux-gnueabi make file
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "${{ env.GO_VERSION }}"
+
+      - name: Prepare libpcap
+        run: |
+          export LIBPCAP_VERSION=${{ env.LIBPCAP_VERSION }}
+          wget -qO - https://www.tcpdump.org/release/libpcap-${LIBPCAP_VERSION}.tar.gz | tar zvxf -
+      - name: Cross-compile libpcap for armv5/v6/v7
+        run: |
+          sudo mkdir -p /build/sysroot/armv5 /build/sysroot/armv6 /build/sysroot/armv7
+          cd libpcap-${{ env.LIBPCAP_VERSION }}
+          for variant in armv5:armv5te armv6:armv6 armv7:armv7-a; do
+            arch=${variant%:*}
+            march=${variant#*:}
+            ./configure --host=arm-linux-gnueabi --with-pcap=linux --disable-dbus \
+              --prefix=/build/sysroot/$arch CFLAGS="-march=$march"
+            make
+            sudo make install
+            make distclean
+          done
+      - name: Build arm32 binaries
+        run: |
+          make .linux-arm32
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: iprd-build-${{ runner.os }}-arm32
           path: dist/iprd*
           retention-days: 1
 
@@ -147,7 +223,7 @@ jobs:
     name: Create release
     permissions:
       contents: write
-    needs: [linux-amd64, macos, freebsd, windows]
+    needs: [linux-amd64, linux-aarch64, linux-arm32, macos, freebsd, windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
