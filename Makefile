@@ -249,10 +249,6 @@ $(LINUX_ARMV7_S_NAME): .prepare
 	@file $(LINUX_ARMV7_S_NAME)
 	@arm-linux-gnueabi-readelf -d $(LINUX_ARMV7_S_NAME)
 
-## docker-clean : remove Docker containers
-docker-clean:
-	docker image rm ${AMD64_IMAGE} ${ARM_IMAGE} || true
-
 # FreeBSD
 .PHONY: .vagrant-check
 .vagrant-check:
@@ -333,10 +329,12 @@ $(DEB_S_NAME): linux-amd64
 	@rm -rf $(DEB_STAGING)
 	@echo "Created: $(DEB_S_NAME)"
 
+DOCKER_IMAGE := $(DOCKER_REPO)/$(PROJECT_NAME):$(DOCKER_VERSION)
+
 .PHONY: docker docker_clean .docker
 docker:
 	docker build \
-		-t $(DOCKER_REPO)/$(PROJECT_NAME):$(DOCKER_VERSION) \
+		-t $(DOCKER_IMAGE) \
 		--build-arg VERSION=$(DOCKER_VERSION) \
 		-f iprd.dockerfile .
 
@@ -346,13 +344,17 @@ docker:
 
 docker-shell:
 	docker run --rm -it --network=host \
-	$(DOCKER_REPO)/$(PROJECT_NAME):$(DOCKER_VERSION) \
+	$(DOCKER_IMAGE) \
 	/bin/sh
 
 docker-release:
 	docker buildx build \
-	-t $(DOCKER_REPO)/$(PROJECT_NAME):$(DOCKER_VERSION) \
+	-t $(DOCKER_IMAGE) \
 	-t $(DOCKER_REPO)/$(PROJECT_NAME):latest \
 	--build-arg VERSION=$(DOCKER_VERSION) \
 	--platform linux/amd64 \
 	--push -f iprd.dockerfile .
+
+## docker-clean : remove Docker containers
+docker-clean:
+	docker image rm ${AMD64_IMAGE} ${ARM_IMAGE} || true
