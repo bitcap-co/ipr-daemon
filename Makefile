@@ -352,7 +352,7 @@ docker-release:
 	-t $(DOCKER_IMAGE) \
 	-t $(DOCKER_REPO)/$(PROJECT_NAME):latest \
 	--build-arg VERSION=$(DOCKER_VERSION) \
-	--platform linux/amd64 \
+	--platform linux/arm64,linux/amd64 \
 	--push -f iprd.dockerfile .
 
 ## docker-clean : remove Docker containers
