@@ -142,3 +142,15 @@ func (i *IPReportSealminer) UnmarshalJSON(data []byte) error {
 
 	return nil
 }
+
+// IPReportAuradine represents the JSON payload of IP Report packet from Auradine miners
+type IPReportAuradine struct {
+	Command      string `json:"command"`
+	SerialNo     string `json:"SerialNo"`
+	IPAddress    string `json:"ip"`
+	MACAddress   string `json:"mac"`
+	Model        string `json:"model"`
+	Version      string `json:"version"`
+	Hostname     string `json:"hostname"`
+	InternalType string `json:"InternalType"`
+}
