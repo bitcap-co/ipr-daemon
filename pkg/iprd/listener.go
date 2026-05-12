@@ -92,6 +92,13 @@ func (l *IPRListener) Activate() error {
 		l.log.Info("filter option is set: only broadcast known ports!")
 	}
 	if len(l.cfg.IgnoreAddresses) > 0 && l.cfg.IgnoreAddresses[0] != "" {
+		for i, mac := range l.cfg.IgnoreAddresses {
+			newMac := ParseMACAddress(mac)
+			if len(newMac) == 0 {
+				l.log.Warn(fmt.Sprintf("invalid mac: %d - %s", i, mac))
+			}
+			l.cfg.IgnoreAddresses[i] = newMac
+		}
 		l.log.Info(fmt.Sprintf("set ignored addresses: [%s]", strings.Join(l.cfg.IgnoreAddresses, ",")))
 	}
 	return nil

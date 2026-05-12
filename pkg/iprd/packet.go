@@ -10,9 +10,9 @@ import (
 	"unicode/utf8"
 
 	"github.com/goccy/go-json"
+	"github.com/google/uuid"
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
-	"github.com/google/uuid"
 )
 
 const (
@@ -137,7 +137,7 @@ func NewIPReportPacket(packet gopacket.Packet) (*IPReportPacket, error) {
 // Optionally can take a series of source MAC addresses to be ignored returning "ignored" error.
 func ParseIPReportPacket(packet *IPReportPacket, ignoredAddrs ...string) error {
 	// optionally passed-in MAC addresses to ignore
-	if len(ignoredAddrs) > 0 && ignoredAddrs[0] != "" {
+	if len(ignoredAddrs) > 0 {
 		if slices.Contains(ignoredAddrs, packet.SrcMAC) {
 			return fmt.Errorf("ignored")
 		}
