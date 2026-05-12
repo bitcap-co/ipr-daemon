@@ -10,6 +10,17 @@ import (
 	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
 )
 
+type flagSlice []string
+
+func (f *flagSlice) String() string {
+	return fmt.Sprintf("%s", strings.Join(*f, ","))
+}
+
+func (f *flagSlice) Set(value string) error {
+	*f = append(*f, value)
+	return nil
+}
+
 var (
 	log = iprd.NewLogger()
 
@@ -22,9 +33,11 @@ var (
 	flIgnoreAddresses = flag.String("ignore", "", "List of MAC addresses to ignore packets from. Separated by comma.")
 	flList            = flag.Bool("list", false, "List all available system network interfaces to listen on.")
 	flForwardPort     = flag.Int("p", 7788, "TCP stream/broadcast port for forwarding packet data.")
+	flNetworkPrefixes flagSlice
 )
 
 func main() {
+	flag.Var(&flNetworkPrefixes, "add-prefix", "List of network prefixes to append to BPF filter.")
 	flag.Parse()
 
 	// list interfaces and exit.
@@ -49,6 +62,7 @@ func main() {
 		ListenInterface: *flInterface,
 		ForwardPort:     *flForwardPort,
 		IgnoreAddresses: strings.Split(*flIgnoreAddresses, ","),
+		NetworkPrefixes: strings.Split(flNetworkPrefixes.String(), ","),
 	}
 	if *flConfig != "" {
 		cfg, err = iprd.NewIPRDConfigFromFile(*flConfig)

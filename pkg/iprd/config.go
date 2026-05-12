@@ -16,6 +16,7 @@ type IPRDConfig struct {
 	ListenInterface string   `toml:"listen_interface"`
 	ForwardPort     int      `toml:"forward_port"`
 	IgnoreAddresses []string `toml:"ignore_addrs"`
+	NetworkPrefixes []string `toml:"network_prefixes"`
 }
 
 // Validate returns error if IPRDConfig contains invalid values
@@ -54,6 +55,9 @@ func (cfg *IPRDConfig) Merge(target *IPRDConfig) *IPRDConfig {
 	if len(target.IgnoreAddresses) > 0 {
 		result.IgnoreAddresses = target.IgnoreAddresses
 	}
+	if len(target.NetworkPrefixes) > 0 {
+		result.NetworkPrefixes = target.NetworkPrefixes
+	}
 	return &result
 }
 
@@ -66,6 +70,7 @@ func DefaultIPRDConfig() *IPRDConfig {
 		ListenInterface: "eth0",
 		ForwardPort:     7788,
 		IgnoreAddresses: []string{},
+		NetworkPrefixes: []string{},
 	}
 }
 

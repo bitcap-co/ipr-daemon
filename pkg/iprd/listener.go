@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	bpfTemplate string = "src host %s and (dst net 255 or dst net %s) and udp src portrange 1024-65535 and udp dst portrange 1024-49151"
+	bpfTemplate string = "(%s) and (dst net 255 or %s) and udp src portrange 1024-65535 and udp dst portrange 1024-49151"
 )
 
 type IPRListener struct {
@@ -64,7 +64,23 @@ func (l *IPRListener) Activate() error {
 	l.log.Info(fmt.Sprintf("activate handle on interface: %s (%s)", l.iface.FriendlyName, l.iface.MACAddr()))
 
 	// set BPF expression on new active handle.
-	bpfExpr := fmt.Sprintf(bpfTemplate, l.iface.NetworkPrefix(), l.iface.NetworkPrefix())
+	// build network prefixes into expression
+	var prefixes []string = []string{l.iface.NetworkPrefix()}
+	if len(l.cfg.NetworkPrefixes) > 0 && l.cfg.NetworkPrefixes[0] != "" {
+		prefixes = append(prefixes, l.cfg.NetworkPrefixes...)
+	}
+	var src_prefix strings.Builder
+	var dst_prefix strings.Builder
+	for _, prefix := range prefixes {
+		sep := " or "
+		if prefixes[len(prefixes)-1] == prefix {
+			sep = ""
+		}
+		src_prefix.WriteString(fmt.Sprintf("src host %s%s", prefix, sep))
+		dst_prefix.WriteString(fmt.Sprintf("dst net %s%s", prefix, sep))
+	}
+	bpfExpr := fmt.Sprintf(bpfTemplate, src_prefix.String(), dst_prefix.String())
+	l.log.Info(bpfExpr)
 	if err = l.handle.SetBPFFilter(bpfExpr); err != nil {
 		return fmt.Errorf("failed to set BPF expression: %w", err)
 	}
