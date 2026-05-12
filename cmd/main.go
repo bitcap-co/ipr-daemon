@@ -30,13 +30,14 @@ var (
 	flDebug           = flag.Bool("d", false, "Switch to enable packet debugging output.")
 	flFilter          = flag.Bool("filter", false, "Switch to only broadcast known ports/miner types over forward port. Excludes 'unknown' type.")
 	flInterface       = flag.String("i", "eth0", "Name or index of interface to listen/capture on.")
-	flIgnoreAddresses = flag.String("ignore", "", "List of MAC addresses to ignore packets from. Separated by comma.")
 	flList            = flag.Bool("list", false, "List all available system network interfaces to listen on.")
 	flForwardPort     = flag.Int("p", 7788, "TCP stream/broadcast port for forwarding packet data.")
 	flNetworkPrefixes flagSlice
+	flIgnoreAddresses flagSlice
 )
 
 func main() {
+	flag.Var(&flIgnoreAddresses, "ignore", "List of MAC addresses to ignore packets from.")
 	flag.Var(&flNetworkPrefixes, "add-prefix", "List of network prefixes to append to BPF filter.")
 	flag.Parse()
 
@@ -61,7 +62,7 @@ func main() {
 		Filter:          *flFilter,
 		ListenInterface: *flInterface,
 		ForwardPort:     *flForwardPort,
-		IgnoreAddresses: strings.Split(*flIgnoreAddresses, ","),
+		IgnoreAddresses: strings.Split(flIgnoreAddresses.String(), ","),
 		NetworkPrefixes: strings.Split(flNetworkPrefixes.String(), ","),
 	}
 	if *flConfig != "" {
