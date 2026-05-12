@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/goccy/go-json"
 )
@@ -153,4 +154,32 @@ type IPReportAuradine struct {
 	Version      string `json:"version"`
 	Hostname     string `json:"hostname"`
 	InternalType string `json:"InternalType"`
+}
+
+func ParseMACAddress(macAddress string) string {
+	if macAddress == "" {
+		return ""
+	}
+	macAddress = strings.ToLower(macAddress)
+	switch len(macAddress) {
+	case 17:
+		macAddress = strings.ReplaceAll(macAddress, "-", ":")
+	case 12:
+		var newMacAddress string
+		for i := 0; i < 12; i += 2 {
+			newMacAddress += macAddress[i : i+2]
+			if i < 10 {
+				newMacAddress += ":"
+			}
+		}
+		macAddress = newMacAddress
+	default:
+		return ""
+	}
+
+	if !ValidMAC.MatchString(macAddress) {
+		return ""
+	}
+
+	return macAddress
 }
