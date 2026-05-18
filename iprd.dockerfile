@@ -28,6 +28,8 @@ listen_interface = "eth0"
 forward_port = 7788
 # ignored_addrs is a list of MAC addresses to be blacklisted (useful for ignoring packets from specific network devices)
 ignore_addrs = [""]
+# network_prefixes is a list of network prefixes to append to BPF filter.
+network_prefixes = [""]
 EOF
 
 ENV ARGS=""
