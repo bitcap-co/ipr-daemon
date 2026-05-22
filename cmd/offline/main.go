@@ -55,21 +55,23 @@ func dumpPcap(fd string, debug bool) error {
 			log.Debug("--- Dumped Packet ---")
 			log.Debug(fmt.Sprintf("%s\n", packet.Dump()))
 		}
-		ipr, _ := iprd.NewIPReportPacket(packet)
-		if ipr == nil {
-			log.Error(fmt.Errorf("failed to decode packet"))
+		ipr, err := iprd.NewIPReportPacket(packet)
+		if err != nil {
+			log.Error(fmt.Errorf("failed to decode packet: %s", err))
 			continue
 		}
 		if err := iprd.ParseIPReportPacket(ipr); err != nil {
-			log.Error(fmt.Errorf("%s - Not valid: %w",
-				ipr.String(), err))
+			if err.Error() == "duplicate packet" {
+				// ignore duplicate packets
+				if debug {
+					log.Warn(fmt.Sprintf("%s - Duplicate", ipr.String()))
+				}
+				continue
+			}
+			log.Error(fmt.Errorf("%s - Not valid: %w", ipr.String(), err))
 			continue
 		}
-		log.Info("Valid IP Report!")
-		if debug {
-			log.Debug(ipr.String())
-			log.Debug(fmt.Sprintf("Received UDP Payload (%d) -> %s", len(ipr.Datagram), ipr.Payload))
-		}
+		log.Info(fmt.Sprintf("%s - Valid IP report", ipr.String()))
 	}
 	return nil
 }
