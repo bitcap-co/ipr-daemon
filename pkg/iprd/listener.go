@@ -24,9 +24,14 @@ type IPRListener struct {
 // NewListener returns a new IPRListener. If logger is nil, a new IPRLogger is created.
 // Setting logDebug to true enables debug packet logging. Setting filter to true excludes 'unknown' MinerTypeHint.
 func NewListener(cfg *IPRDConfig, logger *IPRLogger, iface *IPRInterface) *IPRListener {
+	if cfg == nil {
+		// pass in default config if not supplied
+		cfg = DefaultIPRDConfig()
+	}
 	if logger == nil {
 		logger = NewLogger()
 	}
+
 	inactive, _ := pcap.NewInactiveHandle(iface.Name)
 	return &IPRListener{
 		cfg:      cfg,
