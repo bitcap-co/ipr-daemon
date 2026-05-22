@@ -17,6 +17,7 @@ type IPRDConfig struct {
 	ForwardPort     int      `toml:"forward_port"`
 	IgnoreAddresses []string `toml:"ignore_addrs"`
 	NetworkPrefixes []string `toml:"network_prefixes"`
+	CaptureFile     string   `toml:"capture_file"`
 }
 
 // Validate returns error if IPRDConfig contains invalid values
@@ -58,6 +59,9 @@ func (cfg *IPRDConfig) Merge(target *IPRDConfig) *IPRDConfig {
 	if len(target.NetworkPrefixes) > 0 {
 		result.NetworkPrefixes = target.NetworkPrefixes
 	}
+	if target.CaptureFile != "" {
+		result.CaptureFile = target.CaptureFile
+	}
 	return &result
 }
 
@@ -71,6 +75,7 @@ func DefaultIPRDConfig() *IPRDConfig {
 		ForwardPort:     7788,
 		IgnoreAddresses: []string{},
 		NetworkPrefixes: []string{},
+		CaptureFile:     "",
 	}
 }
 
