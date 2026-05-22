@@ -32,6 +32,7 @@ var (
 	flInterface       = flag.String("i", "eth0", "Name or index of interface to listen/capture on.")
 	flList            = flag.Bool("list", false, "List all available system network interfaces to listen on.")
 	flForwardPort     = flag.Int("p", 7788, "TCP stream/broadcast port for forwarding packet data.")
+	flCaptureFile     = flag.String("capture-file", "", "Path to write received packets to in pcap format for replay/debugging. Empty disables.")
 	flNetworkPrefixes flagSlice
 	flIgnoreAddresses flagSlice
 )
@@ -64,6 +65,7 @@ func main() {
 		ForwardPort:     *flForwardPort,
 		IgnoreAddresses: strings.Split(flIgnoreAddresses.String(), ","),
 		NetworkPrefixes: strings.Split(flNetworkPrefixes.String(), ","),
+		CaptureFile:     *flCaptureFile,
 	}
 	if *flConfig != "" {
 		cfg, err = iprd.NewIPRDConfigFromFile(*flConfig)
