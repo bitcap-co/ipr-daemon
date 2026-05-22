@@ -2,6 +2,7 @@ package iprd
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"math"
 	"net"
@@ -122,6 +123,12 @@ func (b *IPRBroadcast) Listen() {
 						b.mu.Unlock()
 						b.logger.Info(fmt.Sprintf("accepted new connection from: %s", conn.RemoteAddr().String()))
 					}
+				}
+			}
+			if err := scanner.Err(); err != nil {
+				var netErr net.Error
+				if !errors.As(err, &netErr) || !netErr.Timeout() {
+					b.logger.Error(fmt.Errorf("scanner error from %s: %w", conn.RemoteAddr(), err))
 				}
 			}
 		}()
