@@ -81,11 +81,10 @@ func (l *IPRListener) Activate() error {
 		if prefixes[len(prefixes)-1] == prefix {
 			sep = ""
 		}
-		src_prefix.WriteString(fmt.Sprintf("src host %s%s", prefix, sep))
-		dst_prefix.WriteString(fmt.Sprintf("dst net %s%s", prefix, sep))
+		fmt.Fprintf(&src_prefix, "src host %s%s", prefix, sep)
+		fmt.Fprintf(&dst_prefix, "dst net %s%s", prefix, sep)
 	}
 	bpfExpr := fmt.Sprintf(bpfTemplate, src_prefix.String(), dst_prefix.String())
-	l.log.Info(bpfExpr)
 	if err = l.handle.SetBPFFilter(bpfExpr); err != nil {
 		return fmt.Errorf("failed to set BPF expression: %w", err)
 	}
