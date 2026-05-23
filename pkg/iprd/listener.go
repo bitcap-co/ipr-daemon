@@ -51,7 +51,7 @@ func (l *IPRListener) Broadcast() chan []byte {
 func (l *IPRListener) Activate() error {
 	var err error
 	if l.iface == nil {
-		return fmt.Errorf("interface can not be nil.")
+		return fmt.Errorf("interface can not be nil")
 	}
 	l.inactive, err = pcap.NewInactiveHandle(l.iface.Name)
 	if err != nil {
