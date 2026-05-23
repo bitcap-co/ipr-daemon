@@ -24,21 +24,21 @@ type IPRListener struct {
 // NewListener returns a new IPRListener. If logger is nil, a new IPRLogger is created.
 // Setting logDebug to true enables debug packet logging. Setting filter to true excludes 'unknown' MinerTypeHint.
 func NewListener(cfg *IPRDConfig, logger *IPRLogger, iface *IPRInterface) *IPRListener {
-	if cfg == nil {
-		// pass in default config if not supplied
-		cfg = DefaultIPRDConfig()
+	if iface == nil {
+		return &IPRListener{}
 	}
 	if logger == nil {
 		logger = NewLogger()
 	}
-
-	inactive, _ := pcap.NewInactiveHandle(iface.Name)
+	if cfg == nil {
+		// pass in default config if not supplied
+		cfg = DefaultIPRDConfig()
+	}
 	return &IPRListener{
-		cfg:      cfg,
-		log:      logger,
-		iface:    iface,
-		inactive: inactive,
-		ch:       make(chan []byte),
+		cfg:   cfg,
+		log:   logger,
+		iface: iface,
+		ch:    make(chan []byte),
 	}
 }
 
@@ -49,13 +49,17 @@ func (l *IPRListener) Broadcast() chan []byte {
 
 // Activate sets a new active pcap handle on iface. This must be called once before Listen().
 func (l *IPRListener) Activate() error {
-	if l.inactive == nil {
-		return fmt.Errorf("failed to create handle: %w", l.inactive.Error())
+	var err error
+	if l.iface == nil {
+		return fmt.Errorf("interface can not be nil.")
+	}
+	l.inactive, err = pcap.NewInactiveHandle(l.iface.Name)
+	if err != nil {
+		return fmt.Errorf("failed to create handle: %w", err)
 	}
 	defer l.inactive.CleanUp()
 
 	// configure new handle.
-	var err error
 	if err = l.inactive.SetSnapLen(1600); err != nil {
 		return fmt.Errorf("could not set snap len: %w", err)
 	} else if err = l.inactive.SetPromisc(true); err != nil {
