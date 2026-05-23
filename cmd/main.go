@@ -77,7 +77,10 @@ func main() {
 	// get interface from flags.
 	var iface *iprd.IPRInterface
 	if cfg.Auto {
-		iface = autoFindLANInterface()
+		iface, err = iprd.FindLANInterface()
+		if err != nil {
+			log.Fatal(err)
+		}
 	} else {
 		iface = getInterfaceFromFlag(cfg.ListenInterface)
 	}
@@ -116,14 +119,6 @@ func main() {
 
 	// start listening
 	listener.Listen()
-}
-
-func autoFindLANInterface() *iprd.IPRInterface {
-	iface, err := iprd.FindLANInterface()
-	if err != nil {
-		log.Fatal(err)
-	}
-	return iface
 }
 
 func getInterfaceFromFlag(name string) *iprd.IPRInterface {
