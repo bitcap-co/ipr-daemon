@@ -49,27 +49,31 @@ func dumpPcap(fd string, debug bool) error {
 	if err != nil {
 		return err
 	}
+	var packetCount int64 = 0
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	for packet := range packetSource.Packets() {
+		packetCount++
 		if debug {
 			log.Debug("--- Dumped Packet ---")
 			log.Debug(fmt.Sprintf("%s\n", packet.Dump()))
 		}
-		ipr, _ := iprd.NewIPReportPacket(packet)
-		if ipr == nil {
-			log.Error(fmt.Errorf("failed to decode packet"))
+		ipr, err := iprd.NewIPReportPacket(packet)
+		if err != nil {
+			log.Error(fmt.Errorf("failed to decode packet %d: %s", packetCount, err))
 			continue
 		}
 		if err := iprd.ParseIPReportPacket(ipr); err != nil {
-			log.Error(fmt.Errorf("%s - Not valid: %w",
-				ipr.String(), err))
+			if err.Error() == "duplicate packet" {
+				// ignore duplicate packets
+				if debug {
+					log.Warn(fmt.Sprintf("Cnt:%d %s - Duplicate", packetCount, ipr.String()))
+				}
+				continue
+			}
+			log.Error(fmt.Errorf("Cnt:%d %s - Not valid: %w", packetCount, ipr.String(), err))
 			continue
 		}
-		log.Info("Valid IP Report!")
-		if debug {
-			log.Debug(ipr.String())
-			log.Debug(fmt.Sprintf("Received UDP Payload (%d) -> %s", len(ipr.Datagram), ipr.Payload))
-		}
+		log.Info(fmt.Sprintf("Cnt:%d %s - Valid IP report", packetCount, ipr.String()))
 	}
 	return nil
 }
