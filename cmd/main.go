@@ -40,7 +40,7 @@ var (
 
 func main() {
 	flag.Var(&flIgnoreAddresses, "ignore", "List of MAC addresses to ignore packets from.")
-	flag.Var(&flNetworkPrefixes, "add-prefix", "List of network prefixes to append to BPF filter.")
+	flag.Var(&flNetworkPrefixes, "add-network", "List of network prefixes to append to BPF filter. (i.e 10.10 to also listen for 10.10.xxx.xxx addresses)")
 	flag.Parse()
 
 	// list interfaces and exit.
