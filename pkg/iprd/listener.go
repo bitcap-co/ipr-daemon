@@ -76,7 +76,10 @@ func (l *IPRListener) Activate() error {
 
 	// set BPF expression on new active handle.
 	// build network prefixes into expression
-	var prefixes []string = []string{l.iface.NetworkPrefix()}
+	var prefixes = []string{}
+	if !l.cfg.NoRootNetwork {
+		prefixes = []string{l.iface.NetworkPrefix()}
+	}
 	if len(l.cfg.NetworkPrefixes) > 0 && l.cfg.NetworkPrefixes[0] != "" {
 		prefixes = append(prefixes, l.cfg.NetworkPrefixes...)
 	}

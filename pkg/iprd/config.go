@@ -13,6 +13,7 @@ type IPRDConfig struct {
 	Debug           bool     `toml:"debug"`
 	Auto            bool     `toml:"auto"`
 	Filter          bool     `toml:"filter"`
+	NoRootNetwork   bool     `toml:"no_root_network"`
 	ListenInterface string   `toml:"listen_interface"`
 	ForwardPort     int      `toml:"forward_port"`
 	IgnoreAddresses []string `toml:"ignore_addrs"`
@@ -62,6 +63,9 @@ func (cfg *IPRDConfig) Merge(target *IPRDConfig) *IPRDConfig {
 	if target.CaptureFile != "" {
 		result.CaptureFile = target.CaptureFile
 	}
+	if target.NoRootNetwork {
+		result.NoRootNetwork = target.NoRootNetwork
+	}
 	return &result
 }
 
@@ -71,6 +75,7 @@ func DefaultIPRDConfig() *IPRDConfig {
 		Debug:           false,
 		Auto:            false,
 		Filter:          false,
+		NoRootNetwork:   false,
 		ListenInterface: "eth0",
 		ForwardPort:     7788,
 		IgnoreAddresses: []string{},

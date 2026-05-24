@@ -32,7 +32,8 @@ var (
 	flInterface       = flag.String("i", "eth0", "Name or index of interface to listen/capture on.")
 	flList            = flag.Bool("list", false, "List all available system network interfaces to listen on.")
 	flForwardPort     = flag.Int("p", 7788, "TCP stream/broadcast port for forwarding packet data.")
-	flCaptureFile     = flag.String("capture-file", "", "Path to write received packets to in pcap format for replay/debugging. Empty disables.")
+	flCaptureFile     = flag.String("capture-file", "", "Path to write received packets to in PCAP format for replay/debugging. Empty disables.")
+	flNoRootNetwork   = flag.Bool("no-root-network", false, "Switch to exclude root network from interface from BPF filter.")
 	flNetworkPrefixes flagSlice
 	flIgnoreAddresses flagSlice
 )
@@ -54,6 +55,10 @@ func main() {
 		os.Exit(0)
 	}
 
+	if *flNoRootNetwork && flNetworkPrefixes.String() == "" {
+		log.Fatal(fmt.Errorf("no network prefixes supplied. Use -add-network to add a network"))
+	}
+
 	// build/read configuration.
 	var err error
 	var cfg *iprd.IPRDConfig
@@ -61,6 +66,7 @@ func main() {
 		Debug:           *flDebug,
 		Auto:            *flAuto,
 		Filter:          *flFilter,
+		NoRootNetwork:   *flNoRootNetwork,
 		ListenInterface: *flInterface,
 		ForwardPort:     *flForwardPort,
 		IgnoreAddresses: strings.Split(flIgnoreAddresses.String(), ","),
