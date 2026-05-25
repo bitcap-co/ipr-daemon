@@ -12,7 +12,7 @@ import (
 
 const (
 	captureSnapLen     uint32 = 1600
-	maxCaptureFileSize int64  = 4194304 // 4mb
+	maxCaptureFileSize int64  = 4 * 1024 * 1024 // max capture file size of 4mb
 	pcapFileHeaderSize int64  = 24
 	pcapRecordHeader   int64  = 16
 )
@@ -33,8 +33,7 @@ type IPRListener struct {
 	captureBytes int64
 }
 
-// NewListener returns a new IPRListener. If logger is nil, a new IPRLogger is created.
-// Setting logDebug to true enables debug packet logging. Setting filter to true excludes 'unknown' MinerTypeHint.
+// NewListener returns a new IPRListener, taking in a IPRDConfig to configure behavior. If logger is nil, a new IPRLogger is created.
 func NewListener(cfg *IPRDConfig, logger *IPRLogger, iface *IPRInterface) *IPRListener {
 	if cfg == nil {
 		// pass in default config if not supplied
