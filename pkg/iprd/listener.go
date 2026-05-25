@@ -36,12 +36,15 @@ type IPRListener struct {
 
 // NewListener returns a new IPRListener, taking in a IPRDConfig to configure behavior. If logger is nil, a new IPRLogger is created.
 func NewListener(cfg *IPRDConfig, logger *IPRLogger, iface *IPRInterface) *IPRListener {
-	if cfg == nil {
-		// pass in default config if not supplied
-		cfg = DefaultIPRDConfig()
+	if iface == nil {
+		return &IPRListener{}
 	}
 	if logger == nil {
 		logger = NewLogger()
+	}
+	if cfg == nil {
+		// pass in default config if not supplied
+		cfg = DefaultIPRDConfig()
 	}
 	return &IPRListener{
 		cfg:   cfg,

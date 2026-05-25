@@ -12,7 +12,7 @@ import (
 type flagSlice []string
 
 func (f *flagSlice) String() string {
-	return fmt.Sprintf("%s", strings.Join(*f, ","))
+	return strings.Join(*f, ",")
 }
 
 func (f *flagSlice) Set(value string) error {
