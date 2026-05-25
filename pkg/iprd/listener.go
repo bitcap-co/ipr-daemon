@@ -3,6 +3,7 @@ package iprd
 import (
 	"fmt"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/gopacket/gopacket"
@@ -42,14 +43,11 @@ func NewListener(cfg *IPRDConfig, logger *IPRLogger, iface *IPRInterface) *IPRLi
 	if logger == nil {
 		logger = NewLogger()
 	}
-
-	inactive, _ := pcap.NewInactiveHandle(iface.Name)
 	return &IPRListener{
-		cfg:      cfg,
-		log:      logger,
-		iface:    iface,
-		inactive: inactive,
-		ch:       make(chan []byte),
+		cfg:   cfg,
+		log:   logger,
+		iface: iface,
+		ch:    make(chan []byte),
 	}
 }
 
@@ -60,13 +58,20 @@ func (l *IPRListener) Broadcast() chan []byte {
 
 // Activate sets a new active pcap handle on iface. This must be called once before Listen().
 func (l *IPRListener) Activate() error {
-	if l.inactive == nil {
-		return fmt.Errorf("failed to create handle: %w", l.inactive.Error())
+	var err error
+	if l.iface == nil {
+		err = l.setInterface()
+		if err != nil {
+			return err
+		}
+	}
+	l.inactive, err = pcap.NewInactiveHandle(l.iface.Name)
+	if err != nil {
+		return fmt.Errorf("failed to create handle: %w", err)
 	}
 	defer l.inactive.CleanUp()
 
 	// configure new handle.
-	var err error
 	if err = l.inactive.SetSnapLen(int(captureSnapLen)); err != nil {
 		return fmt.Errorf("could not set snap len: %w", err)
 	} else if err = l.inactive.SetPromisc(true); err != nil {
@@ -215,5 +220,37 @@ func (l *IPRListener) flushCaptureFile() error {
 	l.captureW = w
 	l.captureBytes = pcapFileHeaderSize
 	l.log.Info(fmt.Sprintf("capture file reached %d bytes, flushed", maxCaptureFileSize))
+	return nil
+}
+
+// setInterface finds the specified interface from config and sets on listener.
+// returns error if fails to find
+func (l *IPRListener) setInterface() error {
+	var err error
+	var iface *IPRInterface
+	if l.cfg.Auto {
+		iface, err = FindLANInterface()
+		if err != nil {
+			return err
+		}
+	} else {
+		// find interface by name or index from config
+		if index, err := strconv.Atoi(l.cfg.ListenInterface); err == nil {
+			iface, err = GetInterfaceByIndex(index)
+			if err != nil {
+				return err
+			}
+		} else {
+			iface, err = GetInterfaceByName(l.cfg.ListenInterface)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	// sanity check to make sure that interface has UP flag
+	if !iface.IsUp() {
+		return fmt.Errorf("interface %s is not marked at UP", iface.FriendlyName)
+	}
+	l.iface = iface
 	return nil
 }

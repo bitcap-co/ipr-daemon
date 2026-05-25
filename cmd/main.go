@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
@@ -79,24 +78,10 @@ func main() {
 			log.Fatal(err)
 		}
 	}
-
-	// get interface from flags.
-	var iface *iprd.IPRInterface
-	if cfg.Auto {
-		iface, err = iprd.FindLANInterface()
-		if err != nil {
-			log.Fatal(err)
-		}
-	} else {
-		iface = getInterfaceFromFlag(cfg.ListenInterface)
-	}
-	// sanity check to make sure that interface is marked as UP.
-	if !iface.IsUp() {
-		log.Fatal(fmt.Errorf("interface %s is not marked as UP", iface.FriendlyName))
-	}
 	log.Info("start IPReporter Daemon...")
+
 	// initialize IPRListener handle on iface, passing in cfg.
-	listener := iprd.NewListener(cfg, log, iface)
+	listener := iprd.NewListener(cfg, log, nil)
 	if err := listener.Activate(); err != nil {
 		log.Fatal(err)
 	}
@@ -125,19 +110,4 @@ func main() {
 
 	// start listening
 	listener.Listen()
-}
-
-func getInterfaceFromFlag(name string) *iprd.IPRInterface {
-	if index, err := strconv.Atoi(name); err == nil {
-		iface, err := iprd.GetInterfaceByIndex(index)
-		if err != nil {
-			log.Fatal(err)
-		}
-		return iface
-	}
-	iface, err := iprd.GetInterfaceByName(name)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return iface
 }
