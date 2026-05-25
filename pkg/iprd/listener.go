@@ -10,21 +10,27 @@ import (
 	"github.com/gopacket/gopacket/pcapgo"
 )
 
-const captureSnapLen uint32 = 1600
+const (
+	captureSnapLen     uint32 = 1600
+	maxCaptureFileSize int64  = 4194304 // 4mb
+	pcapFileHeaderSize int64  = 24
+	pcapRecordHeader   int64  = 16
+)
 
 const (
 	bpfTemplate string = "(%s) and (dst net 255 or %s) and udp src portrange 1024-65535 and udp dst portrange 1024-49151"
 )
 
 type IPRListener struct {
-	cfg         *IPRDConfig
-	log         *IPRLogger
-	iface       *IPRInterface
-	inactive    *pcap.InactiveHandle
-	handle      *pcap.Handle
-	ch          chan []byte
-	captureFile *os.File
-	captureW    *pcapgo.Writer
+	cfg          *IPRDConfig
+	log          *IPRLogger
+	iface        *IPRInterface
+	inactive     *pcap.InactiveHandle
+	handle       *pcap.Handle
+	ch           chan []byte
+	captureFile  *os.File
+	captureW     *pcapgo.Writer
+	captureBytes int64
 }
 
 // NewListener returns a new IPRListener. If logger is nil, a new IPRLogger is created.
@@ -126,7 +132,8 @@ func (l *IPRListener) Activate() error {
 		}
 		l.captureFile = f
 		l.captureW = w
-		l.log.Info(fmt.Sprintf("capturing packets to: %s", l.cfg.CaptureFile))
+		l.captureBytes = pcapFileHeaderSize
+		l.log.Info(fmt.Sprintf("capturing packets to -> %s", l.cfg.CaptureFile))
 	}
 	return nil
 }
@@ -144,6 +151,13 @@ func (l *IPRListener) Listen() {
 		if l.captureW != nil {
 			if err := l.captureW.WritePacket(packet.Metadata().CaptureInfo, packet.Data()); err != nil {
 				l.log.Error(fmt.Errorf("failed to write packet to capture file: %w", err))
+			} else {
+				l.captureBytes += pcapRecordHeader + int64(len(packet.Data()))
+				if l.captureBytes >= maxCaptureFileSize {
+					if err := l.flushCaptureFile(); err != nil {
+						l.log.Error(fmt.Errorf("failed to flush capture file: %w", err))
+					}
+				}
 			}
 		}
 		// try and initialize as IPReportPacket.
@@ -184,4 +198,23 @@ func (l *IPRListener) Listen() {
 		}
 		l.ch <- msg
 	}
+}
+
+// flushCaptureFile truncates the capture file and rewrites the pcap header,
+// keeping disk usage bounded by maxCaptureFileSize.
+func (l *IPRListener) flushCaptureFile() error {
+	if _, err := l.captureFile.Seek(0, 0); err != nil {
+		return fmt.Errorf("seek: %w", err)
+	}
+	if err := l.captureFile.Truncate(0); err != nil {
+		return fmt.Errorf("truncate: %w", err)
+	}
+	w := pcapgo.NewWriter(l.captureFile)
+	if err := w.WriteFileHeader(captureSnapLen, l.handle.LinkType()); err != nil {
+		return fmt.Errorf("write header: %w", err)
+	}
+	l.captureW = w
+	l.captureBytes = pcapFileHeaderSize
+	l.log.Info(fmt.Sprintf("capture file reached %d bytes, flushed", maxCaptureFileSize))
+	return nil
 }
