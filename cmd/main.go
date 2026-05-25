@@ -4,7 +4,6 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"strconv"
 	"strings"
 
 	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
@@ -32,13 +31,15 @@ var (
 	flInterface       = flag.String("i", "eth0", "Name or index of interface to listen/capture on.")
 	flList            = flag.Bool("list", false, "List all available system network interfaces to listen on.")
 	flForwardPort     = flag.Int("p", 7788, "TCP stream/broadcast port for forwarding packet data.")
+	flCaptureFile     = flag.String("capture-file", "", "Path to write received packets to in PCAP format for replay/debugging. Empty disables.")
+	flNoRootNetwork   = flag.Bool("no-root-network", false, "Switch to exclude root network from interface from BPF filter.")
 	flNetworkPrefixes flagSlice
 	flIgnoreAddresses flagSlice
 )
 
 func main() {
 	flag.Var(&flIgnoreAddresses, "ignore", "List of MAC addresses to ignore packets from.")
-	flag.Var(&flNetworkPrefixes, "add-prefix", "List of network prefixes to append to BPF filter.")
+	flag.Var(&flNetworkPrefixes, "add-network", "List of network prefixes to append to BPF filter. (i.e 10.10 to also listen for 10.10.xxx.xxx addresses)")
 	flag.Parse()
 
 	// list interfaces and exit.
@@ -53,6 +54,10 @@ func main() {
 		os.Exit(0)
 	}
 
+	if *flNoRootNetwork && flNetworkPrefixes.String() == "" {
+		log.Fatal(fmt.Errorf("no network prefixes supplied. Use -add-network to add a network"))
+	}
+
 	// build/read configuration.
 	var err error
 	var cfg *iprd.IPRDConfig
@@ -60,10 +65,12 @@ func main() {
 		Debug:           *flDebug,
 		Auto:            *flAuto,
 		Filter:          *flFilter,
+		NoRootNetwork:   *flNoRootNetwork,
 		ListenInterface: *flInterface,
 		ForwardPort:     *flForwardPort,
 		IgnoreAddresses: strings.Split(flIgnoreAddresses.String(), ","),
 		NetworkPrefixes: strings.Split(flNetworkPrefixes.String(), ","),
+		CaptureFile:     *flCaptureFile,
 	}
 	if *flConfig != "" {
 		cfg, err = iprd.NewIPRDConfigFromFile(*flConfig)
@@ -71,21 +78,10 @@ func main() {
 			log.Fatal(err)
 		}
 	}
-
-	// get interface from flags.
-	var iface *iprd.IPRInterface
-	if cfg.Auto {
-		iface = autoFindLANInterface()
-	} else {
-		iface = getInterfaceFromFlag(cfg.ListenInterface)
-	}
-	// sanity check to make sure that interface is marked as UP.
-	if !iface.IsUp() {
-		log.Fatal(fmt.Errorf("interface %s is not marked as UP", iface.FriendlyName))
-	}
 	log.Info("start IPReporter Daemon...")
+
 	// initialize IPRListener handle on iface, passing in cfg.
-	listener := iprd.NewListener(cfg, log, iface)
+	listener := iprd.NewListener(cfg, log, nil)
 	if err := listener.Activate(); err != nil {
 		log.Fatal(err)
 	}
@@ -114,27 +110,4 @@ func main() {
 
 	// start listening
 	listener.Listen()
-}
-
-func autoFindLANInterface() *iprd.IPRInterface {
-	iface, err := iprd.FindLANInterface()
-	if err != nil {
-		log.Fatal(err)
-	}
-	return iface
-}
-
-func getInterfaceFromFlag(name string) *iprd.IPRInterface {
-	if index, err := strconv.Atoi(name); err == nil {
-		iface, err := iprd.GetInterfaceByIndex(index)
-		if err != nil {
-			log.Fatal(err)
-		}
-		return iface
-	}
-	iface, err := iprd.GetInterfaceByName(name)
-	if err != nil {
-		log.Fatal(err)
-	}
-	return iface
 }

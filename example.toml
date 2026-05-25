@@ -4,6 +4,8 @@ debug = false
 auto = false
 # filter is a switch to only broadcast known ports/miner types over forward port. Excludes 'unknown' type.
 filter = false
+# no_root_network is a switch to remove the root network on listen_interface from BPF filter, only using networks from network_prefixes.
+no_root_network = false
 # listen_interface is the name of the the desired interface to listen/capture on
 listen_interface = "eth0"
 # forward_port is the TCP stream/broadcast port to forward packet data over
@@ -12,3 +14,5 @@ forward_port = 7788
 ignore_addrs = [""]
 # network_prefixes is a list of network prefixes to append to BPF filter.
 network_prefixes = [""]
+# capture_file is the file descriptor to write received packets to in PCAP format
+capture_file = ""

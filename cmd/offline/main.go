@@ -11,16 +11,29 @@ import (
 	"github.com/gopacket/gopacket/pcap"
 )
 
+type flagSlice []string
+
+func (f *flagSlice) String() string {
+	return strings.Join(*f, ",")
+}
+
+func (f *flagSlice) Set(value string) error {
+	*f = append(*f, value)
+	return nil
+}
+
 var (
 	// flags
-	flPcapFile = flag.String("f", "", "File descriptor for .pcap file.")
-	flDebug    = flag.Bool("d", false, "Switch to enable packet debugging output to stdout.")
+	flPcapFile        = flag.String("f", "", "File descriptor for .pcap file.")
+	flDebug           = flag.Bool("d", false, "Switch to enable packet debugging output to stdout.")
+	flIgnoreAddresses flagSlice
 
 	log = iprd.NewLogger()
 )
 
 func main() {
 	log.SetPrefix("iprd-offline: ")
+	flag.Var(&flIgnoreAddresses, "ignore", "List of MAC addresses to ignore packets from.")
 	flag.Parse()
 
 	if *flPcapFile == "" {
@@ -49,29 +62,37 @@ func dumpPcap(fd string, debug bool) error {
 	if err != nil {
 		return err
 	}
+	var packetCount int64 = 0
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	for packet := range packetSource.Packets() {
+		packetCount++
 		if debug {
 			log.Debug("--- Dumped Packet ---")
 			log.Debug(fmt.Sprintf("%s\n", packet.Dump()))
 		}
 		ipr, err := iprd.NewIPReportPacket(packet)
 		if err != nil {
-			log.Error(fmt.Errorf("failed to decode packet: %s", err))
+			log.Error(fmt.Errorf("failed to decode packet %d: %s", packetCount, err))
 			continue
 		}
-		if err := iprd.ParseIPReportPacket(ipr); err != nil {
+		if err := iprd.ParseIPReportPacket(ipr, flIgnoreAddresses...); err != nil {
 			if err.Error() == "duplicate packet" {
 				// ignore duplicate packets
 				if debug {
-					log.Warn(fmt.Sprintf("%s - Duplicate", ipr.String()))
+					log.Warn(fmt.Sprintf("Cnt:%d %s - Duplicate", packetCount, ipr.String()))
 				}
 				continue
 			}
-			log.Error(fmt.Errorf("%s - Not valid: %w", ipr.String(), err))
+			if err.Error() == "ignored" {
+				if debug {
+					log.Warn(fmt.Sprintf("Cnt:%d %s - Ignored", packetCount, ipr.String()))
+				}
+				continue
+			}
+			log.Error(fmt.Errorf("Cnt:%d %s - Not valid: %w", packetCount, ipr.String(), err))
 			continue
 		}
-		log.Info(fmt.Sprintf("%s - Valid IP report", ipr.String()))
+		log.Info(fmt.Sprintf("Cnt:%d %s - Valid IP report", packetCount, ipr.String()))
 	}
 	return nil
 }

@@ -2,10 +2,20 @@ package iprd
 
 import (
 	"fmt"
+	"os"
+	"strconv"
 	"strings"
 
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/pcap"
+	"github.com/gopacket/gopacket/pcapgo"
+)
+
+const (
+	captureSnapLen     uint32 = 1600
+	maxCaptureFileSize int64  = 4 * 1024 * 1024 // max capture file size of 4mb
+	pcapFileHeaderSize int64  = 24
+	pcapRecordHeader   int64  = 16
 )
 
 const (
@@ -13,27 +23,27 @@ const (
 )
 
 type IPRListener struct {
-	cfg      *IPRDConfig
-	log      *IPRLogger
-	iface    *IPRInterface
-	inactive *pcap.InactiveHandle
-	handle   *pcap.Handle
-	ch       chan []byte
+	cfg          *IPRDConfig
+	log          *IPRLogger
+	iface        *IPRInterface
+	inactive     *pcap.InactiveHandle
+	handle       *pcap.Handle
+	ch           chan []byte
+	captureFile  *os.File
+	captureW     *pcapgo.Writer
+	captureBytes int64
 }
 
-// NewListener returns a new IPRListener. If logger is nil, a new IPRLogger is created.
-// Setting logDebug to true enables debug packet logging. Setting filter to true excludes 'unknown' MinerTypeHint.
+// NewListener returns a new IPRListener, taking in a IPRDConfig to configure behavior. If logger is nil, a new IPRLogger is created.
 func NewListener(cfg *IPRDConfig, logger *IPRLogger, iface *IPRInterface) *IPRListener {
-	if iface == nil {
-		return &IPRListener{}
-	}
-	if logger == nil {
-		logger = NewLogger()
-	}
 	if cfg == nil {
 		// pass in default config if not supplied
 		cfg = DefaultIPRDConfig()
 	}
+	if logger == nil {
+		logger = NewLogger()
+	}
+
 	return &IPRListener{
 		cfg:   cfg,
 		log:   logger,
@@ -51,7 +61,10 @@ func (l *IPRListener) Broadcast() chan []byte {
 func (l *IPRListener) Activate() error {
 	var err error
 	if l.iface == nil {
-		return fmt.Errorf("interface can not be nil")
+		err = l.setInterface()
+		if err != nil {
+			return err
+		}
 	}
 	l.inactive, err = pcap.NewInactiveHandle(l.iface.Name)
 	if err != nil {
@@ -60,7 +73,7 @@ func (l *IPRListener) Activate() error {
 	defer l.inactive.CleanUp()
 
 	// configure new handle.
-	if err = l.inactive.SetSnapLen(1600); err != nil {
+	if err = l.inactive.SetSnapLen(int(captureSnapLen)); err != nil {
 		return fmt.Errorf("could not set snap len: %w", err)
 	} else if err = l.inactive.SetPromisc(true); err != nil {
 		return fmt.Errorf("could not set promisc mode: %w", err)
@@ -74,7 +87,10 @@ func (l *IPRListener) Activate() error {
 
 	// set BPF expression on new active handle.
 	// build network prefixes into expression
-	var prefixes = []string{l.iface.NetworkPrefix()}
+	var prefixes = []string{}
+	if !l.cfg.NoRootNetwork {
+		prefixes = []string{l.iface.NetworkPrefix()}
+	}
 	if len(l.cfg.NetworkPrefixes) > 0 && l.cfg.NetworkPrefixes[0] != "" {
 		prefixes = append(prefixes, l.cfg.NetworkPrefixes...)
 	}
@@ -109,16 +125,46 @@ func (l *IPRListener) Activate() error {
 		}
 		l.log.Info(fmt.Sprintf("set ignored addresses: [%s]", strings.Join(l.cfg.IgnoreAddresses, ",")))
 	}
+	if l.cfg.CaptureFile != "" {
+		f, err := os.Create(l.cfg.CaptureFile)
+		if err != nil {
+			return fmt.Errorf("failed to open capture file: %w", err)
+		}
+		w := pcapgo.NewWriter(f)
+		if err = w.WriteFileHeader(captureSnapLen, l.handle.LinkType()); err != nil {
+			f.Close()
+			return fmt.Errorf("failed to write pcap file header: %w", err)
+		}
+		l.captureFile = f
+		l.captureW = w
+		l.captureBytes = pcapFileHeaderSize
+		l.log.Info(fmt.Sprintf("capturing packets to -> %s", l.cfg.CaptureFile))
+	}
 	return nil
 }
 
 // Listen will start reading packets from the active handle and sends the marshalled IPReportPacket to Broadcast().
 func (l *IPRListener) Listen() {
 	defer l.handle.Close()
+	if l.captureFile != nil {
+		defer l.captureFile.Close()
+	}
 	l.log.Info("start listen...")
 
 	source := gopacket.NewPacketSource(l.handle, l.handle.LinkType())
 	for packet := range source.Packets() {
+		if l.captureW != nil {
+			if err := l.captureW.WritePacket(packet.Metadata().CaptureInfo, packet.Data()); err != nil {
+				l.log.Error(fmt.Errorf("failed to write packet to capture file: %w", err))
+			} else {
+				l.captureBytes += pcapRecordHeader + int64(len(packet.Data()))
+				if l.captureBytes >= maxCaptureFileSize {
+					if err := l.flushCaptureFile(); err != nil {
+						l.log.Error(fmt.Errorf("failed to flush capture file: %w", err))
+					}
+				}
+			}
+		}
 		// try and initialize as IPReportPacket.
 		r, _ := NewIPReportPacket(packet)
 		if r == nil {
@@ -157,4 +203,55 @@ func (l *IPRListener) Listen() {
 		}
 		l.ch <- msg
 	}
+}
+
+// flushCaptureFile truncates the capture file and rewrites the pcap header,
+// keeping disk usage bounded by maxCaptureFileSize.
+func (l *IPRListener) flushCaptureFile() error {
+	if _, err := l.captureFile.Seek(0, 0); err != nil {
+		return fmt.Errorf("seek: %w", err)
+	}
+	if err := l.captureFile.Truncate(0); err != nil {
+		return fmt.Errorf("truncate: %w", err)
+	}
+	w := pcapgo.NewWriter(l.captureFile)
+	if err := w.WriteFileHeader(captureSnapLen, l.handle.LinkType()); err != nil {
+		return fmt.Errorf("write header: %w", err)
+	}
+	l.captureW = w
+	l.captureBytes = pcapFileHeaderSize
+	l.log.Info(fmt.Sprintf("capture file reached %d bytes, flushed", maxCaptureFileSize))
+	return nil
+}
+
+// setInterface finds the specified interface from config and sets on listener.
+// returns error if fails to find
+func (l *IPRListener) setInterface() error {
+	var err error
+	var iface *IPRInterface
+	if l.cfg.Auto {
+		iface, err = FindLANInterface()
+		if err != nil {
+			return err
+		}
+	} else {
+		// find interface by name or index from config
+		if index, err := strconv.Atoi(l.cfg.ListenInterface); err == nil {
+			iface, err = GetInterfaceByIndex(index)
+			if err != nil {
+				return err
+			}
+		} else {
+			iface, err = GetInterfaceByName(l.cfg.ListenInterface)
+			if err != nil {
+				return err
+			}
+		}
+	}
+	// sanity check to make sure that interface has UP flag
+	if !iface.IsUp() {
+		return fmt.Errorf("interface %s is not marked at UP", iface.FriendlyName)
+	}
+	l.iface = iface
+	return nil
 }
