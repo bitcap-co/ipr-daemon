@@ -79,20 +79,20 @@ func dumpPcap(fd string, debug bool) error {
 			if err.Error() == "duplicate packet" {
 				// ignore duplicate packets
 				if debug {
-					log.Warn(fmt.Sprintf("Cnt:%d %s - Duplicate", packetCount, ipr.String()))
+					log.Warn(fmt.Sprintf("cnt:%d %s - Duplicate", packetCount, ipr.String()))
 				}
 				continue
 			}
 			if err.Error() == "ignored" {
 				if debug {
-					log.Warn(fmt.Sprintf("Cnt:%d %s - Ignored", packetCount, ipr.String()))
+					log.Warn(fmt.Sprintf("cnt:%d %s - Ignored", packetCount, ipr.String()))
 				}
 				continue
 			}
-			log.Error(fmt.Errorf("Cnt:%d %s - Not valid: %w", packetCount, ipr.String(), err))
+			log.Error(fmt.Errorf("cnt:%d %s - Not valid: %w", packetCount, ipr.String(), err))
 			continue
 		}
-		log.Info(fmt.Sprintf("Cnt:%d %s - Valid IP report", packetCount, ipr.String()))
+		log.Info(fmt.Sprintf("cnt:%d %s - Valid IP report", packetCount, ipr.String()))
 	}
 	return nil
 }
