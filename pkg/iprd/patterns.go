@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/goccy/go-json"
@@ -156,6 +157,7 @@ type IPReportAuradine struct {
 	InternalType string `json:"InternalType"`
 }
 
+// ParseMACAddress parses macAddress as a new MAC address.
 func ParseMACAddress(macAddress string) string {
 	if macAddress == "" {
 		return ""
@@ -182,4 +184,32 @@ func ParseMACAddress(macAddress string) string {
 	}
 
 	return macAddress
+}
+
+// parseIPv4Network parses a IPv4 network filter string, returning back network if is a valid network filter for BPF.
+// returns empty if invalid
+func parseIPv4Network(network string) string {
+	if network == "" {
+		return ""
+	}
+	if len(network) > 15 {
+		return ""
+	}
+	octets := strings.Split(network, ".")
+	validNetwork := func() bool {
+		for _, octet := range octets {
+			if o, err := strconv.Atoi(octet); err == nil {
+				if o < 0 || o > 255 {
+					return false
+				}
+			} else {
+				return false
+			}
+		}
+		return true
+	}()
+	if !validNetwork {
+		return ""
+	}
+	return network
 }

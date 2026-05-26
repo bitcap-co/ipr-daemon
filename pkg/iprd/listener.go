@@ -97,6 +97,9 @@ func (l *IPRListener) Activate() error {
 	var src_prefix strings.Builder
 	var dst_prefix strings.Builder
 	for _, prefix := range prefixes {
+		if p := parseIPv4Network(prefix); p == "" {
+			continue
+		}
 		sep := " or "
 		if prefixes[len(prefixes)-1] == prefix {
 			sep = ""
