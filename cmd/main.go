@@ -33,6 +33,7 @@ var (
 	flForwardPort     = flag.Int("p", 7788, "TCP stream/broadcast port for forwarding packet data.")
 	flCaptureFile     = flag.String("capture-file", "", "Path to write received packets to in PCAP format for replay/debugging. Empty disables.")
 	flNoRootNetwork   = flag.Bool("no-root-network", false, "Switch to exclude root network from interface from BPF filter.")
+	flWriteConfig     = flag.String("w", "", "Path to new config file. Writes supplied arguements to new TOML config file and exits.")
 	flNetworkPrefixes flagSlice
 	flIgnoreAddresses flagSlice
 )
@@ -71,6 +72,16 @@ func main() {
 		IgnoreAddresses: strings.Split(flIgnoreAddresses.String(), ","),
 		NetworkPrefixes: strings.Split(flNetworkPrefixes.String(), ","),
 		CaptureFile:     *flCaptureFile,
+	}
+	if *flWriteConfig != "" {
+		*flWriteConfig = strings.Split(*flWriteConfig, ".")[0]
+		*flWriteConfig = *flWriteConfig + ".toml"
+		err = iprd.WriteIPRDConfigToFile(cfg, *flWriteConfig)
+		if err != nil {
+			log.Fatal(err)
+		}
+		log.Info(fmt.Sprintf("successfully wrote -> %s", *flWriteConfig))
+		os.Exit(0)
 	}
 	if *flConfig != "" {
 		cfg, err = iprd.NewIPRDConfigFromFile(*flConfig)
