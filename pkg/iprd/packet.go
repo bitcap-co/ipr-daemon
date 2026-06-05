@@ -30,6 +30,7 @@ var (
 		18650: Sealminer,
 		9999:  Elphapex,
 		12345: Auradine,
+		54321: IPollo,
 	}
 	record = NewRecord(10)
 )
