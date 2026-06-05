@@ -21,6 +21,7 @@ const (
 	Sealminer   MinerTypeHint = "sealminer"
 	Elphapex    MinerTypeHint = "elphapex"
 	Auradine    MinerTypeHint = "auradine"
+	IPollo      MinerTypeHint = "ipollo"
 )
 
 var (
@@ -31,6 +32,7 @@ var (
 		"IR":     regexp.MustCompile(fmt.Sprintf(`^addr:%s`, ValidIP)),
 		"BT":     regexp.MustCompile(fmt.Sprintf(`^IP:%sMAC:%s`, ValidIP, ValidMAC)),
 		"DG":     regexp.MustCompile(`^DG_IPREPORT_ONLY`),
+		"IP":     regexp.MustCompile(fmt.Sprintf(`^IP Addr:\[%s\].*?MAC Addr:\[%s\]`, ValidIP, ValidMAC)),
 	}
 )
 

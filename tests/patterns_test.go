@@ -22,3 +22,12 @@ func TestSealminerParse(t *testing.T) {
 		t.Fatalf("got %s, want %s", got, want)
 	}
 }
+
+func TestIPolloParse(t *testing.T) {
+	var data = []byte("IP Addr:[172.16.6.167]   MAC Addr:[02:81:34:A8:B5:61]    Time:[2026-06-04 23:02:19]")
+	got := iprd.MsgPatterns["IP"].Match(data)
+	want := true
+	if got != want {
+		t.Fatalf("got no match, want match")
+	}
+}
