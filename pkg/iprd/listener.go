@@ -19,7 +19,7 @@ const (
 )
 
 const (
-	bpfTemplate string = "(%s) and (dst net 255 or %s) and udp src portrange 1024-65535 and udp dst portrange 1024-49151"
+	bpfTemplate string = "(%s) and (dst net 255 or %s) and udp src portrange 1024-65535 and udp dst portrange 1024-65535"
 )
 
 type IPRListener struct {
