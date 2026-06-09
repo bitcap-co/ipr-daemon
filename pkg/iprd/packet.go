@@ -149,13 +149,11 @@ func ParseIPReportPacket(packet *IPReportPacket, ignoredAddrs ...string) error {
 		packet.MinerHint = minerHint
 	}
 	// check for existing record.
-	if record.Contains(packet.SrcIP) {
-		ent := record.Get(packet.SrcIP)
-		if ent.SrcMAC == packet.SrcMAC && ent.MinerHint == packet.MinerHint {
-			// if record exists and is not over minimun record age, mark as duplicate packet.
-			if time.Now().UnixMilli()-ent.UpdatedAt <= recordMinAge {
-				return fmt.Errorf("duplicate packet")
-			}
+	if record.Contains(packet.SrcMAC) {
+		ent := record.Get(packet.SrcMAC)
+		// if record exists and is not over minimum record age, mark as dup packet.
+		if time.Now().UnixMilli()-ent.UpdatedAt <= recordMinAge {
+			return fmt.Errorf("duplicate packet")
 		}
 	}
 	// if not valid UTF-8, it could be encoded/compressed.
@@ -195,7 +193,7 @@ func ParseIPReportPacket(packet *IPReportPacket, ignoredAddrs ...string) error {
 		}
 	}
 	// update record with new packet data.
-	record.Add(packet.SrcIP, RecordEntry{
+	record.Add(packet.SrcMAC, RecordEntry{
 		SrcIP:     packet.SrcIP,
 		SrcMAC:    packet.SrcMAC,
 		MinerHint: packet.MinerHint,
