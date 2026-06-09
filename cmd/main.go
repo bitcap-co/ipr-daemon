@@ -24,23 +24,25 @@ var (
 	log = iprd.NewLogger()
 
 	// flags
-	flAuto            = flag.Bool("a", false, "Switch to use the defined LAN interface (matching description of 'lan' or 'LAN') for listening. Overrides -i flag.")
-	flConfig          = flag.String("c", "", "Path to config file. Overrides any other supplied flags.")
-	flDebug           = flag.Bool("d", false, "Switch to enable packet debugging output.")
-	flFilter          = flag.Bool("filter", false, "Switch to only broadcast known ports/miner types over forward port. Excludes 'unknown' type.")
-	flInterface       = flag.String("i", "eth0", "Name or index of interface to listen/capture on.")
-	flList            = flag.Bool("list", false, "List all available system network interfaces to listen on.")
-	flForwardPort     = flag.Int("p", 7788, "TCP stream/broadcast port for forwarding packet data.")
-	flCaptureFile     = flag.String("capture-file", "", "Path to write received packets to in PCAP format for replay/debugging. Empty disables.")
-	flNoRootNetwork   = flag.Bool("no-root-network", false, "Switch to exclude root network from interface from BPF filter.")
-	flWriteConfig     = flag.String("w", "", "Path to new config file. Writes supplied arguements to new TOML config file and exits.")
-	flNetworkPrefixes flagSlice
-	flIgnoreAddresses flagSlice
+	flAuto              = flag.Bool("a", false, "Switch to use the defined LAN interface (matching description of 'lan' or 'LAN') for listening. Overrides -i flag.")
+	flConfig            = flag.String("c", "", "Path to config file. Overrides any other supplied flags.")
+	flDebug             = flag.Bool("d", false, "Switch to enable packet debugging output.")
+	flFilter            = flag.Bool("filter", false, "Switch to only broadcast known ports/miner types over forward port. Excludes 'unknown' type.")
+	flInterface         = flag.String("i", "eth0", "Name or index of interface to listen/capture on.")
+	flList              = flag.Bool("list", false, "List all available system network interfaces to listen on.")
+	flForwardPort       = flag.Int("p", 7788, "TCP stream/broadcast port for forwarding packet data.")
+	flCaptureFile       = flag.String("capture-file", "", "Path to write received packets to in PCAP format for replay/debugging. Empty disables.")
+	flNoRootNetwork     = flag.Bool("no-root-network", false, "Switch to exclude root network from interface from BPF filter.")
+	flWriteConfig       = flag.String("w", "", "Path to new config file. Writes supplied arguements to new TOML config file and exits.")
+	flNetworkPrefixes   flagSlice
+	flNetworkExclusions flagSlice
+	flIgnoreAddresses   flagSlice
 )
 
 func main() {
 	flag.Var(&flIgnoreAddresses, "ignore", "List of MAC addresses to ignore packets from.")
 	flag.Var(&flNetworkPrefixes, "add-network", "List of network prefixes to append to BPF filter. (i.e 10.10 to also listen for 10.10.xxx.xxx addresses)")
+	flag.Var(&flNetworkExclusions, "exclude", "List of network prefixes/VLANs to additionally exclude from in BPF filter.")
 	flag.Parse()
 
 	// list interfaces and exit.
@@ -63,15 +65,16 @@ func main() {
 	var err error
 	var cfg *iprd.IPRDConfig
 	cfg = &iprd.IPRDConfig{
-		Debug:           *flDebug,
-		Auto:            *flAuto,
-		Filter:          *flFilter,
-		NoRootNetwork:   *flNoRootNetwork,
-		ListenInterface: *flInterface,
-		ForwardPort:     *flForwardPort,
-		IgnoreAddresses: strings.Split(flIgnoreAddresses.String(), ","),
-		NetworkPrefixes: strings.Split(flNetworkPrefixes.String(), ","),
-		CaptureFile:     *flCaptureFile,
+		Debug:             *flDebug,
+		Auto:              *flAuto,
+		Filter:            *flFilter,
+		NoRootNetwork:     *flNoRootNetwork,
+		ListenInterface:   *flInterface,
+		ForwardPort:       *flForwardPort,
+		IgnoreAddresses:   strings.Split(flIgnoreAddresses.String(), ","),
+		NetworkPrefixes:   strings.Split(flNetworkPrefixes.String(), ","),
+		NetworkExclusions: strings.Split(flNetworkExclusions.String(), ","),
+		CaptureFile:       *flCaptureFile,
 	}
 	if *flWriteConfig != "" {
 		*flWriteConfig = strings.Split(*flWriteConfig, ".")[0]
