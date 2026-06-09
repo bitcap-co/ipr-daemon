@@ -169,14 +169,15 @@ func ParseMACAddress(macAddress string) string {
 	case 17:
 		macAddress = strings.ReplaceAll(macAddress, "-", ":")
 	case 12:
-		var newMacAddress string
+		var newMacAddress strings.Builder
+		newMacAddress.Grow(17)
 		for i := 0; i < 12; i += 2 {
-			newMacAddress += macAddress[i : i+2]
+			newMacAddress.WriteString(macAddress[i : i+2])
 			if i < 10 {
-				newMacAddress += ":"
+				newMacAddress.WriteString(":")
 			}
 		}
-		macAddress = newMacAddress
+		macAddress = newMacAddress.String()
 	default:
 		return ""
 	}
