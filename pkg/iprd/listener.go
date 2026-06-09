@@ -106,6 +106,18 @@ func (l *IPRListener) Activate() error {
 		}
 		fmt.Fprintf(&src_prefix, "src host %s%s", prefix, sep)
 		fmt.Fprintf(&dst_prefix, "dst net %s%s", prefix, sep)
+
+	}
+	// build source exclusions to src_prefix if supplied
+	var exclusions = []string{}
+	if len(l.cfg.NetworkExclusions) > 0 && l.cfg.NetworkExclusions[0] != "" {
+		exclusions = append(exclusions, l.cfg.NetworkExclusions...)
+	}
+	for _, exclude := range exclusions {
+		if e := parseIPv4Network(exclude); e == "" {
+			continue
+		}
+		fmt.Fprintf(&src_prefix, " and not %s", exclude)
 	}
 	bpfExpr := fmt.Sprintf(bpfTemplate, src_prefix.String(), dst_prefix.String())
 	if err = l.handle.SetBPFFilter(bpfExpr); err != nil {

@@ -10,15 +10,16 @@ import (
 
 // IPRDConfig describes a new IPR Daemon configuration
 type IPRDConfig struct {
-	Debug           bool     `toml:"debug"`
-	Auto            bool     `toml:"auto"`
-	Filter          bool     `toml:"filter"`
-	NoRootNetwork   bool     `toml:"no_root_network"`
-	ListenInterface string   `toml:"listen_interface"`
-	ForwardPort     int      `toml:"forward_port"`
-	IgnoreAddresses []string `toml:"ignore_addrs"`
-	NetworkPrefixes []string `toml:"network_prefixes"`
-	CaptureFile     string   `toml:"capture_file"`
+	Debug             bool     `toml:"debug"`
+	Auto              bool     `toml:"auto"`
+	Filter            bool     `toml:"filter"`
+	NoRootNetwork     bool     `toml:"no_root_network"`
+	ListenInterface   string   `toml:"listen_interface"`
+	ForwardPort       int      `toml:"forward_port"`
+	IgnoreAddresses   []string `toml:"ignore_addrs"`
+	NetworkPrefixes   []string `toml:"network_prefixes"`
+	NetworkExclusions []string `toml:"network_exclusions"`
+	CaptureFile       string   `toml:"capture_file"`
 }
 
 // Validate returns error if IPRDConfig contains invalid values
@@ -60,6 +61,9 @@ func (cfg *IPRDConfig) Merge(target *IPRDConfig) *IPRDConfig {
 	if len(target.NetworkPrefixes) > 0 {
 		result.NetworkPrefixes = target.NetworkPrefixes
 	}
+	if len(target.NetworkExclusions) > 0 {
+		result.NetworkExclusions = target.NetworkExclusions
+	}
 	if target.CaptureFile != "" {
 		result.CaptureFile = target.CaptureFile
 	}
@@ -72,15 +76,16 @@ func (cfg *IPRDConfig) Merge(target *IPRDConfig) *IPRDConfig {
 // DefaultIPRDConfig returns a default IPRDConfig
 func DefaultIPRDConfig() *IPRDConfig {
 	return &IPRDConfig{
-		Debug:           false,
-		Auto:            false,
-		Filter:          false,
-		NoRootNetwork:   false,
-		ListenInterface: "eth0",
-		ForwardPort:     7788,
-		IgnoreAddresses: []string{},
-		NetworkPrefixes: []string{},
-		CaptureFile:     "",
+		Debug:             false,
+		Auto:              false,
+		Filter:            false,
+		NoRootNetwork:     false,
+		ListenInterface:   "eth0",
+		ForwardPort:       7788,
+		IgnoreAddresses:   []string{},
+		NetworkPrefixes:   []string{},
+		NetworkExclusions: []string{},
+		CaptureFile:       "",
 	}
 }
 
