@@ -40,9 +40,9 @@ var (
 )
 
 func main() {
-	flag.Var(&flIgnoreAddresses, "ignore", "List of MAC addresses to ignore packets from.")
-	flag.Var(&flNetworkPrefixes, "add-network", "List of network prefixes to append to BPF filter. (i.e 10.10 to also listen for 10.10.xxx.xxx addresses)")
-	flag.Var(&flNetworkExclusions, "exclude", "List of network prefixes/VLANs to additionally exclude from in BPF filter.")
+	flag.Var(&flIgnoreAddresses, "ignore", "List of MAC addresses to ignore packets from.\nThis flag supports chaining or comma-separated string.")
+	flag.Var(&flNetworkPrefixes, "add-network", "List of network prefixes to append to BPF filter. Network prefixes are IPv4 network numbers that can be written as a dotted quad, triple, pair or a single number.\nThis flag supports chaining or comma-separated string.")
+	flag.Var(&flNetworkExclusions, "exclude", "List of network prefixes to additionally exclude from BPF filter.\nThis flag supports chaining or comma-separated string.")
 	flag.Parse()
 
 	// list interfaces and exit.
