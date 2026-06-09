@@ -32,6 +32,8 @@ forward_port = 7788
 ignore_addrs = [""]
 # network_prefixes is a list of network prefixes to append to BPF filter.
 network_prefixes = [""]
+# network_exclusions is a list of network prefixes to additionally exclude from BPF filter.
+network_exclusions = [""]
 # capture_file is the file descriptor to write received packets to in PCAP format
 capture_file = ""
 EOF
