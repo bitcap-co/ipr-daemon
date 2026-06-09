@@ -95,6 +95,7 @@ func (l *IPRListener) Activate() error {
 		prefixes = append(prefixes, l.cfg.NetworkPrefixes...)
 	}
 	var src_prefix strings.Builder
+	src_prefix.WriteString("src host ")
 	var dst_prefix strings.Builder
 	for _, prefix := range prefixes {
 		if p := parseIPv4Network(prefix); p == "" {
@@ -104,9 +105,8 @@ func (l *IPRListener) Activate() error {
 		if prefixes[len(prefixes)-1] == prefix {
 			sep = ""
 		}
-		fmt.Fprintf(&src_prefix, "src host %s%s", prefix, sep)
-		fmt.Fprintf(&dst_prefix, "dst net %s%s", prefix, sep)
-
+		fmt.Fprintf(&src_prefix, "%s%s", prefix, sep)
+		fmt.Fprintf(&dst_prefix, "%s%s", prefix, sep)
 	}
 	// build source exclusions to src_prefix if supplied
 	var exclusions = []string{}
