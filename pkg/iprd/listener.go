@@ -91,33 +91,30 @@ func (l *IPRListener) Activate() error {
 	if !l.cfg.NoRootNetwork {
 		prefixes = []string{l.iface.NetworkPrefix()}
 	}
-	if len(l.cfg.NetworkPrefixes) > 0 && l.cfg.NetworkPrefixes[0] != "" {
-		prefixes = append(prefixes, l.cfg.NetworkPrefixes...)
+	for _, p := range l.cfg.NetworkPrefixes {
+		if p != "" {
+			prefixes = append(prefixes, p)
+		}
 	}
 	var src_prefix strings.Builder
 	src_prefix.WriteString("src host ")
 	var dst_prefix strings.Builder
-	for _, prefix := range prefixes {
+	for i, prefix := range prefixes {
 		if p := parseIPv4Network(prefix); p == "" {
 			continue
 		}
 		sep := " or "
-		if prefixes[len(prefixes)-1] == prefix {
+		if i == len(prefixes)-1 {
 			sep = ""
 		}
 		fmt.Fprintf(&src_prefix, "%s%s", prefix, sep)
 		fmt.Fprintf(&dst_prefix, "%s%s", prefix, sep)
 	}
 	// build source exclusions to src_prefix if supplied
-	var exclusions = []string{}
-	if len(l.cfg.NetworkExclusions) > 0 && l.cfg.NetworkExclusions[0] != "" {
-		exclusions = append(exclusions, l.cfg.NetworkExclusions...)
-	}
-	for _, exclude := range exclusions {
-		if e := parseIPv4Network(exclude); e == "" {
-			continue
+	for _, ex := range l.cfg.NetworkExclusions {
+		if e := parseIPv4Network(ex); e != "" {
+			fmt.Fprintf(&src_prefix, " and not %s", e)
 		}
-		fmt.Fprintf(&src_prefix, " and not %s", exclude)
 	}
 	bpfExpr := fmt.Sprintf(bpfTemplate, src_prefix.String(), dst_prefix.String())
 	if err = l.handle.SetBPFFilter(bpfExpr); err != nil {
