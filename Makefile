@@ -20,7 +20,7 @@ PROJECT_DELTA      := $(shell DELTA_LINES=$$(git diff | wc -l); if [ $${DELTA_LI
 VERSION_PKG        := $(shell echo $(PROJECT_VERSION) | sed 's/^v//g')
 LICENSE            := MIT
 URL                := https://github.com/$(REPO_ORG)/$(PROJECT_NAME)
-DESCRIPTION        := ASIC Miner IP Report listener
+DESCRIPTION        := LAN-wide miner IP Report listener
 
 # Build variables
 BUILDINFOS         := $(shell date +%FT%T%z)$(BUILDINFOSDET)

@@ -60,7 +60,7 @@ func main() {
 			delta = fmt.Sprintf(" [%s delta]", DELTA)
 			TAG = "Unknown"
 		}
-		fmt.Printf("ipr-daemon v%s -- LAN-wide miner IP Report listener\n", VERSION)
+		fmt.Printf("ipr-daemon v%s\n", VERSION)
 		fmt.Printf("%s (%s)%s built at %s\n", COMMIT, TAG, delta, BUILDINFO)
 		os.Exit(0)
 	}
