@@ -188,7 +188,7 @@ func ParseIPReportPacket(packet *IPReportPacket, ignoredAddrs ...string) error {
 	// ignore packet if it doesn't contain source IP within UDP datagram.
 	if !bytes.Contains(packet.Datagram, []byte(packet.SrcIP)) {
 		// edge case for Elphapex: it sends a static message that doesn't contain source IP.
-		if !MsgPatterns["DG"].Match(packet.Datagram) {
+		if !MsgPatterns["elphapex"].Match(packet.Datagram) {
 			return fmt.Errorf("no source IP found in datagram")
 		}
 	}

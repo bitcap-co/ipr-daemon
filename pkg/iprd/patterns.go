@@ -28,11 +28,11 @@ var (
 	ValidIP     = regexp.MustCompile(`\b(?:(?:2(?:[0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9])\.){3}(?:(?:2([0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9]))\b`)
 	ValidMAC    = regexp.MustCompile(`([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})`)
 	MsgPatterns = map[string]*regexp.Regexp{
-		"Common": regexp.MustCompile(fmt.Sprintf(`^%s,%s`, ValidIP, ValidMAC)),
-		"IR":     regexp.MustCompile(fmt.Sprintf(`^addr:%s`, ValidIP)),
-		"BT":     regexp.MustCompile(fmt.Sprintf(`^IP:%sMAC:%s`, ValidIP, ValidMAC)),
-		"DG":     regexp.MustCompile(`^DG_IPREPORT_ONLY`),
-		"IP":     regexp.MustCompile(fmt.Sprintf(`^IP Addr:\[%s\].*?MAC Addr:\[%s\]`, ValidIP, ValidMAC)),
+		"common":     regexp.MustCompile(fmt.Sprintf(`^%s,%s`, ValidIP, ValidMAC)),
+		"iceriver":   regexp.MustCompile(fmt.Sprintf(`^addr:%s`, ValidIP)),
+		"whatsminer": regexp.MustCompile(fmt.Sprintf(`^IP:%sMAC:%s`, ValidIP, ValidMAC)),
+		"elphapex":   regexp.MustCompile(`^DG_IPREPORT_ONLY`),
+		"ipollo":     regexp.MustCompile(fmt.Sprintf(`^IP Addr:\[%s\].*?MAC Addr:\[%s\]`, ValidIP, ValidMAC)),
 	}
 )
 
