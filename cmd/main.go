@@ -21,6 +21,13 @@ func (f *flagSlice) Set(value string) error {
 }
 
 var (
+	// build info
+	VERSION   = "unknown"
+	BUILDINFO = "unknown"
+	TAG       = "NO-TAG"
+	COMMIT    = "unknown"
+	DELTA     = ""
+
 	log = iprd.NewLogger()
 
 	// flags
@@ -37,6 +44,7 @@ var (
 	flNetworkPrefixes   flagSlice
 	flNetworkExclusions flagSlice
 	flIgnoreAddresses   flagSlice
+	flVersion           = flag.Bool("version", false, "Print version info and exits.")
 )
 
 func main() {
@@ -44,6 +52,18 @@ func main() {
 	flag.Var(&flNetworkPrefixes, "add-network", "List of network prefixes to append to BPF filter. Network prefixes are IPv4 network numbers that can be written as a dotted quad, triple, pair or a single number.\nThis flag supports chaining or comma-separated string.")
 	flag.Var(&flNetworkExclusions, "exclude", "List of network prefixes to additionally exclude from BPF filter.\nThis flag supports chaining or comma-separated string.")
 	flag.Parse()
+
+	// print version info and exit
+	if *flVersion {
+		delta := ""
+		if len(DELTA) > 0 {
+			delta = fmt.Sprintf(" [%s delta]", DELTA)
+			TAG = "Unknown"
+		}
+		fmt.Printf("ipr-daemon v%s -- LAN-wide miner IP Report listener\n", VERSION)
+		fmt.Printf("%s (%s)%s built at %s\n", COMMIT, TAG, delta, BUILDINFO)
+		os.Exit(0)
+	}
 
 	// list interfaces and exit.
 	if *flList {
