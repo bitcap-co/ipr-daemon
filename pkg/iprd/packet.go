@@ -31,6 +31,7 @@ var (
 		9999:  Elphapex,
 		12345: Auradine,
 		54321: IPollo,
+		42069: HiveGPU,
 	}
 	record = NewRecord(10)
 )

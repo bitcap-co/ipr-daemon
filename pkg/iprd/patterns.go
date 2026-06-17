@@ -22,6 +22,7 @@ const (
 	Elphapex    MinerTypeHint = "elphapex"
 	Auradine    MinerTypeHint = "auradine"
 	IPollo      MinerTypeHint = "ipollo"
+	HiveGPU     MinerTypeHint = "hivegpu"
 )
 
 var (
@@ -33,6 +34,7 @@ var (
 		"whatsminer": regexp.MustCompile(fmt.Sprintf(`^IP:%sMAC:%s`, ValidIP, ValidMAC)),
 		"elphapex":   regexp.MustCompile(`^DG_IPREPORT_ONLY`),
 		"ipollo":     regexp.MustCompile(fmt.Sprintf(`^IP Addr:\[%s\].*?MAC Addr:\[%s\]`, ValidIP, ValidMAC)),
+		"hivegpu":    regexp.MustCompile(fmt.Sprintf(`^HiveOS %s`, ValidIP)),
 	}
 )
 
