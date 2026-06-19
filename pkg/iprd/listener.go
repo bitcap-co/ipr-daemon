@@ -57,6 +57,46 @@ func (l *IPRListener) Broadcast() chan []byte {
 	return l.ch
 }
 
+func (l *IPRListener) setupBPF(root string) error {
+	// build network prefixes in expression
+	var networks = []string{}
+	if !l.cfg.NoRootNetwork {
+		networks = append(networks, root)
+	}
+	for _, prefix := range l.cfg.NetworkPrefixes {
+		if p := ParseBPFNetwork(prefix); p != "" {
+			networks = append(networks, p)
+		}
+	}
+
+	var src_prefix strings.Builder
+	src_prefix.WriteString("src host ")
+	var dst_prefix strings.Builder
+	for i, p := range networks {
+		sep := " or "
+		if i == len(networks)-1 {
+			sep = ""
+		}
+		fmt.Fprintf(&src_prefix, "%s%s", p, sep)
+		fmt.Fprintf(&dst_prefix, "%s%s", p, sep)
+	}
+
+	// build source network exclusions
+	for _, ex := range l.cfg.NetworkExclusions {
+		if p := ParseBPFNetwork(ex); p != "" {
+			fmt.Fprintf(&src_prefix, " and not %s", p)
+		}
+	}
+
+	bpfExpr := fmt.Sprintf(bpfTemplate, src_prefix.String(), dst_prefix.String())
+	l.log.Info(bpfExpr)
+	if err := l.handle.SetBPFFilter(bpfExpr); err != nil {
+		return fmt.Errorf("failed to set BPF expression: %w", err)
+	}
+	l.log.Info(fmt.Sprintf("set BPF filter expression: %s", bpfExpr))
+	return nil
+}
+
 // Activate sets a new active pcap handle on iface. This must be called once before Listen().
 func (l *IPRListener) Activate() error {
 	var err error
@@ -85,57 +125,15 @@ func (l *IPRListener) Activate() error {
 	}
 	l.log.Info(fmt.Sprintf("activate handle on interface: %s (%s)", l.iface.FriendlyName, l.iface.MACAddr()))
 
-	// set BPF expression on new active handle.
-	// build network prefixes into expression
-	var prefixes = []string{}
-	if !l.cfg.NoRootNetwork {
-		prefixes = []string{l.iface.NetworkPrefix()}
+	err = l.setupBPF(l.iface.NetworkPrefix())
+	if err != nil {
+		return err
 	}
-	for _, p := range l.cfg.NetworkPrefixes {
-		if p != "" {
-			prefixes = append(prefixes, p)
-		}
-	}
-	var src_prefix strings.Builder
-	src_prefix.WriteString("src host ")
-	var dst_prefix strings.Builder
-	for i, prefix := range prefixes {
-		if p := ParseBPFNetwork(prefix); p == "" {
-			continue
-		}
-		sep := " or "
-		if i == len(prefixes)-1 {
-			sep = ""
-		}
-		fmt.Fprintf(&src_prefix, "%s%s", prefix, sep)
-		fmt.Fprintf(&dst_prefix, "%s%s", prefix, sep)
-	}
-	// build source exclusions to src_prefix if supplied
-	for _, ex := range l.cfg.NetworkExclusions {
-		if e := ParseBPFNetwork(ex); e != "" {
-			fmt.Fprintf(&src_prefix, " and not %s", e)
-		}
-	}
-	bpfExpr := fmt.Sprintf(bpfTemplate, src_prefix.String(), dst_prefix.String())
-	if err = l.handle.SetBPFFilter(bpfExpr); err != nil {
-		return fmt.Errorf("failed to set BPF expression: %w", err)
-	}
-	l.log.Info(fmt.Sprintf("set BPF filter expression: %s", bpfExpr))
 	if l.cfg.Debug {
 		l.log.Debug("--- DEBUG OUTPUT ON ---")
 	}
 	if l.cfg.Filter {
 		l.log.Info("filter option is set: only broadcast known ports!")
-	}
-	if len(l.cfg.IgnoreAddresses) > 0 && l.cfg.IgnoreAddresses[0] != "" {
-		for i, mac := range l.cfg.IgnoreAddresses {
-			newMac := ParseMACAddress(mac)
-			if len(newMac) == 0 {
-				l.log.Warn(fmt.Sprintf("invalid mac: %d - %s", i, mac))
-			}
-			l.cfg.IgnoreAddresses[i] = newMac
-		}
-		l.log.Info(fmt.Sprintf("set ignored addresses: [%s]", strings.Join(l.cfg.IgnoreAddresses, ",")))
 	}
 	if l.cfg.CaptureFile != "" {
 		f, err := os.Create(l.cfg.CaptureFile)
