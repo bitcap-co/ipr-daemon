@@ -191,30 +191,36 @@ func ParseMACAddress(macAddress string) string {
 	return macAddress
 }
 
-// parseIPv4Network parses a IPv4 network filter string, returning back network if is a valid network filter for BPF.
-// returns empty if invalid
-func parseIPv4Network(network string) string {
-	if network == "" {
+// ParseBPFNetwork returns net on successful parse, empty if not.
+// net is a BPF IPv4 network number that can be written as a dotted quad (192.168.1.0), dotted triple (192.168.1),
+// dotted pair (192.168) or single number (10).
+func ParseBPFNetwork(net string) string {
+	if net == "" {
 		return ""
 	}
-	if len(network) > 15 {
+	// max dotted quad/IPv4 has length of 15
+	if len(net) > 15 {
 		return ""
 	}
-	octets := strings.Split(network, ".")
-	validNetwork := func() bool {
+	octets := strings.Split(net, ".")
+	if len(octets) > 4 {
+		return ""
+	}
+
+	validNet := func() bool {
 		for _, octet := range octets {
-			if o, err := strconv.Atoi(octet); err == nil {
+			if o, err := strconv.Atoi(octet); err != nil {
+				return false
+			} else {
 				if o < 0 || o > 255 {
 					return false
 				}
-			} else {
-				return false
 			}
 		}
 		return true
 	}()
-	if !validNetwork {
+	if !validNet {
 		return ""
 	}
-	return network
+	return net
 }

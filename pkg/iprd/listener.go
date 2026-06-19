@@ -100,7 +100,7 @@ func (l *IPRListener) Activate() error {
 	src_prefix.WriteString("src host ")
 	var dst_prefix strings.Builder
 	for i, prefix := range prefixes {
-		if p := parseIPv4Network(prefix); p == "" {
+		if p := ParseBPFNetwork(prefix); p == "" {
 			continue
 		}
 		sep := " or "
@@ -112,7 +112,7 @@ func (l *IPRListener) Activate() error {
 	}
 	// build source exclusions to src_prefix if supplied
 	for _, ex := range l.cfg.NetworkExclusions {
-		if e := parseIPv4Network(ex); e != "" {
+		if e := ParseBPFNetwork(ex); e != "" {
 			fmt.Fprintf(&src_prefix, " and not %s", e)
 		}
 	}

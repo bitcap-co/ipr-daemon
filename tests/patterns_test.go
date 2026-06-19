@@ -31,3 +31,29 @@ func TestIPolloParse(t *testing.T) {
 		t.Fatalf("got no match, want match")
 	}
 }
+
+func TestParseBPFNetwork(t *testing.T) {
+	cases := []struct {
+		Name string
+		Net  string
+		Want string
+	}{
+		{"empty network", "", ""},
+		{"over max network length", "255.255.255.2555", ""},
+		{"too many octets", "255.255.255.255.1", ""},
+		{"octet out of range", "256", ""},
+		{"dotted quad", "192.168.1.0", "192.168.1.0"},
+		{"dotted triple", "192.168.1", "192.168.1"},
+		{"dotted pair", "192.168", "192.168"},
+		{"single", "10", "10"},
+	}
+
+	for _, test := range cases {
+		t.Run(test.Name, func(t *testing.T) {
+			got := iprd.ParseBPFNetwork(test.Net)
+			if got != test.Want {
+				t.Errorf("got %q, want %q", got, test.Want)
+			}
+		})
+	}
+}
