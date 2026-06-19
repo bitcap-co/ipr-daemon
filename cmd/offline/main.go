@@ -11,29 +11,16 @@ import (
 	"github.com/gopacket/gopacket/pcap"
 )
 
-type flagSlice []string
-
-func (f *flagSlice) String() string {
-	return strings.Join(*f, ",")
-}
-
-func (f *flagSlice) Set(value string) error {
-	*f = append(*f, value)
-	return nil
-}
-
 var (
 	// flags
-	flPcapFile        = flag.String("f", "", "File descriptor for .pcap file.")
-	flDebug           = flag.Bool("d", false, "Switch to enable packet debugging output to stdout.")
-	flIgnoreAddresses flagSlice
+	flPcapFile = flag.String("f", "", "File descriptor for .pcap file.")
+	flDebug    = flag.Bool("d", false, "Switch to enable packet debugging output to stdout.")
 
 	log = iprd.NewLogger()
 )
 
 func main() {
 	log.SetPrefix("iprd-offline: ")
-	flag.Var(&flIgnoreAddresses, "ignore", "List of MAC addresses to ignore packets from.")
 	flag.Parse()
 
 	if *flPcapFile == "" {
@@ -75,17 +62,11 @@ func dumpPcap(fd string, debug bool) error {
 			log.Error(fmt.Errorf("failed to decode packet %d: %s", packetCount, err))
 			continue
 		}
-		if err := iprd.ParseIPReportPacket(ipr, flIgnoreAddresses...); err != nil {
+		if err := iprd.ParseIPReportPacket(ipr); err != nil {
 			if err.Error() == "duplicate packet" {
 				// ignore duplicate packets
 				if debug {
 					log.Warn(fmt.Sprintf("cnt:%d %s - Duplicate", packetCount, ipr.String()))
-				}
-				continue
-			}
-			if err.Error() == "ignored" {
-				if debug {
-					log.Warn(fmt.Sprintf("cnt:%d %s - Ignored", packetCount, ipr.String()))
 				}
 				continue
 			}
