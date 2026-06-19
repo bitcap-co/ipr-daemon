@@ -19,7 +19,7 @@ const (
 )
 
 const (
-	bpfTemplate string = "(%s) and (dst net 255 or %s) and udp src portrange 1024-65535 and udp dst portrange 1024-65535"
+	bpfTemplate string = "(%s and (dst net 255 or %s) and udp src portrange 1024-65535 and udp dst portrange 1024-65535"
 )
 
 type IPRListener struct {
@@ -86,6 +86,28 @@ func (l *IPRListener) setupBPF(root string) error {
 		if p := ParseBPFNetwork(ex); p != "" {
 			fmt.Fprintf(&src_prefix, " and not %s", p)
 		}
+	}
+	fmt.Fprint(&src_prefix, ")")
+
+	// build source MAC addresses to exclude (ignored addresses)
+	var ignored = []string{}
+	for _, mac := range l.cfg.IgnoreAddresses {
+		if m := ParseMACAddress(mac); m != "" {
+			ignored = append(ignored, m)
+		}
+	}
+	if len(ignored) > 0 {
+		var ignore_addrs strings.Builder
+		ignore_addrs.WriteString(" and (not ether src ")
+		for i, mac := range ignored {
+			sep := " or "
+			if i == len(ignored)-1 {
+				sep = ""
+			}
+			fmt.Fprintf(&ignore_addrs, "%s%s", mac, sep)
+		}
+		fmt.Fprint(&ignore_addrs, ")")
+		fmt.Fprint(&src_prefix, ignore_addrs.String())
 	}
 
 	bpfExpr := fmt.Sprintf(bpfTemplate, src_prefix.String(), dst_prefix.String())
@@ -182,7 +204,7 @@ func (l *IPRListener) Listen() {
 			continue
 		}
 		// parse IPReportPacket to validate that it is an IP Report packet.
-		if err := ParseIPReportPacket(r, l.cfg.IgnoreAddresses...); err != nil {
+		if err := ParseIPReportPacket(r); err != nil {
 			// warn on duplicate packet.
 			if err.Error() == "duplicate packet" {
 				l.log.Warn(fmt.Sprintf("%s - %s", r.String(), err))
