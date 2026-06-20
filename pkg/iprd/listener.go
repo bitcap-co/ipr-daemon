@@ -58,12 +58,12 @@ func (l *IPRListener) Broadcast() chan []byte {
 }
 
 func (l *IPRListener) setupBPF(root string) error {
-	// build network prefixes in expression
+	// build networks into expression
 	var networks = []string{}
 	if !l.cfg.NoRootNetwork {
 		networks = append(networks, root)
 	}
-	for _, prefix := range l.cfg.NetworkPrefixes {
+	for _, prefix := range l.cfg.NetworkInclusions {
 		if p := ParseBPFNetwork(prefix); p != "" {
 			networks = append(networks, p)
 		}
@@ -91,7 +91,7 @@ func (l *IPRListener) setupBPF(root string) error {
 
 	// build source MAC addresses to exclude (ignored addresses)
 	var ignored = []string{}
-	for _, mac := range l.cfg.IgnoreAddresses {
+	for _, mac := range l.cfg.IgnoredDevices {
 		if m := ParseMACAddress(mac); m != "" {
 			ignored = append(ignored, m)
 		}
@@ -154,8 +154,8 @@ func (l *IPRListener) Activate() error {
 	if l.cfg.Debug {
 		l.log.Debug("--- DEBUG OUTPUT ON ---")
 	}
-	if l.cfg.Filter {
-		l.log.Info("filter option is set: only broadcast known ports!")
+	if l.cfg.ForwardKnown {
+		l.log.Info("fowarding known ports only")
 	}
 	if l.cfg.CaptureFile != "" {
 		f, err := os.Create(l.cfg.CaptureFile)
@@ -216,7 +216,7 @@ func (l *IPRListener) Listen() {
 			}
 			continue
 		}
-		if l.cfg.Filter {
+		if l.cfg.ForwardKnown {
 			if r.MinerHint == UnknownType {
 				l.log.Warn(fmt.Sprintf("received unknown IP Report %s", r.String()))
 				continue

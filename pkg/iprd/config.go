@@ -12,12 +12,12 @@ import (
 type IPRDConfig struct {
 	Debug             bool     `toml:"debug"`
 	Auto              bool     `toml:"auto"`
-	Filter            bool     `toml:"filter"`
-	NoRootNetwork     bool     `toml:"no_root_network"`
 	ListenInterface   string   `toml:"listen_interface"`
 	ForwardPort       int      `toml:"forward_port"`
-	IgnoreAddresses   []string `toml:"ignore_addrs"`
-	NetworkPrefixes   []string `toml:"network_prefixes"`
+	ForwardKnown      bool     `toml:"forward_known"`
+	NoRootNetwork     bool     `toml:"no_root_network"`
+	IgnoredDevices    []string `toml:"ignored_devices"`
+	NetworkInclusions []string `toml:"network_inclusions"`
 	NetworkExclusions []string `toml:"network_exclusions"`
 	CaptureFile       string   `toml:"capture_file"`
 }
@@ -46,8 +46,8 @@ func (cfg *IPRDConfig) Merge(target *IPRDConfig) *IPRDConfig {
 	if target.Auto {
 		result.Auto = target.Auto
 	}
-	if target.Filter {
-		result.Filter = target.Filter
+	if target.ForwardKnown {
+		result.ForwardKnown = target.ForwardKnown
 	}
 	if target.ListenInterface != "" {
 		result.ListenInterface = target.ListenInterface
@@ -55,11 +55,11 @@ func (cfg *IPRDConfig) Merge(target *IPRDConfig) *IPRDConfig {
 	if target.ForwardPort > 0 {
 		result.ForwardPort = target.ForwardPort
 	}
-	if len(target.IgnoreAddresses) > 0 {
-		result.IgnoreAddresses = target.IgnoreAddresses
+	if len(target.IgnoredDevices) > 0 {
+		result.IgnoredDevices = target.IgnoredDevices
 	}
-	if len(target.NetworkPrefixes) > 0 {
-		result.NetworkPrefixes = target.NetworkPrefixes
+	if len(target.NetworkInclusions) > 0 {
+		result.NetworkInclusions = target.NetworkInclusions
 	}
 	if len(target.NetworkExclusions) > 0 {
 		result.NetworkExclusions = target.NetworkExclusions
@@ -78,12 +78,12 @@ func DefaultIPRDConfig() *IPRDConfig {
 	return &IPRDConfig{
 		Debug:             false,
 		Auto:              false,
-		Filter:            false,
-		NoRootNetwork:     false,
 		ListenInterface:   "eth0",
 		ForwardPort:       7788,
-		IgnoreAddresses:   []string{},
-		NetworkPrefixes:   []string{},
+		ForwardKnown:      false,
+		NoRootNetwork:     false,
+		IgnoredDevices:    []string{},
+		NetworkInclusions: []string{},
 		NetworkExclusions: []string{},
 		CaptureFile:       "",
 	}
