@@ -3,6 +3,6 @@ services:
     image: mattwert/ipr-daemon:latest
     network_mode: "host"
     volumes:
-      # set CONFIG_PATH env to TOML config file or modify the existing "example.toml" to override iprd configuration.
-      - ${CONFIG_PATH:-./example.toml}:/home/iprd.toml
+      # set CONFIG_PATH env to TOML config file or modify the existing "default.toml" to override iprd configuration.
+      - ${CONFIG_PATH:-./default.toml}:/home/iprd.toml
     entrypoint: /usr/local/bin/iprd -c /home/iprd.toml

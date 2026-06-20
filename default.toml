@@ -1,21 +1,3 @@
-FROM golang:1.25-alpine AS builder
-
-ARG VERSION
-
-RUN apk add --update git build-base libpcap libpcap-dev && \
-    mkdir ipr-daemon
-COPY . ipr-daemon/
-
-RUN cd ipr-daemon && \
-    DOCKER_VERSION=${VERSION} make .docker && \
-    mkdir -p /usr/local/bin && \
-    cp dist/iprd /usr/local/bin/iprd
-
-FROM alpine
-RUN apk add --update libpcap && \
-    mkdir -p /usr/local/bin
-COPY --from=builder /usr/local/bin/iprd /usr/local/bin/
-RUN cat <<EOF > /home/iprd.toml
 # debug is a switch to enable packet debugging output.
 debug = false
 # auto is a switch to find and use the defined LAN interface (description matching 'lan/LAN') for listening.
@@ -40,7 +22,3 @@ network_inclusions = [""]
 network_exclusions = [""]
 # capture_file is a path to write receieved packets to in PCAP format for replay/debugging.
 capture_file = ""
-EOF
-
-ENV ARGS=""
-CMD /usr/local/bin/iprd ${ARGS}
