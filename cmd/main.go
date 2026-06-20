@@ -31,26 +31,26 @@ var (
 	log = iprd.NewLogger()
 
 	// flags
-	flAuto              = flag.Bool("a", false, "Switch to use the defined LAN interface (matching description of 'lan' or 'LAN') for listening. Overrides -i flag.")
-	flConfig            = flag.String("c", "", "Path to config file. Overrides any other supplied flags.")
+	flVersion           = flag.Bool("version", false, "Prints version info and exits")
+	flList              = flag.Bool("list", false, "Lists all available network interfaces that can be listened on.")
 	flDebug             = flag.Bool("d", false, "Switch to enable packet debugging output.")
-	flFilter            = flag.Bool("filter", false, "Switch to only broadcast known ports/miner types over forward port. Excludes 'unknown' type.")
+	flAuto              = flag.Bool("a", false, "Switch to use the defined LAN interface (description matching 'lan' or 'LAN') for listening. Overrides -i flag.")
 	flInterface         = flag.String("i", "eth0", "Name or index of interface to listen/capture on.")
-	flList              = flag.Bool("list", false, "List all available system network interfaces to listen on.")
-	flForwardPort       = flag.Int("p", 7788, "TCP stream/broadcast port for forwarding packet data.")
-	flCaptureFile       = flag.String("capture-file", "", "Path to write received packets to in PCAP format for replay/debugging. Empty disables.")
-	flNoRootNetwork     = flag.Bool("no-root-network", false, "Switch to exclude root network from interface from BPF filter.")
-	flWriteConfig       = flag.String("w", "", "Path to new config file. Writes supplied arguements to new TOML config file and exits.")
-	flNetworkPrefixes   flagSlice
+	flForwardPort       = flag.Int("p", 7788, "TCP stream/broadcast port for forwarding IP report packet data.")
+	flForwardKnown      = flag.Bool("known", false, "Switch to only forward IP reports from known miner types/ports over forward port.")
+	flNoRootNetwork     = flag.Bool("no-root-network", false, "Switch to not include the interface network in BPF filter.")
+	flNetworkInclusions flagSlice
 	flNetworkExclusions flagSlice
-	flIgnoreAddresses   flagSlice
-	flVersion           = flag.Bool("version", false, "Print version info and exits.")
+	flIgnoredDevices    flagSlice
+	flCaptureFile       = flag.String("capture-file", "", "Path to write received packets to in PCAP format for replay/debugging.")
+	flConfig            = flag.String("c", "", "Path to TOML config file. Overrides any other supplied flags.")
+	flWrite             = flag.String("w", "", "Path to new TOML config file. Writes the supplied arguments to new config path.")
 )
 
 func main() {
-	flag.Var(&flIgnoreAddresses, "ignore", "List of MAC addresses to ignore packets from.\nThis flag supports chaining or comma-separated string.")
-	flag.Var(&flNetworkPrefixes, "add-network", "List of network prefixes to append to BPF filter. Network prefixes are IPv4 network numbers that can be written as a dotted quad, triple, pair or a single number.\nThis flag supports chaining or comma-separated string.")
-	flag.Var(&flNetworkExclusions, "exclude", "List of network prefixes to additionally exclude from BPF filter.\nThis flag supports chaining or comma-separated string.")
+	flag.Var(&flIgnoredDevices, "ignore", "List of source MAC addresses to exclude in BPF filter.\nThis flag supports chaining or comma-separated string.")
+	flag.Var(&flNetworkInclusions, "add-network", "List of networks to append to BPF filter. Networks are IPv4 network numbers that can be written as a dotted quad, triple, pair or a single number.\nThis flag supports chaining or comma-separated string.")
+	flag.Var(&flNetworkExclusions, "exclude", "List of networks to additionally exclude from BPF filter.\nThis flag supports chaining or comma-separated string.")
 	flag.Parse()
 
 	// print version info and exit
@@ -77,8 +77,8 @@ func main() {
 		os.Exit(0)
 	}
 
-	if *flNoRootNetwork && flNetworkPrefixes.String() == "" {
-		log.Fatal(fmt.Errorf("no network prefixes supplied. Use -add-network to add a network"))
+	if *flNoRootNetwork && flNetworkInclusions.String() == "" {
+		log.Fatal(fmt.Errorf("no networks supplied. Use -add-network to add a network"))
 	}
 
 	// build/read configuration.
@@ -87,23 +87,23 @@ func main() {
 	cfg = &iprd.IPRDConfig{
 		Debug:             *flDebug,
 		Auto:              *flAuto,
-		Filter:            *flFilter,
-		NoRootNetwork:     *flNoRootNetwork,
 		ListenInterface:   *flInterface,
 		ForwardPort:       *flForwardPort,
-		IgnoreAddresses:   strings.Split(flIgnoreAddresses.String(), ","),
-		NetworkPrefixes:   strings.Split(flNetworkPrefixes.String(), ","),
+		ForwardKnown:      *flForwardKnown,
+		NoRootNetwork:     *flNoRootNetwork,
+		IgnoredDevices:    strings.Split(flIgnoredDevices.String(), ","),
+		NetworkInclusions: strings.Split(flNetworkInclusions.String(), ","),
 		NetworkExclusions: strings.Split(flNetworkExclusions.String(), ","),
 		CaptureFile:       *flCaptureFile,
 	}
-	if *flWriteConfig != "" {
-		*flWriteConfig = strings.Split(*flWriteConfig, ".")[0]
-		*flWriteConfig = *flWriteConfig + ".toml"
-		err = iprd.WriteIPRDConfigToFile(cfg, *flWriteConfig)
+	if *flWrite != "" {
+		*flWrite = strings.Split(*flWrite, ".")[0]
+		*flWrite = *flWrite + ".toml"
+		err = iprd.WriteIPRDConfigToFile(cfg, *flWrite)
 		if err != nil {
 			log.Fatal(err)
 		}
-		log.Info(fmt.Sprintf("successfully wrote -> %s", *flWriteConfig))
+		log.Info(fmt.Sprintf("successfully wrote -> %s", *flWrite))
 		os.Exit(0)
 	}
 	if *flConfig != "" {
