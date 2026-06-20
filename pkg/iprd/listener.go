@@ -111,7 +111,6 @@ func (l *IPRListener) setupBPF(root string) error {
 	}
 
 	bpfExpr := fmt.Sprintf(bpfTemplate, src_prefix.String(), dst_prefix.String())
-	l.log.Info(bpfExpr)
 	if err := l.handle.SetBPFFilter(bpfExpr); err != nil {
 		return fmt.Errorf("failed to set BPF expression: %w", err)
 	}
