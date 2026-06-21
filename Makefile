@@ -319,9 +319,9 @@ $(DEB_S_NAME): linux-amd64
 	@install -m 0755 $(LINUX_AMD64_S_NAME)           $(DEB_STAGING)/usr/bin/iprd
 	@install -m 0644 resources/systemd/iprd.service  $(DEB_STAGING)/etc/systemd/system/iprd.service
 	@install -m 0644 resources/systemd/iprd.conf     $(DEB_STAGING)/etc/iprd.conf
-	@install -m 0755 scripts/startup/postinst        $(DEB_STAGING)/DEBIAN/postinst
-	@install -m 0755 scripts/startup/prerm           $(DEB_STAGING)/DEBIAN/prerm
-	@install -m 0755 scripts/startup/postrm          $(DEB_STAGING)/DEBIAN/postrm
+	@install -m 0755 scripts/package/postinst        $(DEB_STAGING)/DEBIAN/postinst
+	@install -m 0755 scripts/package/prerm           $(DEB_STAGING)/DEBIAN/prerm
+	@install -m 0755 scripts/package/postrm          $(DEB_STAGING)/DEBIAN/postrm
 	@printf '/etc/iprd.conf\n' > $(DEB_STAGING)/DEBIAN/conffiles
 	@printf 'Package: iprd\nVersion: $(VERSION_PKG)\nArchitecture: $(GOARCH)\nMaintainer: MatthewWertman <matt@bitcap.co>\nSection: net\nPriority: optional\nDescription: ASIC Miner IP Report listener\n' \
 	    > $(DEB_STAGING)/DEBIAN/control

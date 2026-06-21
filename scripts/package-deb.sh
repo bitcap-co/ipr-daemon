@@ -58,9 +58,9 @@ mkdir -p "$STAGING/etc/systemd/system"
 install -m 0755 "$BINARY"                                              "$STAGING/usr/bin/iprd"
 install -m 0644 "$REPO_ROOT/resources/systemd/iprd.service"            "$STAGING/etc/systemd/system/iprd.service"
 install -m 0644 "$REPO_ROOT/resources/systemd/iprd.conf"               "$STAGING/etc/iprd.conf"
-install -m 0755 "$REPO_ROOT/scripts/startup/postinst"                  "$STAGING/DEBIAN/postinst"
-install -m 0755 "$REPO_ROOT/scripts/startup/prerm"                     "$STAGING/DEBIAN/prerm"
-install -m 0755 "$REPO_ROOT/scripts/startup/postrm"                    "$STAGING/DEBIAN/postrm"
+install -m 0755 "$REPO_ROOT/scripts/package/postinst"                  "$STAGING/DEBIAN/postinst"
+install -m 0755 "$REPO_ROOT/scripts/package/prerm"                     "$STAGING/DEBIAN/prerm"
+install -m 0755 "$REPO_ROOT/scripts/package/postrm"                    "$STAGING/DEBIAN/postrm"
 
 # ── DEBIAN/control ────────────────────────────────────────────────────────────
 cat > "$STAGING/DEBIAN/control" <<EOF
