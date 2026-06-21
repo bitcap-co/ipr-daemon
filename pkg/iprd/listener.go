@@ -157,6 +157,8 @@ func (l *IPRListener) Activate() error {
 		l.log.Info("fowarding known ports only")
 	}
 	if l.cfg.CaptureFile != "" {
+		l.cfg.CaptureFile = strings.Split(l.cfg.CaptureFile, ".")[0]
+		l.cfg.CaptureFile = l.cfg.CaptureFile + ".pcap"
 		f, err := os.Create(l.cfg.CaptureFile)
 		if err != nil {
 			return fmt.Errorf("failed to open capture file: %w", err)
