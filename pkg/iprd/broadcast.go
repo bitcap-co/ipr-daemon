@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
+	"maps"
 	"math"
 	"net"
 	"sync"
@@ -42,7 +43,7 @@ func NewBroadcaster(logger *IPRLogger, port int) (*IPRBroadcast, error) {
 		listener: listener,
 		clients:  make(map[uint64]net.Conn),
 		Msgs:     make(chan []byte),
-		Errs:     make(chan error),
+		Errs:     make(chan error, 64),
 	}
 	return b, nil
 }
@@ -58,39 +59,56 @@ func (b *IPRBroadcast) incrementCounter() uint64 {
 	return b.counter
 }
 
-func (b *IPRBroadcast) broadcast(msg []byte) []error {
-	b.mu.RLock()
-	defer b.mu.RUnlock()
+// writeTimeout bounds a single client write so a slow or half-open
+// connection cannot stall delivery to every other client.
+const writeTimeout = 5 * time.Second
 
-	errs := make([]error, 0)
-	for id, conn := range b.clients {
-		if _, err := conn.Write(append(msg, '\n')); err != nil {
-			// close and remove client on error
+func (b *IPRBroadcast) broadcast(msg []byte) {
+	// Build the payload once. msg is owned by the channel sender, so we copy
+	// into a fresh buffer rather than appending in place.
+	payload := make([]byte, len(msg)+1)
+	copy(payload, msg)
+	payload[len(msg)] = '\n'
+
+	// Snapshot the client set so we don't hold the lock across blocking
+	// writes (which would also block new subscriptions).
+	b.mu.RLock()
+	conns := make(map[uint64]net.Conn, len(b.clients))
+	maps.Copy(conns, b.clients)
+	b.mu.RUnlock()
+
+	for id, conn := range conns {
+		conn.SetWriteDeadline(time.Now().Add(writeTimeout))
+		if _, err := conn.Write(payload); err != nil {
+			// Close and reap the client on any write error.
+			b.logger.Error(fmt.Errorf("dropping client %s: %w", conn.RemoteAddr(), err))
 			conn.Close()
+			b.mu.Lock()
 			delete(b.clients, id)
-			errs = append(errs, err)
+			b.mu.Unlock()
 		}
 	}
-
-	return errs
 }
 
 // Listen accepts incoming clients and subscribes them for broadcasted messages.
 func (b *IPRBroadcast) Listen() {
 	go func() {
 		for msg := range b.Msgs {
-			errs := b.broadcast(msg)
-			for _, err := range errs {
-				if err != nil {
-					b.Errs <- err
-				}
-			}
+			// broadcast logs and reaps failed clients itself; it never
+			// blocks on b.Errs, so the producer can't deadlock against it.
+			b.broadcast(msg)
 		}
 	}()
 	for {
 		conn, err := b.listener.Accept()
 		if err != nil {
-			b.Errs <- err
+			// Non-blocking: never wedge the accept loop if nobody is
+			// draining Errs at this instant.
+			select {
+			case b.Errs <- err:
+			default:
+				b.logger.Error(err)
+			}
 		}
 
 		if conn == nil {
@@ -104,6 +122,13 @@ func (b *IPRBroadcast) Listen() {
 				delete(b.clients, id)
 				conn.Close()
 			}()
+
+			// Enable TCP keepalive so dead peers are detected even when no
+			// data is flowing, rather than lingering as half-open sockets.
+			if tcpConn, ok := conn.(*net.TCPConn); ok {
+				tcpConn.SetKeepAlive(true)
+				tcpConn.SetKeepAlivePeriod(30 * time.Second)
+			}
 
 			conn.SetReadDeadline(time.Now().Add(time.Second * 10))
 			clientSubscribed := false
