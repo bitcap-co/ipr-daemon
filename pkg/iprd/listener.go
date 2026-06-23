@@ -98,7 +98,7 @@ func (l *IPRListener) setupBPF(root string) error {
 	}
 	if len(ignored) > 0 {
 		var ignore_addrs strings.Builder
-		ignore_addrs.WriteString(" and (not ether src ")
+		ignore_addrs.WriteString(" and not (ether src ")
 		for i, mac := range ignored {
 			sep := " or "
 			if i == len(ignored)-1 {
