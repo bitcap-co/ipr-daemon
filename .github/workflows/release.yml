@@ -183,6 +183,7 @@ jobs:
             go version
             git config --global --add safe.directory /home/runner/work/ipr-daemon/ipr-daemon
             FREEBSD_VERSION=${{ env.FREEBSD_VERSION }} gmake freebsd-binaries
+            FREEBSD_VERSION=${{ env.FREEBSD_VERSION }} gmake .freebsd-package
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
