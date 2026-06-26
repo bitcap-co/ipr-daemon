@@ -105,6 +105,36 @@ This lands the binary in `/usr/local/sbin/`, writes the rc service, enables it v
 Once installed, the service is controlled with `service iprd {start|stop|status}`.
 Extra arguments can be passed via `iprd_flags="..."` in `/etc/rc.conf`.
 
+### Docker
+A pre-built image is published to Docker Hub at
+[`mattwert/ipr-daemon`](https://hub.docker.com/r/mattwert/ipr-daemon).
+
+Because iprd sniffs packets across the LAN, the container must run on the **host
+network**. The simplest run uses auto interface detection (`-a`):
+```bash
+docker run -d --name ipr-daemon --network host -e ARGS="-a" mattwert/ipr-daemon:latest
+```
+`ARGS` accepts any iprd flags (e.g. `-e ARGS="-i eth0 -p 7788"`); see `iprd -h`.
+
+To configure via a TOML file instead, mount your own config and point iprd at it
+(the image ships a sample at `/home/iprd.toml`):
+```bash
+docker run -d --name ipr-daemon --network host \
+  -v ./default.toml:/home/iprd.toml \
+  mattwert/ipr-daemon:latest /usr/local/bin/iprd -c /home/iprd.toml
+```
+
+Or with Docker Compose (see `compose.yaml`):
+```bash
+# optionally set CONFIG_PATH to your own TOML config (defaults to ./default.toml)
+CONFIG_PATH=./default.toml docker compose up -d
+```
+
+> [!NOTE]
+> Host networking is required so the daemon can see LAN traffic. If packet capture
+> fails, the container may also need the `NET_ADMIN` capability
+> (`--cap-add=NET_ADMIN`) to put the interface into promiscuous mode.
+
 ## Usage
 
 ### Finding network interfaces to listen on
