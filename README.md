@@ -46,7 +46,30 @@ Install `libpcap` via Brew:
 brew install libpcap
 ```
 
-### FreeBSD/pfSense setup
+### Linux/Debian setup
+The Linux binary is statically built (no `libpcap` needed on the target) and can be
+installed as a systemd service via a `.deb` package.
+
+Build the package (compiles the static Linux/amd64 binary in Docker first):
+```bash
+make deb-package            # produces dist/iprd_<version>_amd64.deb
+```
+then copy it to the target and install:
+```bash
+scp dist/iprd_<version>_amd64.deb target:
+ssh target
+sudo dpkg -i ./iprd_<version>_amd64.deb
+```
+This installs `/usr/bin/iprd`, the systemd unit `/etc/systemd/system/iprd.service`,
+and the config `/etc/iprd.conf`, then enables + starts the service. Remove with
+`sudo dpkg -r iprd`.
+
+Once installed, the service is controlled with `sudo systemctl {start|stop|status} iprd`.
+Arguments are passed via the `ARGS=` line in `/etc/iprd.conf` (defaults to `-a`); run
+`sudo systemctl restart iprd` after editing. Your edits to `/etc/iprd.conf` are
+preserved across package upgrades.
+
+### FreeBSD/pfSense/OPNsense setup
 The FreeBSD binary is statically built (no `libpcap` needed on the target) and can
 be installed as an rc service two ways.
 
