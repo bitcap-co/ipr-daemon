@@ -1,0 +1,26 @@
+name: iprd
+version: "%%VERSION%%"
+origin: net/iprd
+comment: "ASIC Miner IP Report listener"
+maintainer: matt@bitcap.co
+www: https://github.com/bitcap-co/ipr-daemon
+prefix: /usr/local
+arch: "%%ARCH%%"
+desc: <<EOD
+iprd listens for IP Report packets broadcast by ASIC miners on the local
+network and forwards them over TCP.
+EOD
+scripts: {
+  post-install: <<EOS
+#!/bin/sh
+sysrc iprd_enable=YES
+service iprd start
+EOS
+  pre-deinstall: <<EOS
+#!/bin/sh
+if service iprd onestatus >/dev/null 2>&1; then
+    service iprd stop
+fi
+sysrc -x iprd_enable >/dev/null 2>&1 || true
+EOS
+}

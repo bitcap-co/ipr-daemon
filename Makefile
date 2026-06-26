@@ -260,6 +260,13 @@ freebsd: .vagrant-check
 	vagrant provision && vagrant up && vagrant ssh-config >.vagrant-ssh && \
 		scp -F .vagrant-ssh default:$(PROJECT_NAME)/dist/*freebsd* dist/
 
+## freebsd-package : build FreeBSD/amd64 .pkg package with Vagrant VM
+.PHONY: freebsd-package
+freebsd-package: .vagrant-check
+	vagrant provision && vagrant up && vagrant ssh-config >.vagrant-ssh && \
+		ssh -F .vagrant-ssh default 'sh -c "PATH=/usr/local/bin:$$PATH; cd $(PROJECT_NAME) && gmake .freebsd-package"' && \
+		scp -F .vagrant-ssh default:$(PROJECT_NAME)/dist/*.pkg dist/
+
 ## freebsd-shell : get shell in FreeBSD Vagrant VM
 freebsd-shell:
 	vagrant ssh
@@ -281,6 +288,25 @@ $(FREEBSD_AMD64_S_NAME):
 	go build -ldflags '$(LDFLAGS) -linkmode external -extldflags -static' \
 		-o $(FREEBSD_AMD64_S_NAME) ./cmd/main.go
 	@echo "Created: $(FREEBSD_AMD64_S_NAME)"
+
+# FreeBSD .pkg packaging (must run on FreeBSD — needs the pkg(8) tool).
+# Invoked inside the Vagrant VM by the host-side `freebsd-package` target.
+FREEBSD_MAJOR      := $(shell echo $(FREEBSD_VERSION) | cut -d. -f1)
+FREEBSD_PKG_STAGE  := $(DIST_DIR)iprd-pkg-stage
+
+## .freebsd-package : (run on FreeBSD) stage tree and build .pkg with pkg create
+.PHONY: .freebsd-package
+.freebsd-package: $(FREEBSD_AMD64_S_NAME)
+	@rm -rf $(FREEBSD_PKG_STAGE)
+	@mkdir -p $(FREEBSD_PKG_STAGE)/usr/local/sbin $(FREEBSD_PKG_STAGE)/usr/local/etc/rc.d
+	@install -m 0755 $(FREEBSD_AMD64_S_NAME)      $(FREEBSD_PKG_STAGE)/usr/local/sbin/iprd
+	@install -m 0555 resources/freebsd/rc.d/iprd  $(FREEBSD_PKG_STAGE)/usr/local/etc/rc.d/iprd
+	@sed -e 's/%%VERSION%%/$(VERSION_PKG)/' \
+	     -e 's/%%ARCH%%/FreeBSD:$(FREEBSD_MAJOR):amd64/' \
+	     resources/freebsd/+MANIFEST.in > $(DIST_DIR)+MANIFEST
+	pkg create -M $(DIST_DIR)+MANIFEST -p resources/freebsd/pkg-plist -r $(FREEBSD_PKG_STAGE) -o $(DIST_DIR)
+	@rm -rf $(FREEBSD_PKG_STAGE) $(DIST_DIR)+MANIFEST
+	@echo "Created: $(DIST_DIR)iprd-$(VERSION_PKG).pkg"
 endif
 
 # macOS/darwin

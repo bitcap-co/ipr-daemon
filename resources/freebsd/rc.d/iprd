@@ -8,7 +8,7 @@
 name=iprd
 desc="IP Report Daemon"
 rcvar=iprd_enable
-command="/usr/sbin/${name}"
+command="/usr/local/sbin/${name}"
 
 start_precmd="${name}_prestart"
 
