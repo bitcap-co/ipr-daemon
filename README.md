@@ -46,6 +46,42 @@ Install `libpcap` via Brew:
 brew install libpcap
 ```
 
+### FreeBSD/pfSense setup
+The FreeBSD binary is statically built (no `libpcap` needed on the target) and can
+be installed as an rc service two ways.
+
+**Packaged install (recommended).** Build a native `.pkg` from the Vagrant VM:
+```bash
+make freebsd-package        # produces dist/iprd-<version>.pkg
+```
+then copy it to the target and install:
+```bash
+scp dist/iprd-<version>.pkg target:
+ssh target
+pkg add ./iprd-<version>.pkg
+```
+This installs `/usr/local/sbin/iprd`, registers the rc service at
+`/usr/local/etc/rc.d/iprd`, and enables + starts it. Remove with `pkg delete iprd`.
+
+> [!NOTE]
+> `pkg add` refuses on an ABI mismatch (e.g. a different FreeBSD major, or some
+> pfSense builds). Use `pkg add -f ./iprd-<version>.pkg` to force the install.
+
+**Manual install.** Copy the binary and the installer script to the target and run
+it as root:
+```bash
+scp dist/iprd-<version>-freebsd-amd64 target:iprd
+scp resources/freebsd/install-freebsd.sh target:
+ssh target
+su -
+./install-freebsd.sh
+```
+This lands the binary in `/usr/local/sbin/`, writes the rc service, enables it via
+`sysrc iprd_enable=YES`, and starts it.
+
+Once installed, the service is controlled with `service iprd {start|stop|status}`.
+Extra arguments can be passed via `iprd_flags="..."` in `/etc/rc.conf`.
+
 ## Usage
 
 ### Finding network interfaces to listen on
