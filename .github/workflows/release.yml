@@ -38,8 +38,7 @@ jobs:
 
       - name: Create Debian package
         run: |
-          cd scripts
-          ./package-deb.sh -V ${{ github.ref_name }}
+          make .deb-package
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:

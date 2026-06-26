@@ -335,12 +335,17 @@ $(DARWIN_S_NAME): ./cmd/main.go .prepare
 endif
 
 DEB_S_NAME := $(DIST_DIR)$(OUTPUT_BINARY)_$(VERSION_PKG)_$(GOARCH).deb
-## deb-package : build .deb package from linux-amd64 binary in dist/
-deb-package: $(DEB_S_NAME)
-
 DEB_STAGING        := $(DIST_DIR)$(OUTPUT_BINARY)_$(VERSION_PKG)_$(GOARCH)
 
-$(DEB_S_NAME): linux-amd64
+## deb-package : build static linux-amd64 binary (Docker) and package as .deb
+.PHONY: deb-package
+deb-package: linux-amd64
+	$(MAKE) .deb-package
+
+## .deb-package : package the existing dist/ linux-amd64 binary as .deb
+.PHONY: .deb-package
+.deb-package:
+	@test -f $(LINUX_AMD64_S_NAME) || { echo "ERROR: $(LINUX_AMD64_S_NAME) not found — build it first (make linux-amd64 or make .linux-amd64)" >&2; exit 1; }
 	@mkdir -p $(DEB_STAGING)/DEBIAN $(DEB_STAGING)/usr/bin $(DEB_STAGING)/etc/systemd/system
 	@install -m 0755 $(LINUX_AMD64_S_NAME)           $(DEB_STAGING)/usr/bin/iprd
 	@install -m 0644 resources/systemd/iprd.service  $(DEB_STAGING)/etc/systemd/system/iprd.service
