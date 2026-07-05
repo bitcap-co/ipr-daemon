@@ -3,7 +3,9 @@ package main
 import (
 	"flag"
 	"fmt"
+	"net"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
@@ -36,6 +38,7 @@ var (
 	flDebug             = flag.Bool("d", false, "Switch to enable packet debugging output.")
 	flAuto              = flag.Bool("a", false, "Switch to use the defined LAN interface (description matching 'lan' or 'LAN') for listening. Overrides -i flag.")
 	flInterface         = flag.String("i", "eth0", "Name or index of interface to listen/capture on.")
+	flForwardBind       = flag.String("b", "", "IP address to bind the TCP broadcast stream to. Empty binds all interfaces.")
 	flForwardPort       = flag.Int("p", 7788, "TCP stream/broadcast port for forwarding IP report packet data.")
 	flForwardKnown      = flag.Bool("known", false, "Switch to only forward IP reports from known miner types/ports over forward port.")
 	flNoRootNetwork     = flag.Bool("no-root-network", false, "Switch to not include the interface network in BPF filter.")
@@ -88,6 +91,7 @@ func main() {
 		Debug:             *flDebug,
 		Auto:              *flAuto,
 		ListenInterface:   *flInterface,
+		ForwardBind:       *flForwardBind,
 		ForwardPort:       *flForwardPort,
 		ForwardKnown:      *flForwardKnown,
 		NoRootNetwork:     *flNoRootNetwork,
@@ -121,7 +125,7 @@ func main() {
 	}
 
 	// open TCP broadcast.
-	broadcaster, err := iprd.NewBroadcaster(log, cfg.ForwardPort)
+	broadcaster, err := iprd.NewBroadcaster(log, cfg.ForwardBind, cfg.ForwardPort)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -139,7 +143,7 @@ func main() {
 			}
 		}
 	}()
-	log.Info(fmt.Sprintf("set tcp forwarding -> :%d", cfg.ForwardPort))
+	log.Info(fmt.Sprintf("set tcp forwarding -> %s", net.JoinHostPort(cfg.ForwardBind, strconv.Itoa(cfg.ForwardPort))))
 	log.Info("successfully started iprd!")
 
 	// start listening
