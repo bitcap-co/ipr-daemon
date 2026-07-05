@@ -159,6 +159,12 @@ To configure the TCP stream port, use `-p` to supply:
 ```bash
 sudo ./iprd -i "eth0" -p <SOME_PORT>
 ```
+
+By default the TCP stream binds all interfaces. On a multi-homed host you can restrict
+it to a single local IP with `-b`:
+```bash
+sudo ./iprd -i "eth0" -b 192.168.1.10
+```
 Also see `iprd -h` for a list of all available options.
 
 > [!NOTE]
