@@ -5,6 +5,9 @@ debug = false
 auto = false
 # listen_inteface is the name or index of interface for listen/capture.
 listen_interface = "eth0"
+# forward_bind is the local IP address to bind the TCP broadcast stream to.
+# empty binds all interfaces (default).
+forward_bind = ""
 # forward_port is the TCP stream/broadcast port for forwarding IP report packet data.
 forward_port = 7788
 # forward_known is a switch to only forward IP reports from known miner types/ports over forward_port.

@@ -3,6 +3,7 @@ package iprd
 import (
 	"fmt"
 	"io"
+	"net"
 	"os"
 
 	"github.com/BurntSushi/toml"
@@ -13,6 +14,7 @@ type IPRDConfig struct {
 	Debug             bool     `toml:"debug"`
 	Auto              bool     `toml:"auto"`
 	ListenInterface   string   `toml:"listen_interface"`
+	ForwardBind       string   `toml:"forward_bind"`
 	ForwardPort       int      `toml:"forward_port"`
 	ForwardKnown      bool     `toml:"forward_known"`
 	NoRootNetwork     bool     `toml:"no_root_network"`
@@ -29,6 +31,9 @@ func (cfg *IPRDConfig) Validate() error {
 	}
 	if cfg.ForwardPort <= 0 {
 		return fmt.Errorf("ForwardPort must be positive")
+	}
+	if cfg.ForwardBind != "" && net.ParseIP(cfg.ForwardBind) == nil {
+		return fmt.Errorf("ForwardBind must be a valid IP address")
 	}
 	return nil
 }
@@ -51,6 +56,9 @@ func (cfg *IPRDConfig) Merge(target *IPRDConfig) *IPRDConfig {
 	}
 	if target.ListenInterface != "" {
 		result.ListenInterface = target.ListenInterface
+	}
+	if target.ForwardBind != "" {
+		result.ForwardBind = target.ForwardBind
 	}
 	if target.ForwardPort > 0 {
 		result.ForwardPort = target.ForwardPort
@@ -79,6 +87,7 @@ func DefaultIPRDConfig() *IPRDConfig {
 		Debug:             false,
 		Auto:              false,
 		ListenInterface:   "eth0",
+		ForwardBind:       "",
 		ForwardPort:       7788,
 		ForwardKnown:      false,
 		NoRootNetwork:     false,

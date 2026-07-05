@@ -7,6 +7,7 @@ import (
 	"maps"
 	"math"
 	"net"
+	"strconv"
 	"sync"
 	"time"
 
@@ -28,12 +29,13 @@ type IPRBroadcast struct {
 	Errs     chan error
 }
 
-// NewBroadcaster returns a new IPRBroadcast at specified port.
-func NewBroadcaster(logger *IPRLogger, port int) (*IPRBroadcast, error) {
+// NewBroadcaster returns a new IPRBroadcast at specified port. bind is the local
+// IP address to listen on; an empty bind binds all interfaces.
+func NewBroadcaster(logger *IPRLogger, bind string, port int) (*IPRBroadcast, error) {
 	if logger == nil {
 		logger = NewLogger()
 	}
-	listener, err := net.Listen("tcp", fmt.Sprintf(":%d", port))
+	listener, err := net.Listen("tcp", net.JoinHostPort(bind, strconv.Itoa(port)))
 	if err != nil {
 		return nil, err
 	}
