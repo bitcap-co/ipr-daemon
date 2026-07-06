@@ -8,6 +8,8 @@ EnvironmentFile=/etc/iprd.conf
 User=root
 Group=root
 ExecStart=/usr/bin/iprd $ARGS
+Restart=on-failure
+RestartSec=5
 
 [Install]
 WantedBy=multi-user.target
