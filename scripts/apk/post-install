@@ -1,0 +1,4 @@
+#!/bin/sh
+# apk post-install — register the OpenRC service and start it.
+rc-update add iprd default 2>/dev/null || true
+rc-service iprd start 2>/dev/null || true

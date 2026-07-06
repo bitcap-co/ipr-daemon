@@ -1,0 +1,2 @@
+# Arguments passed to iprd by the OpenRC service. See `iprd -h` for all options.
+ARGS="-a"

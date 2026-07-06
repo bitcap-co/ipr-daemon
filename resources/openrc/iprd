@@ -1,0 +1,17 @@
+#!/sbin/openrc-run
+# OpenRC service for iprd (Alpine and other OpenRC systems).
+# Flags are read from /etc/conf.d/iprd (ARGS), mirroring the systemd EnvironmentFile.
+
+name="iprd"
+description="ASIC Miner IP Report listener"
+command="/usr/bin/iprd"
+command_args="${ARGS:--a}"
+command_background="yes"
+pidfile="/run/iprd.pid"
+output_log="/var/log/iprd.log"
+error_log="/var/log/iprd.log"
+
+depend() {
+	need net
+	after firewall
+}

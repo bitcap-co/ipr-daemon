@@ -1,0 +1,4 @@
+#!/bin/sh
+# apk pre-deinstall — stop the service and unregister it.
+rc-service iprd stop 2>/dev/null || true
+rc-update del iprd default 2>/dev/null || true
