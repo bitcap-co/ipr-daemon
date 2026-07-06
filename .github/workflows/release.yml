@@ -36,9 +36,17 @@ jobs:
         run: |
           make .linux-amd64
 
-      - name: Create Debian package
+      - name: Install nfpm
+        run: |
+          echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' | sudo tee /etc/apt/sources.list.d/goreleaser.list
+          sudo apt-get update
+          sudo apt-get install -y nfpm
+      - name: Build Linux packages (deb, rpm, apk)
         run: |
           make .deb-package
+          make .rpm-package
+          make linux-musl-amd64
+          make .apk-package
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
@@ -73,6 +81,18 @@ jobs:
       - name: Build ARM64 binary
         run: |
           make .linux-arm64
+
+      - name: Install nfpm
+        run: |
+          echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' | sudo tee /etc/apt/sources.list.d/goreleaser.list
+          sudo apt-get update
+          sudo apt-get install -y nfpm
+      - name: Build arm64 packages (deb, rpm, apk)
+        run: |
+          make .deb-package-arm64
+          make .rpm-package-arm64
+          make linux-musl-arm64
+          make .apk-package-arm64
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
