@@ -494,4 +494,5 @@ docker-release: docker-buildx
 
 ## docker-clean : remove Docker containers
 docker-clean:
-	docker image rm ${AMD64_IMAGE} ${ARM_IMAGE} || true
+	docker image rm ${AMD64_IMAGE} ${ARM_IMAGE} ${ALPINE_IMAGE} || true
+	docker buildx rm ${BUILDX_BUILDER} || true
