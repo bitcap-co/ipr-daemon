@@ -1,0 +1,6 @@
+#!/bin/sh
+# RPM %post — $1 is 1 on initial install, 2 on upgrade.
+set -e
+systemctl daemon-reload || true
+systemctl enable iprd.service || true
+systemctl start iprd.service || true

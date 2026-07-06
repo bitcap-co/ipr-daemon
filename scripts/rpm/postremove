@@ -1,0 +1,4 @@
+#!/bin/sh
+# RPM %postun — reload so systemd forgets the (possibly removed) unit.
+set -e
+systemctl daemon-reload || true
