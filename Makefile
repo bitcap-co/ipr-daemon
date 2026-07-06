@@ -471,12 +471,25 @@ docker-shell:
 	$(DOCKER_IMAGE) \
 	/bin/sh
 
-docker-release:
+BUILDX_BUILDER := iprd-builder
+
+## docker-buildx : ensure a multi-platform buildx builder exists
+.PHONY: docker-buildx
+docker-buildx:
+	@docker buildx inspect $(BUILDX_BUILDER) >/dev/null 2>&1 || \
+		docker buildx create --name $(BUILDX_BUILDER) --driver docker-container --bootstrap >/dev/null
+	@echo "using buildx builder: $(BUILDX_BUILDER)"
+
+## docker-release : build+push the multi-arch (amd64+arm64) image to Docker Hub
+# Requires QEMU/binfmt for cross-arch emulation (Docker Desktop bundles it; otherwise:
+#   docker run --privileged --rm tonistiigi/binfmt --install arm64,amd64).
+docker-release: docker-buildx
 	docker buildx build \
+	--builder $(BUILDX_BUILDER) \
 	-t $(DOCKER_IMAGE) \
 	-t $(DOCKER_REPO)/$(PROJECT_NAME):latest \
 	--build-arg VERSION=$(DOCKER_VERSION) \
-	--platform linux/amd64 \
+	--platform linux/amd64,linux/arm64 \
 	--push -f iprd.dockerfile .
 
 ## docker-clean : remove Docker containers
