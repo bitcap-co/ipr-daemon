@@ -144,6 +144,42 @@ $(LINUX_AMD64_S_NAME): .prepare
 	        -o $(LINUX_AMD64_S_NAME) ./cmd/main.go
 	@echo "Created: $(LINUX_AMD64_S_NAME)"
 
+# Linux musl (static, for Alpine/apk). One Alpine builder does a native build; the
+# --platform selects the target arch (native on matching CI hardware, qemu elsewhere).
+MUSL_AMD64_S_NAME := $(DIST_DIR)$(OUTPUT_BINARY)-$(PROJECT_VERSION)-linux-musl-amd64
+MUSL_ARM64_S_NAME := $(DIST_DIR)$(OUTPUT_BINARY)-$(PROJECT_VERSION)-linux-musl-arm64
+ALPINE_IMAGE      := $(REPO_ORG)/$(PROJECT_NAME)-builder-alpine:$(DOCKER_VERSION)
+
+## linux-musl-amd64 : build static musl Linux/amd64 binary using Docker (for apk)
+.PHONY: linux-musl-amd64
+linux-musl-amd64:
+	docker build --platform linux/amd64 -t $(ALPINE_IMAGE)-amd64 -f alpine.dockerfile .
+	docker run --rm --platform linux/amd64 \
+		--volume $(shell pwd)/dist:/build/$(PROJECT_NAME)/dist \
+		$(ALPINE_IMAGE)-amd64 .linux-musl-amd64
+
+## linux-musl-arm64 : build static musl Linux/arm64 binary using Docker (for apk)
+.PHONY: linux-musl-arm64
+linux-musl-arm64:
+	docker build --platform linux/arm64 -t $(ALPINE_IMAGE)-arm64 -f alpine.dockerfile .
+	docker run --rm --platform linux/arm64 \
+		--volume $(shell pwd)/dist:/build/$(PROJECT_NAME)/dist \
+		$(ALPINE_IMAGE)-arm64 .linux-musl-arm64
+
+.linux-musl-amd64: $(MUSL_AMD64_S_NAME)
+$(MUSL_AMD64_S_NAME): .prepare
+	CGO_LDFLAGS="$$(pkg-config --libs --static libpcap)" CGO_ENABLED=1 \
+	    go build -ldflags "$(LDFLAGS) -linkmode 'external' -extldflags '-static'" \
+	        -o $(MUSL_AMD64_S_NAME) ./cmd/main.go
+	@echo "Created: $(MUSL_AMD64_S_NAME)"
+
+.linux-musl-arm64: $(MUSL_ARM64_S_NAME)
+$(MUSL_ARM64_S_NAME): .prepare
+	CGO_LDFLAGS="$$(pkg-config --libs --static libpcap)" CGO_ENABLED=1 \
+	    go build -ldflags "$(LDFLAGS) -linkmode 'external' -extldflags '-static'" \
+	        -o $(MUSL_ARM64_S_NAME) ./cmd/main.go
+	@echo "Created: $(MUSL_ARM64_S_NAME)"
+
 # Linux ARM (aarch64 / armv5 / armv6 / armv7)
 LINUX_ARM64_S_NAME := $(DIST_DIR)$(OUTPUT_BINARY)-$(PROJECT_VERSION)-linux-arm64
 LINUX_ARMV5_S_NAME := $(DIST_DIR)$(OUTPUT_BINARY)-$(PROJECT_VERSION)-linux-armv5
