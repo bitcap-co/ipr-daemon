@@ -1,12 +1,15 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"net"
 	"os"
+	"os/signal"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
 )
@@ -118,11 +121,12 @@ func main() {
 	}
 	log.Info("start IPReporter Daemon...")
 
-	// initialize IPRListener handle on iface, passing in cfg.
+	// cancel on SIGINT/SIGTERM for a clean shutdown of the reconnect loop.
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+
+	// initialize IPRListener on iface, passing in cfg.
 	listener := iprd.NewListener(cfg, log, nil)
-	if err := listener.Activate(); err != nil {
-		log.Fatal(err)
-	}
 
 	// open TCP broadcast.
 	broadcaster, err := iprd.NewBroadcaster(log, cfg.ForwardBind, cfg.ForwardPort)
@@ -146,6 +150,10 @@ func main() {
 	log.Info(fmt.Sprintf("set tcp forwarding -> %s", net.JoinHostPort(cfg.ForwardBind, strconv.Itoa(cfg.ForwardPort))))
 	log.Info("successfully started iprd!")
 
-	// start listening
-	listener.Listen()
+	// supervise capture: activates the handle and reconnects on interface loss
+	// until the context is cancelled.
+	if err := listener.Run(ctx); err != nil {
+		log.Fatal(err)
+	}
+	log.Info("shutting down iprd...")
 }
