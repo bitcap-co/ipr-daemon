@@ -1,0 +1,73 @@
+# nfpm spec for iprd — produces .deb, .rpm and .apk from one definition.
+# Driven by env vars so the Makefile can invoke it once per format:
+#   IPRD_ARCH    Go arch (amd64|arm64); nfpm maps to x86_64/aarch64 for rpm/apk
+#   IPRD_VERSION package version (leading 'v' already stripped)
+# nfpm does NOT env-expand contents.src, so the Makefile stages the chosen binary
+# (glibc-static for deb/rpm, musl-static for apk) to the fixed path dist/.nfpm-bin.
+name: "iprd"
+arch: "${IPRD_ARCH}"
+platform: "linux"
+version: "${IPRD_VERSION}"
+version_schema: "none"
+maintainer: "MatthewWertman <matt@bitcap.co>"
+description: |
+  ASIC Miner IP Report listener
+  iprd listens for IP Report packets broadcast by ASIC miners on the local
+  network and forwards them over TCP.
+homepage: "https://github.com/bitcap-co/ipr-daemon"
+license: "MIT"
+section: "net"
+priority: "optional"
+
+contents:
+  - src: "dist/.nfpm-bin"
+    dst: "/usr/bin/iprd"
+    file_info:
+      mode: 0755
+
+  # --- systemd (deb + rpm) ---
+  - src: "resources/systemd/iprd.service"
+    dst: "/usr/lib/systemd/system/iprd.service"
+    file_info:
+      mode: 0644
+    packager: deb
+  - src: "resources/systemd/iprd.service"
+    dst: "/usr/lib/systemd/system/iprd.service"
+    file_info:
+      mode: 0644
+    packager: rpm
+  - src: "resources/systemd/iprd.conf"
+    dst: "/etc/iprd.conf"
+    type: "config|noreplace"
+    packager: deb
+  - src: "resources/systemd/iprd.conf"
+    dst: "/etc/iprd.conf"
+    type: "config|noreplace"
+    packager: rpm
+
+  # --- OpenRC (apk) ---
+  - src: "resources/openrc/iprd"
+    dst: "/etc/init.d/iprd"
+    file_info:
+      mode: 0755
+    packager: apk
+  - src: "resources/openrc/iprd.confd"
+    dst: "/etc/conf.d/iprd"
+    type: "config|noreplace"
+    packager: apk
+
+overrides:
+  deb:
+    scripts:
+      postinstall: "scripts/package/postinst"
+      preremove: "scripts/package/prerm"
+      postremove: "scripts/package/postrm"
+  rpm:
+    scripts:
+      postinstall: "scripts/rpm/postinstall"
+      preremove: "scripts/rpm/preremove"
+      postremove: "scripts/rpm/postremove"
+  apk:
+    scripts:
+      postinstall: "scripts/apk/post-install"
+      preremove: "scripts/apk/pre-deinstall"

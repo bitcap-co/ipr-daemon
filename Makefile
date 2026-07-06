@@ -370,31 +370,88 @@ $(DARWIN_S_NAME): ./cmd/main.go .prepare
 	@echo "Created: $(DARWIN_S_NAME)"
 endif
 
-DEB_S_NAME := $(DIST_DIR)$(OUTPUT_BINARY)_$(VERSION_PKG)_$(GOARCH).deb
-DEB_STAGING        := $(DIST_DIR)$(OUTPUT_BINARY)_$(VERSION_PKG)_$(GOARCH)
+# ── Native packages via nfpm (deb + rpm + apk) ───────────────────────────────
+# nfpm reads nfpm.yaml; the packaged binary/arch/version are passed via env.
+# deb/rpm use the glibc-static binary; apk uses the musl-static binary.
+NFPM ?= nfpm
 
 ## deb-package : build static linux-amd64 binary (Docker) and package as .deb
 .PHONY: deb-package
 deb-package: linux-amd64
 	$(MAKE) .deb-package
 
-## .deb-package : package the existing dist/ linux-amd64 binary as .deb
+## .deb-package : package the existing dist/ linux-amd64 binary as .deb (nfpm)
 .PHONY: .deb-package
 .deb-package:
 	@test -f $(LINUX_AMD64_S_NAME) || { echo "ERROR: $(LINUX_AMD64_S_NAME) not found — build it first (make linux-amd64 or make .linux-amd64)" >&2; exit 1; }
-	@mkdir -p $(DEB_STAGING)/DEBIAN $(DEB_STAGING)/usr/bin $(DEB_STAGING)/etc/systemd/system
-	@install -m 0755 $(LINUX_AMD64_S_NAME)           $(DEB_STAGING)/usr/bin/iprd
-	@install -m 0644 resources/systemd/iprd.service  $(DEB_STAGING)/etc/systemd/system/iprd.service
-	@install -m 0644 resources/systemd/iprd.conf     $(DEB_STAGING)/etc/iprd.conf
-	@install -m 0755 scripts/package/postinst        $(DEB_STAGING)/DEBIAN/postinst
-	@install -m 0755 scripts/package/prerm           $(DEB_STAGING)/DEBIAN/prerm
-	@install -m 0755 scripts/package/postrm          $(DEB_STAGING)/DEBIAN/postrm
-	@printf '/etc/iprd.conf\n' > $(DEB_STAGING)/DEBIAN/conffiles
-	@printf 'Package: iprd\nVersion: $(VERSION_PKG)\nArchitecture: $(GOARCH)\nMaintainer: MatthewWertman <matt@bitcap.co>\nSection: net\nPriority: optional\nDescription: ASIC Miner IP Report listener\n' \
-	    > $(DEB_STAGING)/DEBIAN/control
-	dpkg-deb --root-owner-group --build $(DEB_STAGING) $(DEB_S_NAME)
-	@rm -rf $(DEB_STAGING)
-	@echo "Created: $(DEB_S_NAME)"
+	@cp $(LINUX_AMD64_S_NAME) $(DIST_DIR).nfpm-bin
+	IPRD_ARCH=amd64 IPRD_VERSION=$(VERSION_PKG) $(NFPM) package -f nfpm.yaml -p deb -t $(DIST_DIR)
+	@rm -f $(DIST_DIR).nfpm-bin
+
+## deb-package-arm64 : build static linux-arm64 binary (Docker) and package as arm64 .deb
+.PHONY: deb-package-arm64
+deb-package-arm64: linux-arm64
+	$(MAKE) .deb-package-arm64
+
+## .deb-package-arm64 : package the existing dist/ linux-arm64 binary as arm64 .deb (nfpm)
+.PHONY: .deb-package-arm64
+.deb-package-arm64:
+	@test -f $(LINUX_ARM64_S_NAME) || { echo "ERROR: $(LINUX_ARM64_S_NAME) not found — build it first (make linux-arm64 or make .linux-arm64)" >&2; exit 1; }
+	@cp $(LINUX_ARM64_S_NAME) $(DIST_DIR).nfpm-bin
+	IPRD_ARCH=arm64 IPRD_VERSION=$(VERSION_PKG) $(NFPM) package -f nfpm.yaml -p deb -t $(DIST_DIR)
+	@rm -f $(DIST_DIR).nfpm-bin
+
+## rpm-package : build static linux-amd64 binary (Docker) and package as .rpm
+.PHONY: rpm-package
+rpm-package: linux-amd64
+	$(MAKE) .rpm-package
+
+## .rpm-package : package the existing dist/ linux-amd64 binary as .rpm (nfpm)
+.PHONY: .rpm-package
+.rpm-package:
+	@test -f $(LINUX_AMD64_S_NAME) || { echo "ERROR: $(LINUX_AMD64_S_NAME) not found — build it first (make linux-amd64 or make .linux-amd64)" >&2; exit 1; }
+	@cp $(LINUX_AMD64_S_NAME) $(DIST_DIR).nfpm-bin
+	IPRD_ARCH=amd64 IPRD_VERSION=$(VERSION_PKG) $(NFPM) package -f nfpm.yaml -p rpm -t $(DIST_DIR)
+	@rm -f $(DIST_DIR).nfpm-bin
+
+## rpm-package-arm64 : build static linux-arm64 binary (Docker) and package as arm64 .rpm
+.PHONY: rpm-package-arm64
+rpm-package-arm64: linux-arm64
+	$(MAKE) .rpm-package-arm64
+
+## .rpm-package-arm64 : package the existing dist/ linux-arm64 binary as aarch64 .rpm (nfpm)
+.PHONY: .rpm-package-arm64
+.rpm-package-arm64:
+	@test -f $(LINUX_ARM64_S_NAME) || { echo "ERROR: $(LINUX_ARM64_S_NAME) not found — build it first (make linux-arm64 or make .linux-arm64)" >&2; exit 1; }
+	@cp $(LINUX_ARM64_S_NAME) $(DIST_DIR).nfpm-bin
+	IPRD_ARCH=arm64 IPRD_VERSION=$(VERSION_PKG) $(NFPM) package -f nfpm.yaml -p rpm -t $(DIST_DIR)
+	@rm -f $(DIST_DIR).nfpm-bin
+
+## apk-package : build static musl binary (Docker) and package as .apk
+.PHONY: apk-package
+apk-package: linux-musl-amd64
+	$(MAKE) .apk-package
+
+## .apk-package : package the existing dist/ musl binary as .apk (nfpm)
+.PHONY: .apk-package
+.apk-package:
+	@test -f $(MUSL_AMD64_S_NAME) || { echo "ERROR: $(MUSL_AMD64_S_NAME) not found — build it first (make linux-musl-amd64)" >&2; exit 1; }
+	@cp $(MUSL_AMD64_S_NAME) $(DIST_DIR).nfpm-bin
+	IPRD_ARCH=amd64 IPRD_VERSION=$(VERSION_PKG) $(NFPM) package -f nfpm.yaml -p apk -t $(DIST_DIR)
+	@rm -f $(DIST_DIR).nfpm-bin
+
+## apk-package-arm64 : build static musl arm64 binary (Docker) and package as arm64 .apk
+.PHONY: apk-package-arm64
+apk-package-arm64: linux-musl-arm64
+	$(MAKE) .apk-package-arm64
+
+## .apk-package-arm64 : package the existing dist/ musl arm64 binary as aarch64 .apk (nfpm)
+.PHONY: .apk-package-arm64
+.apk-package-arm64:
+	@test -f $(MUSL_ARM64_S_NAME) || { echo "ERROR: $(MUSL_ARM64_S_NAME) not found — build it first (make linux-musl-arm64)" >&2; exit 1; }
+	@cp $(MUSL_ARM64_S_NAME) $(DIST_DIR).nfpm-bin
+	IPRD_ARCH=arm64 IPRD_VERSION=$(VERSION_PKG) $(NFPM) package -f nfpm.yaml -p apk -t $(DIST_DIR)
+	@rm -f $(DIST_DIR).nfpm-bin
 
 DOCKER_IMAGE := $(DOCKER_REPO)/$(PROJECT_NAME):$(DOCKER_VERSION)
 
