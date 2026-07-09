@@ -60,7 +60,7 @@ Vagrant.configure("2") do |config|
   # by making sure your Vagrantfile isn't accessible to the vagrant box.
   # If you use this you may want to enable additional shared subfolders as
   # shown above.
-  config.vm.synced_folder ".", "/home/vagrant/ipr-daemon", create: true, disabled: false, id: 'source-code', type: 'rsync'
+  config.vm.synced_folder ".", "/home/vagrant/ipr-daemon", create: true, disabled: false, id: 'source-code', type: 'rsync', rsync__exclude: [".git/", ".vagrant/", "dist/"]
 
   config.vm.provider :virtualbox do |vb|
     vb.name = "ipr-daemon-freebsd"
@@ -70,7 +70,7 @@ Vagrant.configure("2") do |config|
     vb.memory = 1024
   end
   config.trigger.after :up do |trigger|
-    trigger.info = "building pfSense/FreeBSD binary..."
+    trigger.info = "building FreeBSD binaries..."
     trigger.name = "build-binary"
     trigger.run = {inline: "vagrant rsync"}
     trigger.run_remote = {inline: "sh -c 'PATH=/usr/local/bin:${PATH} cd ipr-daemon && gmake freebsd-binaries'"}
