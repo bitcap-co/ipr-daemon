@@ -184,7 +184,7 @@ jobs:
           retention-days: 1
 
   freebsd:
-    name: FreeBSD amd64
+    name: FreeBSD amd64/arm64
     runs-on: ubuntu-latest
 
     steps:
@@ -195,7 +195,8 @@ jobs:
           release: "${{ env.FREEBSD_VERSION }}"
           usesh: true
           prepare: |
-            pkg install -y git gmake go libpcap amd64-binutils
+            pkg install -y git gmake go libpcap pkgconf amd64-binutils \
+              aarch64-gcc13 aarch64-binutils aarch64-freebsd-sysroot
           run: |
             ls -la /usr/local/bin
             export PATH=/usr/local/bin:$PATH
@@ -203,10 +204,11 @@ jobs:
             git config --global --add safe.directory /home/runner/work/ipr-daemon/ipr-daemon
             FREEBSD_VERSION=${{ env.FREEBSD_VERSION }} gmake freebsd-binaries
             FREEBSD_VERSION=${{ env.FREEBSD_VERSION }} gmake .freebsd-package
+            FREEBSD_VERSION=${{ env.FREEBSD_VERSION }} gmake .freebsd-package-arm64
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: iprd-build-freebsd-X64
+          name: iprd-build-freebsd-all
           path: dist/iprd*
           retention-days: 1
 

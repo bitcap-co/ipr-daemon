@@ -300,7 +300,7 @@ freebsd: .vagrant-check
 .PHONY: freebsd-package
 freebsd-package: .vagrant-check
 	vagrant provision && vagrant up && vagrant ssh-config >.vagrant-ssh && \
-		ssh -F .vagrant-ssh default 'sh -c "PATH=/usr/local/bin:$$PATH; cd $(PROJECT_NAME) && gmake .freebsd-package"' && \
+		ssh -F .vagrant-ssh default 'sh -c "PATH=/usr/local/bin:$$PATH; cd $(PROJECT_NAME) && gmake .freebsd-package .freebsd-package-arm64"' && \
 		scp -F .vagrant-ssh default:$(PROJECT_NAME)/dist/*.pkg dist/
 
 ## freebsd-shell : get shell in FreeBSD Vagrant VM
@@ -314,35 +314,65 @@ vagrant-clean:
 
 ifeq ($(GOOS),freebsd)
 FREEBSD_AMD64_S_NAME := $(DIST_DIR)$(OUTPUT_BINARY)-$(PROJECT_VERSION)-freebsd-amd64
+FREEBSD_ARM64_S_NAME := $(DIST_DIR)$(OUTPUT_BINARY)-$(PROJECT_VERSION)-freebsd-arm64
+# aarch64-freebsd cross toolchain (installed in the Vagrant VM). Overridable in case
+# the ports triple/version differs from what the glob finds.
+FREEBSD_ARM64_CC      ?= $(firstword $(wildcard /usr/local/bin/aarch64-*-freebsd*-gcc*))
+FREEBSD_ARM64_SYSROOT ?= /usr/local/freebsd-sysroot/aarch64
 
-freebsd-binaries: freebsd-amd64
+freebsd-binaries: freebsd-amd64 freebsd-arm64
 freebsd-amd64: $(FREEBSD_AMD64_S_NAME)
+freebsd-arm64: $(FREEBSD_ARM64_S_NAME)
 
 $(FREEBSD_AMD64_S_NAME):
 	GOOS=freebsd GOARCH=amd64 CGO_ENABLED=1 \
-	CGO_LDFLAGS='-libverbs' \
+	CGO_LDFLAGS="$$(pkg-config --libs libpcap) -libverbs" \
+	CGO_CFLAGS="$$(pkg-config --cflags libpcap)" \
 	go build -ldflags '$(LDFLAGS) -linkmode external -extldflags -static' \
 		-o $(FREEBSD_AMD64_S_NAME) ./cmd/main.go
 	@echo "Created: $(FREEBSD_AMD64_S_NAME)"
+
+# Cross-compile: --sysroot points the cross gcc at the aarch64 base tree for both
+# system headers (fixes runtime/cgo <signal.h> picking up host amd64 headers) and
+# libs (libpcap + libibverbs live in <sysroot>/usr/{include,lib}). Order matters for
+# the static link: -lpcap must precede -libverbs because base libpcap.a's rdmasniff
+# object references ibv_* symbols (same ordering as the amd64 recipe).
+$(FREEBSD_ARM64_S_NAME):
+	GOOS=freebsd GOARCH=arm64 CGO_ENABLED=1 \
+	CC=$(FREEBSD_ARM64_CC) \
+	CGO_CFLAGS="--sysroot=$(FREEBSD_ARM64_SYSROOT)" \
+	CGO_LDFLAGS="--sysroot=$(FREEBSD_ARM64_SYSROOT) -lpcap -libverbs" \
+	go build -ldflags '$(LDFLAGS) -linkmode external -extldflags -static' \
+		-o $(FREEBSD_ARM64_S_NAME) ./cmd/main.go
+	@echo "Created: $(FREEBSD_ARM64_S_NAME)"
 
 # FreeBSD .pkg packaging (must run on FreeBSD — needs the pkg(8) tool).
 # Invoked inside the Vagrant VM by the host-side `freebsd-package` target.
 FREEBSD_MAJOR      := $(shell echo $(FREEBSD_VERSION) | cut -d. -f1)
 FREEBSD_PKG_STAGE  := $(DIST_DIR)iprd-pkg-stage
 
+# Arch of the .pkg to build. Defaults to amd64; .freebsd-package-arm64 overrides these.
+PKG_ARCH ?= amd64
+PKG_BIN  ?= $(FREEBSD_AMD64_S_NAME)
+
 ## .freebsd-package : (run on FreeBSD) stage tree and build .pkg with pkg create
-.PHONY: .freebsd-package
-.freebsd-package: $(FREEBSD_AMD64_S_NAME)
+.PHONY: .freebsd-package .freebsd-package-arm64
+.freebsd-package: $(PKG_BIN)
 	@rm -rf $(FREEBSD_PKG_STAGE)
 	@mkdir -p $(FREEBSD_PKG_STAGE)/usr/local/sbin $(FREEBSD_PKG_STAGE)/usr/local/etc/rc.d
-	@install -m 0755 $(FREEBSD_AMD64_S_NAME)      $(FREEBSD_PKG_STAGE)/usr/local/sbin/iprd
+	@install -m 0755 $(PKG_BIN)                   $(FREEBSD_PKG_STAGE)/usr/local/sbin/iprd
 	@install -m 0555 resources/freebsd/rc.d/iprd  $(FREEBSD_PKG_STAGE)/usr/local/etc/rc.d/iprd
 	@sed -e 's/%%VERSION%%/$(VERSION_PKG)/' \
-	     -e 's/%%ARCH%%/FreeBSD:$(FREEBSD_MAJOR):amd64/' \
+	     -e 's/%%ARCH%%/FreeBSD:$(FREEBSD_MAJOR):$(PKG_ARCH)/' \
 	     resources/freebsd/+MANIFEST.in > $(DIST_DIR)+MANIFEST
 	pkg create -M $(DIST_DIR)+MANIFEST -p resources/freebsd/pkg-plist -r $(FREEBSD_PKG_STAGE) -o $(DIST_DIR)
+	@mv $(DIST_DIR)iprd-$(VERSION_PKG).pkg $(DIST_DIR)iprd-$(VERSION_PKG)-$(PKG_ARCH).pkg
 	@rm -rf $(FREEBSD_PKG_STAGE) $(DIST_DIR)+MANIFEST
-	@echo "Created: $(DIST_DIR)iprd-$(VERSION_PKG).pkg"
+	@echo "Created: $(DIST_DIR)iprd-$(VERSION_PKG)-$(PKG_ARCH).pkg"
+
+## .freebsd-package-arm64 : (run on FreeBSD) build the arm64 .pkg
+.freebsd-package-arm64:
+	$(MAKE) .freebsd-package PKG_ARCH=arm64 PKG_BIN=$(FREEBSD_ARM64_S_NAME)
 endif
 
 # macOS/darwin

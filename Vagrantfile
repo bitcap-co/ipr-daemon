@@ -17,7 +17,7 @@ Vagrant.configure("2") do |config|
   config.vm.guest = :freebsd
   config.ssh.shell = "sh"
   config.vm.provision "shell", inline: <<-SHELL
-    pkg install -y binutils git gmake go libpcap virtualbox-ose-kmod \
+    pkg install -y binutils git gmake go libpcap pkgconf virtualbox-ose-kmod \
       virtualbox-ose-additions-nox11 aarch64-gcc13 \
       aarch64-binutils arm-gnueabi-binutils amd64-binutils \
       armv7-freebsd-sysroot aarch64-freebsd-sysroot
@@ -60,7 +60,7 @@ Vagrant.configure("2") do |config|
   # by making sure your Vagrantfile isn't accessible to the vagrant box.
   # If you use this you may want to enable additional shared subfolders as
   # shown above.
-  config.vm.synced_folder ".", "/home/vagrant/ipr-daemon", create: true, disabled: false, id: 'source-code', type: 'rsync', rsync__exclude: [".git/", ".vagrant/", "dist/"]
+  config.vm.synced_folder ".", "/home/vagrant/ipr-daemon", create: true, disabled: false, id: 'source-code', type: 'rsync', rsync__exclude: [".claude/", ".vagrant/", "dist/"]
 
   config.vm.provider :virtualbox do |vb|
     vb.name = "ipr-daemon-freebsd"
