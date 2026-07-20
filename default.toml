@@ -23,5 +23,7 @@ network_inclusions = [""]
 # network_exclusions is a list of networks to additionally exclude in BPF filter.
 # these get appended after network_inclusions.
 network_exclusions = [""]
-# capture_file is a path to write receieved packets to in PCAP format for replay/debugging.
+# capture_file is a path to write received packets to in PCAP format for replay/debugging.
 capture_file = ""
+# rotate_capture_files keeps the active capture plus three numbered history files instead of flushing it.
+rotate_capture_files = false
