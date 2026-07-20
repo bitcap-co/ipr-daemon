@@ -165,6 +165,16 @@ it to a single local IP with `-b`:
 ```bash
 sudo ./iprd -i "eth0" -b 192.168.1.10
 ```
+To retain capture history, enable capture rotation together with a capture path:
+```bash
+sudo ./iprd -i "eth0" -capture-file /var/log/iprd/capture.pcap -rotate-capture
+```
+Each capture is limited to 4 MiB. Rotation keeps four files total: the active
+`capture.pcap`, then `capture.1.pcap` through `capture.3.pcap` from newest to
+oldest. Without `-rotate-capture`, the active capture is flushed at 4 MiB
+as before. TOML configurations can enable the same behavior with
+`rotate_capture_files = true`.
+
 Also see `iprd -h` for a list of all available options.
 
 > [!NOTE]
