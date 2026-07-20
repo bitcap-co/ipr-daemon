@@ -17,6 +17,7 @@ type IPRDConfig struct {
 	ForwardBind        string   `toml:"forward_bind"`
 	ForwardPort        int      `toml:"forward_port"`
 	ForwardKnown       bool     `toml:"forward_known"`
+	MDNS               bool     `toml:"mdns"`
 	NoRootNetwork      bool     `toml:"no_root_network"`
 	IgnoredDevices     []string `toml:"ignored_devices"`
 	NetworkInclusions  []string `toml:"network_inclusions"`
@@ -54,6 +55,9 @@ func (cfg *IPRDConfig) Merge(target *IPRDConfig) *IPRDConfig {
 	}
 	if target.ForwardKnown {
 		result.ForwardKnown = target.ForwardKnown
+	}
+	if target.MDNS {
+		result.MDNS = target.MDNS
 	}
 	if target.ListenInterface != "" {
 		result.ListenInterface = target.ListenInterface
@@ -94,6 +98,7 @@ func DefaultIPRDConfig() *IPRDConfig {
 		ForwardBind:        "",
 		ForwardPort:        7788,
 		ForwardKnown:       false,
+		MDNS:               false,
 		NoRootNetwork:      false,
 		IgnoredDevices:     []string{},
 		NetworkInclusions:  []string{},
