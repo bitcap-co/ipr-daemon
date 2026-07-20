@@ -31,6 +31,16 @@ func TestValidateForwardBind(t *testing.T) {
 	}
 }
 
+func TestRotateCaptureFilesRoundTrip(t *testing.T) {
+	cfg, err := iprd.NewIPRDConfigFromBytes([]byte(`rotate_capture_files = true`))
+	if err != nil {
+		t.Fatalf("got error %v, want no error", err)
+	}
+	if !cfg.RotateCaptureFiles {
+		t.Fatal("got RotateCaptureFiles false, want true")
+	}
+}
+
 func TestForwardBindRoundTrip(t *testing.T) {
 	cfg, err := iprd.NewIPRDConfigFromBytes([]byte(`forward_bind = "127.0.0.1"`))
 	if err != nil {

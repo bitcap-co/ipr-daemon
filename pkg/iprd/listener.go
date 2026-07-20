@@ -5,11 +5,13 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gopacket/gopacket"
+	"github.com/gopacket/gopacket/layers"
 	"github.com/gopacket/gopacket/pcap"
 	"github.com/gopacket/gopacket/pcapgo"
 )
@@ -19,6 +21,7 @@ const (
 	maxCaptureFileSize int64  = 4 * 1024 * 1024 // max capture file size of 4mb
 	pcapFileHeaderSize int64  = 24
 	pcapRecordHeader   int64  = 16
+	maxCaptureFiles           = 4
 )
 
 const (
@@ -35,17 +38,18 @@ const (
 )
 
 type IPRListener struct {
-	cfg          *IPRDConfig
-	log          *IPRLogger
-	iface        *IPRInterface
-	ifacePinned  bool
-	resolvedName string
-	inactive     *pcap.InactiveHandle
-	handle       *pcap.Handle
-	ch           chan []byte
-	captureFile  *os.File
-	captureW     *pcapgo.Writer
-	captureBytes int64
+	cfg             *IPRDConfig
+	log             *IPRLogger
+	iface           *IPRInterface
+	ifacePinned     bool
+	resolvedName    string
+	inactive        *pcap.InactiveHandle
+	handle          *pcap.Handle
+	ch              chan []byte
+	captureFile     *os.File
+	captureW        *pcapgo.Writer
+	captureBytes    int64
+	captureLinkType layers.LinkType
 }
 
 // NewListener returns a new IPRListener, taking in a IPRDConfig to configure behavior. If logger is nil, a new IPRLogger is created.
@@ -185,20 +189,11 @@ func (l *IPRListener) openCaptureFile() error {
 	if l.cfg.CaptureFile == "" || l.captureFile != nil {
 		return nil
 	}
-	l.cfg.CaptureFile = strings.Split(l.cfg.CaptureFile, ".")[0]
-	l.cfg.CaptureFile = l.cfg.CaptureFile + ".pcap"
-	f, err := os.Create(l.cfg.CaptureFile)
-	if err != nil {
-		return fmt.Errorf("failed to open capture file: %w", err)
+	l.cfg.CaptureFile = normalizeCapturePath(l.cfg.CaptureFile)
+	l.captureLinkType = l.handle.LinkType()
+	if err := l.createCaptureFile(); err != nil {
+		return err
 	}
-	w := pcapgo.NewWriter(f)
-	if err = w.WriteFileHeader(captureSnapLen, l.handle.LinkType()); err != nil {
-		f.Close()
-		return fmt.Errorf("failed to write pcap file header: %w", err)
-	}
-	l.captureFile = f
-	l.captureW = w
-	l.captureBytes = pcapFileHeaderSize
 	l.log.Info(fmt.Sprintf("capturing packets to -> %s", l.cfg.CaptureFile))
 	return nil
 }
@@ -207,6 +202,7 @@ func (l *IPRListener) closeCaptureFile() {
 	if l.captureFile != nil {
 		l.captureFile.Close()
 		l.captureFile = nil
+		l.captureW = nil
 	}
 }
 
@@ -316,8 +312,8 @@ func (l *IPRListener) capture(ctx context.Context) error {
 			} else {
 				l.captureBytes += pcapRecordHeader + int64(len(data))
 				if l.captureBytes >= maxCaptureFileSize {
-					if ferr := l.flushCaptureFile(); ferr != nil {
-						l.log.Error(fmt.Errorf("failed to flush capture file: %w", ferr))
+					if ferr := l.rollCaptureFile(); ferr != nil {
+						l.log.Error(fmt.Errorf("failed to roll capture file: %w", ferr))
 					}
 				}
 			}
@@ -391,6 +387,15 @@ func nextBackoff(cur time.Duration) time.Duration {
 	return next
 }
 
+// rollCaptureFile either rotates capture history or resets the active file,
+// depending on the configured capture mode.
+func (l *IPRListener) rollCaptureFile() error {
+	if l.cfg.RotateCaptureFiles {
+		return l.rotateCaptureFile()
+	}
+	return l.flushCaptureFile()
+}
+
 // flushCaptureFile truncates the capture file and rewrites the pcap header,
 // keeping disk usage bounded by maxCaptureFileSize.
 func (l *IPRListener) flushCaptureFile() error {
@@ -407,6 +412,74 @@ func (l *IPRListener) flushCaptureFile() error {
 	l.captureW = w
 	l.captureBytes = pcapFileHeaderSize
 	l.log.Info(fmt.Sprintf("capture file reached %d bytes, flushed", maxCaptureFileSize))
+	return nil
+}
+
+// rotateCaptureFile archives the active capture and starts a new one. The base
+// file is always current; numbered files are ordered from newest to oldest.
+func (l *IPRListener) rotateCaptureFile() error {
+	if err := l.captureFile.Close(); err != nil {
+		return fmt.Errorf("close active capture: %w", err)
+	}
+	l.captureFile = nil
+	l.captureW = nil
+
+	rotateErr := rotateCaptureFiles(l.cfg.CaptureFile, maxCaptureFiles)
+	openErr := l.createCaptureFile()
+	if rotateErr != nil || openErr != nil {
+		return errors.Join(rotateErr, openErr)
+	}
+	l.log.Info(fmt.Sprintf("capture file reached %d bytes, rotated (keeping %d files)", maxCaptureFileSize, maxCaptureFiles))
+	return nil
+}
+
+func (l *IPRListener) createCaptureFile() error {
+	f, err := os.Create(l.cfg.CaptureFile)
+	if err != nil {
+		return fmt.Errorf("failed to open capture file: %w", err)
+	}
+	w := pcapgo.NewWriter(f)
+	if err := w.WriteFileHeader(captureSnapLen, l.captureLinkType); err != nil {
+		f.Close()
+		return fmt.Errorf("failed to write pcap file header: %w", err)
+	}
+	l.captureFile = f
+	l.captureW = w
+	l.captureBytes = pcapFileHeaderSize
+	return nil
+}
+
+func normalizeCapturePath(path string) string {
+	ext := filepath.Ext(path)
+	if strings.EqualFold(ext, ".pcap") {
+		return path
+	}
+	if strings.TrimSuffix(path, ext) == "" {
+		return path + ".pcap"
+	}
+	return strings.TrimSuffix(path, ext) + ".pcap"
+}
+
+func rotatedCapturePath(path string, index int) string {
+	ext := filepath.Ext(path)
+	return fmt.Sprintf("%s.%d%s", strings.TrimSuffix(path, ext), index, ext)
+}
+
+func rotateCaptureFiles(path string, maxFiles int) error {
+	oldest := rotatedCapturePath(path, maxFiles-1)
+	if err := os.Remove(oldest); err != nil && !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("remove oldest capture %q: %w", oldest, err)
+	}
+	for index := maxFiles - 1; index >= 1; index-- {
+		source := path
+		if index > 1 {
+			source = rotatedCapturePath(path, index-1)
+		}
+		destination := rotatedCapturePath(path, index)
+		if err := os.Rename(source, destination); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return fmt.Errorf("rotate capture %q to %q: %w", source, destination, err)
+		}
+	}
 	return nil
 }
 

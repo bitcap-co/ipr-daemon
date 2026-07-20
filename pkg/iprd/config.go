@@ -11,17 +11,18 @@ import (
 
 // IPRDConfig describes a new IPR Daemon configuration
 type IPRDConfig struct {
-	Debug             bool     `toml:"debug"`
-	Auto              bool     `toml:"auto"`
-	ListenInterface   string   `toml:"listen_interface"`
-	ForwardBind       string   `toml:"forward_bind"`
-	ForwardPort       int      `toml:"forward_port"`
-	ForwardKnown      bool     `toml:"forward_known"`
-	NoRootNetwork     bool     `toml:"no_root_network"`
-	IgnoredDevices    []string `toml:"ignored_devices"`
-	NetworkInclusions []string `toml:"network_inclusions"`
-	NetworkExclusions []string `toml:"network_exclusions"`
-	CaptureFile       string   `toml:"capture_file"`
+	Debug              bool     `toml:"debug"`
+	Auto               bool     `toml:"auto"`
+	ListenInterface    string   `toml:"listen_interface"`
+	ForwardBind        string   `toml:"forward_bind"`
+	ForwardPort        int      `toml:"forward_port"`
+	ForwardKnown       bool     `toml:"forward_known"`
+	NoRootNetwork      bool     `toml:"no_root_network"`
+	IgnoredDevices     []string `toml:"ignored_devices"`
+	NetworkInclusions  []string `toml:"network_inclusions"`
+	NetworkExclusions  []string `toml:"network_exclusions"`
+	CaptureFile        string   `toml:"capture_file"`
+	RotateCaptureFiles bool     `toml:"rotate_capture_files"`
 }
 
 // Validate returns error if IPRDConfig contains invalid values
@@ -75,6 +76,9 @@ func (cfg *IPRDConfig) Merge(target *IPRDConfig) *IPRDConfig {
 	if target.CaptureFile != "" {
 		result.CaptureFile = target.CaptureFile
 	}
+	if target.RotateCaptureFiles {
+		result.RotateCaptureFiles = target.RotateCaptureFiles
+	}
 	if target.NoRootNetwork {
 		result.NoRootNetwork = target.NoRootNetwork
 	}
@@ -84,17 +88,18 @@ func (cfg *IPRDConfig) Merge(target *IPRDConfig) *IPRDConfig {
 // DefaultIPRDConfig returns a default IPRDConfig
 func DefaultIPRDConfig() *IPRDConfig {
 	return &IPRDConfig{
-		Debug:             false,
-		Auto:              false,
-		ListenInterface:   "eth0",
-		ForwardBind:       "",
-		ForwardPort:       7788,
-		ForwardKnown:      false,
-		NoRootNetwork:     false,
-		IgnoredDevices:    []string{},
-		NetworkInclusions: []string{},
-		NetworkExclusions: []string{},
-		CaptureFile:       "",
+		Debug:              false,
+		Auto:               false,
+		ListenInterface:    "eth0",
+		ForwardBind:        "",
+		ForwardPort:        7788,
+		ForwardKnown:       false,
+		NoRootNetwork:      false,
+		IgnoredDevices:     []string{},
+		NetworkInclusions:  []string{},
+		NetworkExclusions:  []string{},
+		CaptureFile:        "",
+		RotateCaptureFiles: false,
 	}
 }
 
