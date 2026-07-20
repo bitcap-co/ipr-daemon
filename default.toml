@@ -12,6 +12,8 @@ forward_bind = ""
 forward_port = 7788
 # forward_known is a switch to only forward IP reports from known miner types/ports over forward_port.
 forward_known = false
+# mdns advertises the TCP forwarding endpoint as _iprd._tcp.local. for LAN discovery.
+mdns = false
 # no_root_network is a switch to not include the interface network in BPF filter.
 no_root_network = false
 # ignored_devices is a list of source MAC addresses to exclude in BPF filter.
