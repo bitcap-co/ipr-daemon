@@ -44,6 +44,7 @@ var (
 	flForwardBind        = flag.String("b", "", "IP address to bind the TCP broadcast stream to. Empty binds all interfaces.")
 	flForwardPort        = flag.Int("p", 7788, "TCP stream/broadcast port for forwarding IP report packet data.")
 	flForwardKnown       = flag.Bool("known", false, "Switch to only forward IP reports from known miner types/ports over forward port.")
+	flMDNS               = flag.Bool("mdns", false, "Advertise the TCP forwarding endpoint over mDNS/DNS-SD.")
 	flNoRootNetwork      = flag.Bool("no-root-network", false, "Switch to not include the interface network in BPF filter.")
 	flNetworkInclusions  flagSlice
 	flNetworkExclusions  flagSlice
@@ -98,6 +99,7 @@ func main() {
 		ForwardBind:        *flForwardBind,
 		ForwardPort:        *flForwardPort,
 		ForwardKnown:       *flForwardKnown,
+		MDNS:               *flMDNS,
 		NoRootNetwork:      *flNoRootNetwork,
 		IgnoredDevices:     strings.Split(flIgnoredDevices.String(), ","),
 		NetworkInclusions:  strings.Split(flNetworkInclusions.String(), ","),
@@ -137,6 +139,21 @@ func main() {
 	}
 	// start listening for incoming clients.
 	go broadcaster.Listen()
+
+	var mdnsAdvertiser *iprd.MDNSAdvertiser
+	if cfg.MDNS {
+		mdnsAdvertiser, err = iprd.NewMDNSAdvertiser(cfg.ForwardBind, cfg.ForwardPort, VERSION)
+		if err != nil {
+			log.Warn(fmt.Sprintf("failed to advertise mDNS service: %v", err))
+		} else {
+			defer func() {
+				if err := mdnsAdvertiser.Close(); err != nil {
+					log.Warn(fmt.Sprintf("failed to withdraw mDNS service: %v", err))
+				}
+			}()
+			log.Info(fmt.Sprintf("advertising mDNS service -> %s.local. port %d", iprd.MDNSServiceType, cfg.ForwardPort))
+		}
+	}
 	// handle channel messages.
 	go func() {
 		for {
@@ -155,6 +172,11 @@ func main() {
 	// supervise capture: activates the handle and reconnects on interface loss
 	// until the context is cancelled.
 	if err := listener.Run(ctx); err != nil {
+		if mdnsAdvertiser != nil {
+			if closeErr := mdnsAdvertiser.Close(); closeErr != nil {
+				log.Warn(fmt.Sprintf("failed to withdraw mDNS service: %v", closeErr))
+			}
+		}
 		log.Fatal(err)
 	}
 	log.Info("shutting down iprd...")
