@@ -175,6 +175,23 @@ oldest. Without `-rotate-capture`, the active capture is flushed at 4 MiB
 as before. TOML configurations can enable the same behavior with
 `rotate_capture_files = true`.
 
+To make the TCP endpoint discoverable by applications on the same LAN, enable
+mDNS/DNS-SD advertisement:
+```bash
+sudo ./iprd -i "eth0" -mdns
+```
+This publishes `_iprd._tcp.local.` with the daemon's hostname, configured TCP
+port, and subscription metadata. TOML configurations can use `mdns = true`.
+Discovery can be verified with Avahi on Linux or `dns-sd` on macOS:
+```bash
+avahi-browse -rt _iprd._tcp
+# or
+dns-sd -B _iprd._tcp local.
+```
+mDNS is link-local multicast, so discovery normally stays within the same
+LAN/VLAN unless the network has an mDNS reflector. No secrets are included in
+the advertised TXT records.
+
 Also see `iprd -h` for a list of all available options.
 
 > [!NOTE]
