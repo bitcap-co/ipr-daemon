@@ -36,21 +36,22 @@ var (
 	log = iprd.NewLogger()
 
 	// flags
-	flVersion           = flag.Bool("version", false, "Prints version info and exits")
-	flList              = flag.Bool("list", false, "Lists all available network interfaces that can be listened on.")
-	flDebug             = flag.Bool("d", false, "Switch to enable packet debugging output.")
-	flAuto              = flag.Bool("a", false, "Switch to use the defined LAN interface (description matching 'lan' or 'LAN') for listening. Overrides -i flag.")
-	flInterface         = flag.String("i", "eth0", "Name or index of interface to listen/capture on.")
-	flForwardBind       = flag.String("b", "", "IP address to bind the TCP broadcast stream to. Empty binds all interfaces.")
-	flForwardPort       = flag.Int("p", 7788, "TCP stream/broadcast port for forwarding IP report packet data.")
-	flForwardKnown      = flag.Bool("known", false, "Switch to only forward IP reports from known miner types/ports over forward port.")
-	flNoRootNetwork     = flag.Bool("no-root-network", false, "Switch to not include the interface network in BPF filter.")
-	flNetworkInclusions flagSlice
-	flNetworkExclusions flagSlice
-	flIgnoredDevices    flagSlice
-	flCaptureFile       = flag.String("capture-file", "", "Path to write received packets to in PCAP format for replay/debugging.")
-	flConfig            = flag.String("c", "", "Path to TOML config file. Overrides any other supplied flags.")
-	flWrite             = flag.String("w", "", "Path to new TOML config file. Writes the supplied arguments to new config path.")
+	flVersion            = flag.Bool("version", false, "Prints version info and exits")
+	flList               = flag.Bool("list", false, "Lists all available network interfaces that can be listened on.")
+	flDebug              = flag.Bool("d", false, "Switch to enable packet debugging output.")
+	flAuto               = flag.Bool("a", false, "Switch to use the defined LAN interface (description matching 'lan' or 'LAN') for listening. Overrides -i flag.")
+	flInterface          = flag.String("i", "eth0", "Name or index of interface to listen/capture on.")
+	flForwardBind        = flag.String("b", "", "IP address to bind the TCP broadcast stream to. Empty binds all interfaces.")
+	flForwardPort        = flag.Int("p", 7788, "TCP stream/broadcast port for forwarding IP report packet data.")
+	flForwardKnown       = flag.Bool("known", false, "Switch to only forward IP reports from known miner types/ports over forward port.")
+	flNoRootNetwork      = flag.Bool("no-root-network", false, "Switch to not include the interface network in BPF filter.")
+	flNetworkInclusions  flagSlice
+	flNetworkExclusions  flagSlice
+	flIgnoredDevices     flagSlice
+	flCaptureFile        = flag.String("capture-file", "", "Path to write received packets to in PCAP format for replay/debugging.")
+	flRotateCaptureFiles = flag.Bool("rotate-capture", false, "Rotate up to four capture files instead of flushing the active file at its size limit.")
+	flConfig             = flag.String("c", "", "Path to TOML config file. Overrides any other supplied flags.")
+	flWrite              = flag.String("w", "", "Path to new TOML config file. Writes the supplied arguments to new config path.")
 )
 
 func main() {
@@ -91,17 +92,18 @@ func main() {
 	var err error
 	var cfg *iprd.IPRDConfig
 	cfg = &iprd.IPRDConfig{
-		Debug:             *flDebug,
-		Auto:              *flAuto,
-		ListenInterface:   *flInterface,
-		ForwardBind:       *flForwardBind,
-		ForwardPort:       *flForwardPort,
-		ForwardKnown:      *flForwardKnown,
-		NoRootNetwork:     *flNoRootNetwork,
-		IgnoredDevices:    strings.Split(flIgnoredDevices.String(), ","),
-		NetworkInclusions: strings.Split(flNetworkInclusions.String(), ","),
-		NetworkExclusions: strings.Split(flNetworkExclusions.String(), ","),
-		CaptureFile:       *flCaptureFile,
+		Debug:              *flDebug,
+		Auto:               *flAuto,
+		ListenInterface:    *flInterface,
+		ForwardBind:        *flForwardBind,
+		ForwardPort:        *flForwardPort,
+		ForwardKnown:       *flForwardKnown,
+		NoRootNetwork:      *flNoRootNetwork,
+		IgnoredDevices:     strings.Split(flIgnoredDevices.String(), ","),
+		NetworkInclusions:  strings.Split(flNetworkInclusions.String(), ","),
+		NetworkExclusions:  strings.Split(flNetworkExclusions.String(), ","),
+		CaptureFile:        *flCaptureFile,
+		RotateCaptureFiles: *flRotateCaptureFiles,
 	}
 	if *flWrite != "" {
 		*flWrite = strings.Split(*flWrite, ".")[0]
