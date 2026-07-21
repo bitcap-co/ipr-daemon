@@ -4,7 +4,7 @@ GOARCH ?= $(shell uname -m | sed -E 's/x86_64/amd64/')
 BUILDINFOSDET ?=
 
 # Project metadata
-PROJECT_VERSION    := 0.4.6
+PROJECT_VERSION    := 0.4.7
 REPO_ORG           := bitcap-co
 DOCKER_REPO        := mattwert
 PROJECT_NAME       := ipr-daemon
