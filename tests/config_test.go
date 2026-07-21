@@ -31,6 +31,16 @@ func TestValidateForwardBind(t *testing.T) {
 	}
 }
 
+func TestMDNSRoundTrip(t *testing.T) {
+	cfg, err := iprd.NewIPRDConfigFromBytes([]byte(`mdns = true`))
+	if err != nil {
+		t.Fatalf("got error %v, want no error", err)
+	}
+	if !cfg.MDNS {
+		t.Fatal("got MDNS false, want true")
+	}
+}
+
 func TestRotateCaptureFilesRoundTrip(t *testing.T) {
 	cfg, err := iprd.NewIPRDConfigFromBytes([]byte(`rotate_capture_files = true`))
 	if err != nil {
