@@ -1,10 +1,92 @@
 package iprd
 
 import (
+	"net"
 	"net/netip"
 	"reflect"
 	"testing"
 )
+
+func TestIsOperationalMulticastInterface(t *testing.T) {
+	required := net.FlagUp | net.FlagRunning | net.FlagMulticast
+	tests := []struct {
+		name  string
+		flags net.Flags
+		want  bool
+	}{
+		{name: "all required flags", flags: required, want: true},
+		{name: "additional flags", flags: required | net.FlagBroadcast, want: true},
+		{name: "not administratively up", flags: net.FlagRunning | net.FlagMulticast},
+		{name: "not running", flags: net.FlagUp | net.FlagMulticast},
+		{name: "no multicast", flags: net.FlagUp | net.FlagRunning},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			iface := net.Interface{Flags: tt.flags}
+			if got := isOperationalMulticastInterface(iface); got != tt.want {
+				t.Errorf("isOperationalMulticastInterface() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestFilterOperationalMulticastInterfaces(t *testing.T) {
+	required := net.FlagUp | net.FlagRunning | net.FlagMulticast
+	ifaces := []net.Interface{
+		{Index: 1, Name: "eth0", Flags: required},
+		{Index: 2, Name: "virbr0", Flags: net.FlagUp | net.FlagMulticast},
+		{Index: 3, Name: "down0", Flags: net.FlagRunning | net.FlagMulticast},
+		{Index: 4, Name: "wlan0", Flags: required | net.FlagBroadcast},
+	}
+
+	got := filterOperationalMulticastInterfaces(ifaces)
+	want := []net.Interface{ifaces[0], ifaces[3]}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("filterOperationalMulticastInterfaces() = %#v, want %#v", got, want)
+	}
+}
+
+func TestReloadOnMDNSInterfaceChange(t *testing.T) {
+	previous := []mdnsInterfaceState{{
+		Index:     2,
+		Name:      "eth0",
+		Flags:     net.FlagUp | net.FlagRunning | net.FlagMulticast,
+		Addresses: []string{"192.168.1.107/24"},
+	}}
+	reloads := 0
+	reload := func() { reloads++ }
+
+	got := reloadOnMDNSInterfaceChange(previous, previous, reload)
+	if reloads != 0 {
+		t.Fatalf("unchanged state triggered %d reload(s), want 0", reloads)
+	}
+	if !reflect.DeepEqual(got, previous) {
+		t.Fatalf("unchanged state returned %#v, want %#v", got, previous)
+	}
+
+	addressChanged := []mdnsInterfaceState{{
+		Index:     2,
+		Name:      "eth0",
+		Flags:     net.FlagUp | net.FlagRunning | net.FlagMulticast,
+		Addresses: []string{"192.168.1.108/24"},
+	}}
+	got = reloadOnMDNSInterfaceChange(got, addressChanged, reload)
+	if reloads != 1 {
+		t.Fatalf("address change triggered %d reload(s), want 1", reloads)
+	}
+	if !reflect.DeepEqual(got, addressChanged) {
+		t.Fatalf("changed state returned %#v, want %#v", got, addressChanged)
+	}
+
+	got = reloadOnMDNSInterfaceChange(got, nil, reload)
+	if reloads != 2 {
+		t.Fatalf("interface removal triggered %d reload(s), want 2", reloads)
+	}
+	if got != nil {
+		t.Fatalf("interface removal returned %#v, want nil", got)
+	}
+}
 
 func TestNewMDNSService(t *testing.T) {
 	service, err := newMDNSService("iprd-host.local", 7788, "0.4.6")
