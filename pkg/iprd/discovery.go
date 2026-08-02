@@ -25,8 +25,8 @@ type MDNSAdvertiser struct {
 }
 
 // NewMDNSAdvertiser advertises the iprd TCP endpoint. A wildcard bind is
-// published on all multicast-capable interfaces; an explicit bind is limited
-// to the local interface that owns that address.
+// published on all operational multicast-capable interfaces; an explicit bind
+// is limited to the local interface that owns that address.
 func NewMDNSAdvertiser(bind string, port int, version string) (*MDNSAdvertiser, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -37,7 +37,9 @@ func NewMDNSAdvertiser(bind string, port int, version string) (*MDNSAdvertiser, 
 		return nil, err
 	}
 
-	client := zeroconf.New().Publish(service)
+	client := zeroconf.New().
+		Publish(service).
+		Interfaces(operationalMulticastInterfaces)
 	addr, explicit, err := parseMDNSBind(bind)
 	if err != nil {
 		return nil, err
@@ -152,8 +154,12 @@ func interfaceForAddress(target netip.Addr) (*net.Interface, error) {
 			if !ok || local.Unmap() != target {
 				continue
 			}
-			if ifaces[i].Flags&net.FlagUp == 0 || ifaces[i].Flags&net.FlagMulticast == 0 {
-				return nil, fmt.Errorf("interface %s for bind address %s does not support multicast", ifaces[i].Name, target)
+			if !isOperationalMulticastInterface(ifaces[i]) {
+				return nil, fmt.Errorf(
+					"interface %s for bind address %s is not up, running, or multicast-capable",
+					ifaces[i].Name,
+					target,
+				)
 			}
 			return &ifaces[i], nil
 		}
@@ -173,4 +179,23 @@ func netAddressIP(addr net.Addr) (netip.Addr, bool) {
 	}
 	parsed, ok := netip.AddrFromSlice(ip)
 	return parsed, ok
+}
+
+func isOperationalMulticastInterface(iface net.Interface) bool {
+	requiredFlags := net.FlagUp | net.FlagRunning | net.FlagMulticast
+	return iface.Flags&requiredFlags == requiredFlags
+}
+
+func operationalMulticastInterfaces() ([]net.Interface, error) {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil, fmt.Errorf("list interfaces for wildcard advertisement: %w", err)
+	}
+	filtered := make([]net.Interface, 0, len(ifaces))
+	for _, iface := range ifaces {
+		if isOperationalMulticastInterface(iface) {
+			filtered = append(filtered, iface)
+		}
+	}
+	return filtered, nil
 }
