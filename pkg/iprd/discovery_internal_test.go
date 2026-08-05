@@ -24,8 +24,8 @@ func TestIsOperationalMulticastInterface(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			iface := net.Interface{Flags: tt.flags}
-			if got := isOperationalMulticastInterface(iface); got != tt.want {
-				t.Errorf("isOperationalMulticastInterface() = %v, want %v", got, tt.want)
+			if got := isOperationalMulticast(iface); got != tt.want {
+				t.Errorf("isOperationalMulticast() = %v, want %v", got, tt.want)
 			}
 		})
 	}

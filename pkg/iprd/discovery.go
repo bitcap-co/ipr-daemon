@@ -117,21 +117,6 @@ func NewMDNSAdvertiser(bind string, port int, version string) (*MDNSAdvertiser, 
 	return advertiser, nil
 }
 
-// Close gracefully withdraws the DNS-SD record. It is safe to call more than once.
-func (a *MDNSAdvertiser) Close() error {
-	if a == nil || a.client == nil {
-		return nil
-	}
-	a.closeOnce.Do(func() {
-		if a.cancel != nil {
-			a.cancel()
-		}
-		a.wg.Wait()
-		a.closeErr = a.client.Close()
-	})
-	return a.closeErr
-}
-
 func (a *MDNSAdvertiser) watchInterfaces(ctx context.Context) {
 	const interval = 5 * time.Second
 
@@ -155,6 +140,21 @@ func (a *MDNSAdvertiser) watchInterfaces(ctx context.Context) {
 			prev = reloadOnMDNSInterfaceChange(prev, curr, a.client.Reload)
 		}
 	}
+}
+
+// Close gracefully withdraws the DNS-SD record. It is safe to call more than once.
+func (a *MDNSAdvertiser) Close() error {
+	if a == nil || a.client == nil {
+		return nil
+	}
+	a.closeOnce.Do(func() {
+		if a.cancel != nil {
+			a.cancel()
+		}
+		a.wg.Wait()
+		a.closeErr = a.client.Close()
+	})
+	return a.closeErr
 }
 
 func reloadOnMDNSInterfaceChange(
@@ -216,6 +216,29 @@ func isMDNSHostRune(r rune) bool {
 		(r >= '0' && r <= '9') || r == '-' || r == '_')
 }
 
+func isOperationalMulticast(iface net.Interface) bool {
+	requiredFlags := net.FlagUp | net.FlagRunning | net.FlagMulticast
+	return iface.Flags&requiredFlags == requiredFlags
+}
+
+func operationalMulticastInterfaces() ([]net.Interface, error) {
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil, fmt.Errorf("list interfaces for wildcard advertisement: %w", err)
+	}
+	return filterOperationalMulticastInterfaces(ifaces), nil
+}
+
+func filterOperationalMulticastInterfaces(ifaces []net.Interface) []net.Interface {
+	filtered := make([]net.Interface, 0, len(ifaces))
+	for _, iface := range ifaces {
+		if isOperationalMulticast(iface) {
+			filtered = append(filtered, iface)
+		}
+	}
+	return filtered
+}
+
 func parseMDNSBind(bind string) (netip.Addr, bool, error) {
 	bind = strings.TrimSpace(bind)
 	if bind == "" {
@@ -250,9 +273,9 @@ func interfaceForAddress(target netip.Addr) (*net.Interface, error) {
 			if !ok || local.Unmap() != target {
 				continue
 			}
-			if !isOperationalMulticastInterface(ifaces[i]) {
+			if !isOperationalMulticast(ifaces[i]) {
 				return nil, fmt.Errorf(
-					"interface %s for bind address %s is not simultaneously up, running, and multicast-capable",
+					"interface %s for bind address %s is not a operational multicast interface",
 					ifaces[i].Name,
 					target,
 				)
@@ -261,43 +284,6 @@ func interfaceForAddress(target netip.Addr) (*net.Interface, error) {
 		}
 	}
 	return nil, fmt.Errorf("bind address %s is not assigned to a local multicast interface", target)
-}
-
-func netAddressIP(addr net.Addr) (netip.Addr, bool) {
-	var ip net.IP
-	switch value := addr.(type) {
-	case *net.IPNet:
-		ip = value.IP
-	case *net.IPAddr:
-		ip = value.IP
-	default:
-		return netip.Addr{}, false
-	}
-	parsed, ok := netip.AddrFromSlice(ip)
-	return parsed, ok
-}
-
-func isOperationalMulticastInterface(iface net.Interface) bool {
-	requiredFlags := net.FlagUp | net.FlagRunning | net.FlagMulticast
-	return iface.Flags&requiredFlags == requiredFlags
-}
-
-func operationalMulticastInterfaces() ([]net.Interface, error) {
-	ifaces, err := net.Interfaces()
-	if err != nil {
-		return nil, fmt.Errorf("list interfaces for wildcard advertisement: %w", err)
-	}
-	return filterOperationalMulticastInterfaces(ifaces), nil
-}
-
-func filterOperationalMulticastInterfaces(ifaces []net.Interface) []net.Interface {
-	filtered := make([]net.Interface, 0, len(ifaces))
-	for _, iface := range ifaces {
-		if isOperationalMulticastInterface(iface) {
-			filtered = append(filtered, iface)
-		}
-	}
-	return filtered
 }
 
 func operationalInterfaceForAddress(target netip.Addr) ([]net.Interface, error) {
@@ -319,11 +305,25 @@ func operationalInterfaceForAddress(target netip.Addr) ([]net.Interface, error) 
 			if !ok || local.Unmap() != target {
 				continue
 			}
-			if !isOperationalMulticastInterface(ifaces[i]) {
+			if !isOperationalMulticast(ifaces[i]) {
 				return []net.Interface{}, nil
 			}
 			return []net.Interface{ifaces[i]}, nil
 		}
 	}
 	return []net.Interface{}, nil
+}
+
+func netAddressIP(addr net.Addr) (netip.Addr, bool) {
+	var ip net.IP
+	switch value := addr.(type) {
+	case *net.IPNet:
+		ip = value.IP
+	case *net.IPAddr:
+		ip = value.IP
+	default:
+		return netip.Addr{}, false
+	}
+	parsed, ok := netip.AddrFromSlice(ip)
+	return parsed, ok
 }
