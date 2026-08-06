@@ -14,17 +14,6 @@ import (
 	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
 )
 
-type flagSlice []string
-
-func (f *flagSlice) String() string {
-	return strings.Join(*f, ",")
-}
-
-func (f *flagSlice) Set(value string) error {
-	*f = append(*f, value)
-	return nil
-}
-
 var (
 	// build info
 	VERSION   = "unknown"
@@ -46,9 +35,9 @@ var (
 	flForwardKnown       = flag.Bool("known", false, "Switch to only forward IP reports from known miner types/ports over forward port.")
 	flMDNS               = flag.Bool("mdns", false, "Advertise the TCP forwarding endpoint over mDNS/DNS-SD.")
 	flNoRootNetwork      = flag.Bool("no-root-network", false, "Switch to not include the interface network in BPF filter.")
-	flNetworkInclusions  flagSlice
-	flNetworkExclusions  flagSlice
-	flIgnoredDevices     flagSlice
+	flNetworkInclusions  iprd.FlagSlice
+	flNetworkExclusions  iprd.FlagSlice
+	flIgnoredDevices     iprd.FlagSlice
 	flCaptureFile        = flag.String("capture-file", "", "Path to write received packets to in PCAP format for replay/debugging.")
 	flRotateCaptureFiles = flag.Bool("rotate-capture", false, "Rotate up to four capture files instead of flushing the active file at its size limit.")
 	flConfig             = flag.String("c", "", "Path to TOML config file. Overrides any other supplied flags.")
@@ -101,9 +90,9 @@ func main() {
 		ForwardKnown:       *flForwardKnown,
 		MDNS:               *flMDNS,
 		NoRootNetwork:      *flNoRootNetwork,
-		IgnoredDevices:     strings.Split(flIgnoredDevices.String(), ","),
-		NetworkInclusions:  strings.Split(flNetworkInclusions.String(), ","),
-		NetworkExclusions:  strings.Split(flNetworkExclusions.String(), ","),
+		IgnoredDevices:     []string(flIgnoredDevices),
+		NetworkInclusions:  []string(flNetworkInclusions),
+		NetworkExclusions:  []string(flNetworkExclusions),
 		CaptureFile:        *flCaptureFile,
 		RotateCaptureFiles: *flRotateCaptureFiles,
 	}

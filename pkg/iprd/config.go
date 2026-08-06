@@ -5,9 +5,26 @@ import (
 	"io"
 	"net"
 	"os"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
+
+// FlagSlice defines a slice flag value that supports chaining and comma-separated values.
+type FlagSlice []string
+
+func (f *FlagSlice) String() string {
+	return strings.Join(*f, ",")
+}
+
+func (f *FlagSlice) Set(value string) error {
+	for _, v := range strings.Split(value, ",") {
+		if v = strings.TrimSpace(v); v != "" {
+			*f = append(*f, v)
+		}
+	}
+	return nil
+}
 
 // IPRDConfig describes a new IPR Daemon configuration
 type IPRDConfig struct {

@@ -1,10 +1,28 @@
 package iprd_test
 
 import (
+	"reflect"
 	"testing"
 
 	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
 )
+
+func TestFlagSliceSupportsChainingAndCommaSeparatedValues(t *testing.T) {
+	var values iprd.FlagSlice
+	for _, value := range []string{"eth0", "eth1, wlan0", "  4  ", ""} {
+		if err := values.Set(value); err != nil {
+			t.Fatalf("Set(%q): %v", value, err)
+		}
+	}
+
+	want := iprd.FlagSlice{"eth0", "eth1", "wlan0", "4"}
+	if !reflect.DeepEqual(values, want) {
+		t.Fatalf("got %v, want %v", values, want)
+	}
+	if got := values.String(); got != "eth0,eth1,wlan0,4" {
+		t.Fatalf("String() = %q, want %q", got, "eth0,eth1,wlan0,4")
+	}
+}
 
 func TestValidateForwardBind(t *testing.T) {
 	tests := []struct {
