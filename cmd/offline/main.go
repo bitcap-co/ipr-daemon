@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"path/filepath"
@@ -50,6 +51,7 @@ func dumpPcap(fd string, debug bool) error {
 		return err
 	}
 	var packetCount int64 = 0
+	processor := iprd.NewPacketProcessor(nil)
 	packetSource := gopacket.NewPacketSource(handle, handle.LinkType())
 	for packet := range packetSource.Packets() {
 		packetCount++
@@ -62,8 +64,8 @@ func dumpPcap(fd string, debug bool) error {
 			log.Error(fmt.Errorf("failed to decode packet %d: %s", packetCount, err))
 			continue
 		}
-		if err := iprd.ParseIPReportPacket(ipr); err != nil {
-			if err.Error() == "duplicate packet" {
+		if err := processor.ParseIPReportPacket(ipr); err != nil {
+			if errors.Is(err, iprd.ErrDuplicatePacket) {
 				// ignore duplicate packets
 				if debug {
 					log.Warn(fmt.Sprintf("cnt:%d %s - Duplicate", packetCount, ipr.String()))

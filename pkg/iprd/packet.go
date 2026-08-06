@@ -1,38 +1,13 @@
 package iprd
 
 import (
-	"bytes"
-	"compress/zlib"
 	"fmt"
-	"io"
 	"time"
-	"unicode/utf8"
 
 	"github.com/goccy/go-json"
 	"github.com/google/uuid"
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
-)
-
-const (
-	zlibSealMinerOffset int   = 8
-	recordMinAge        int64 = 10_000
-)
-
-var (
-	zlibOffsets = []int{0, zlibSealMinerOffset}
-	minerPorts  = map[int]MinerTypeHint{
-		14235: Antminer, // Assume antminer but could be a multitude of miner types (i.e. Volcminer, Hammer)
-		11503: Iceriver,
-		8888:  Whatsminer,
-		1314:  Goldshell,
-		18650: Sealminer,
-		9999:  Elphapex,
-		12345: Auradine,
-		54321: IPollo,
-		42069: HiveGPU,
-	}
-	record = NewRecord(10)
 )
 
 // IPRBroadcastMessage describes the JSON message structure of a IPReportPacket.
@@ -132,64 +107,4 @@ func NewIPReportPacket(packet gopacket.Packet) (*IPReportPacket, error) {
 		Datagram:       udp.Payload,
 		MinerHint:      UnknownType,
 	}, nil
-}
-
-// ParseIPReportPacket analyzes packet for valid IP Report packet. Returns an error on failure.
-func ParseIPReportPacket(packet *IPReportPacket) error {
-	// retrieve miner hint from DstPort.
-	minerHint, ok := minerPorts[packet.DstPort]
-	if ok {
-		packet.MinerHint = minerHint
-	}
-	// check for existing record.
-	if record.Contains(packet.SrcMAC) {
-		ent := record.Get(packet.SrcMAC)
-		// if record exists and is not over minimum record age, mark as dup packet.
-		if time.Now().UnixMilli()-ent.UpdatedAt <= recordMinAge {
-			return fmt.Errorf("duplicate packet")
-		}
-	}
-	// if not valid UTF-8, it could be encoded/compressed.
-	if !utf8.Valid(packet.Datagram) {
-		// check for start of zlib payload given a list of offsets.
-		var zlibStart int
-		zlibStart = -1
-		for _, offset := range zlibOffsets {
-			if offset < len(packet.Datagram) {
-				if packet.Datagram[offset] == byte(0x78) {
-					zlibStart = offset
-					break
-				}
-			}
-		}
-		if zlibStart == -1 {
-			return fmt.Errorf("failed to decode payload - invalid utf8")
-		}
-		b := bytes.NewReader(packet.Datagram[zlibStart:])
-		r, err := zlib.NewReader(b)
-		if err != nil {
-			return fmt.Errorf("failed to decompress payload - %w", err)
-		}
-		defer r.Close()
-		packet.Datagram, err = io.ReadAll(r)
-		if err != nil {
-			return fmt.Errorf("failed to read from zlib reader - %w", err)
-		}
-	}
-
-	packet.Payload = string(packet.Datagram)
-	// ignore packet if it doesn't contain source IP within UDP datagram.
-	if !bytes.Contains(packet.Datagram, []byte(packet.SrcIP)) {
-		// edge case for Elphapex: it sends a static message that doesn't contain source IP.
-		if !MsgPatterns["elphapex"].Match(packet.Datagram) {
-			return fmt.Errorf("no source IP found in datagram")
-		}
-	}
-	// update record with new packet data.
-	record.Add(packet.SrcMAC, RecordEntry{
-		SrcIP:     packet.SrcIP,
-		SrcMAC:    packet.SrcMAC,
-		MinerHint: packet.MinerHint,
-		CreatedAt: packet.Timestamp.UnixMilli()})
-	return nil
 }

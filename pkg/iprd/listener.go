@@ -45,6 +45,7 @@ type IPRListener struct {
 	resolvedName    string
 	inactive        *pcap.InactiveHandle
 	handle          *pcap.Handle
+	processor       *PacketProcessor
 	ch              chan []byte
 	captureFile     *os.File
 	captureW        *pcapgo.Writer
@@ -68,6 +69,7 @@ func NewListener(cfg *IPRDConfig, logger *IPRLogger, iface *IPRInterface) *IPRLi
 		log:         logger,
 		iface:       iface,
 		ifacePinned: iface != nil,
+		processor:   NewPacketProcessor(nil),
 		ch:          make(chan []byte),
 	}
 }
@@ -329,9 +331,9 @@ func (l *IPRListener) capture(ctx context.Context) error {
 			continue
 		}
 		// parse IPReportPacket to validate that it is an IP Report packet.
-		if err := ParseIPReportPacket(r); err != nil {
+		if err := l.processor.ParseIPReportPacket(r); err != nil {
 			// warn on duplicate packet.
-			if err.Error() == "duplicate packet" {
+			if errors.Is(err, ErrDuplicatePacket) {
 				l.log.Warn(fmt.Sprintf("%s - %s", r.String(), err))
 			}
 			if l.cfg.Debug {
