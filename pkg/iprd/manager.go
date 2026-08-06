@@ -166,6 +166,13 @@ func (m *ListenerManager) processCapturedPacket(captured CapturedPacket) []byte 
 	if err != nil {
 		return nil
 	}
+	ipr.InterfaceName = captured.Interface.Name
+	if ipr.InterfaceName == "" {
+		ipr.InterfaceName = captured.Interface.FriendlyName
+	}
+	if ipr.InterfaceName == "" {
+		ipr.InterfaceName = fmt.Sprintf("#%d", captured.Interface.Index)
+	}
 	if err := m.processor.ParseIPReportPacket(ipr); err != nil {
 		if errors.Is(err, ErrDuplicatePacket) {
 			m.log.Warn(fmt.Sprintf("%s - %s", ipr.String(), err))

@@ -2,6 +2,7 @@ package iprd_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,6 +18,14 @@ func validIPReportPacket(mac string, interfaceIndex int) *iprd.IPReportPacket {
 		DstPort:        14235,
 		Datagram:       []byte("IP report from 192.168.1.100"),
 		MinerHint:      iprd.UnknownType,
+	}
+}
+
+func TestIPReportPacketStringIncludesInterfaceName(t *testing.T) {
+	packet := validIPReportPacket("aa:bb:cc:dd:ee:00", 1)
+	packet.InterfaceName = "eth0"
+	if got := packet.String(); !strings.HasPrefix(got, "[iface: eth0 IP: 192.168.1.100") {
+		t.Fatalf("String() = %q, want interface prefix", got)
 	}
 }
 

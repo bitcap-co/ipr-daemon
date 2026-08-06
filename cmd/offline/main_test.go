@@ -73,7 +73,7 @@ func TestDumpPcapNGIncludesInterfaceName(t *testing.T) {
 	if err := dumpPcap(path, false); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output.String(), "iface:test0") {
+	if !strings.Contains(output.String(), "iface: test0") {
 		t.Fatalf("output does not identify PCAP-NG interface:\n%s", output.String())
 	}
 }
@@ -102,7 +102,7 @@ func TestDumpClassicPcapRemainsSupported(t *testing.T) {
 	if err := dumpPcap(path, false); err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(output.String(), "iface:classic") {
+	if !strings.Contains(output.String(), "iface: classic") {
 		t.Fatalf("output does not identify classic PCAP input:\n%s", output.String())
 	}
 }

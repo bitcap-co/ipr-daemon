@@ -127,16 +127,17 @@ func dumpPcapNG(file *os.File, debug bool) error {
 }
 
 func processOfflinePacket(packet gopacket.Packet, processor *iprd.PacketProcessor, packetCount int64, interfaceName string, debug bool) {
-	prefix := fmt.Sprintf("cnt:%d iface:%s", packetCount, interfaceName)
+	prefix := fmt.Sprintf("cnt:%d", packetCount)
 	if debug {
 		log.Debug("--- Dumped Packet ---")
 		log.Debug(fmt.Sprintf("%s\n", packet.Dump()))
 	}
 	ipr, err := iprd.NewIPReportPacket(packet)
 	if err != nil {
-		log.Error(fmt.Errorf("%s - failed to decode packet: %w", prefix, err))
+		log.Error(fmt.Errorf("%s iface:%s - failed to decode packet: %w", prefix, interfaceName, err))
 		return
 	}
+	ipr.InterfaceName = interfaceName
 	if err := processor.ParseIPReportPacket(ipr); err != nil {
 		if errors.Is(err, iprd.ErrDuplicatePacket) {
 			if debug {

@@ -35,6 +35,7 @@ type IPReportPacket struct {
 	Length         int
 	CaptureLength  int
 	InterfaceIndex int
+	InterfaceName  string
 	SrcIP          string
 	DstIP          string
 	SrcMAC         string
@@ -48,8 +49,12 @@ type IPReportPacket struct {
 
 // String returns relevent IPReportPacket info as a string.
 func (r IPReportPacket) String() string {
-	return fmt.Sprintf("[IP: %s -> %s, MAC: %s -> %s, UDP: %d -> %d, Len: %d, Hint: %s]",
-		r.SrcIP, r.DstIP,
+	interfacePrefix := ""
+	if r.InterfaceName != "" {
+		interfacePrefix = fmt.Sprintf("iface: %s ", r.InterfaceName)
+	}
+	return fmt.Sprintf("[%sIP: %s -> %s, MAC: %s -> %s, UDP: %d -> %d, Len: %d, Hint: %s]",
+		interfacePrefix, r.SrcIP, r.DstIP,
 		r.SrcMAC, r.DstMAC,
 		r.SrcPort, r.DstPort,
 		r.CaptureLength, r.MinerHint)
