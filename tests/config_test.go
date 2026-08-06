@@ -27,6 +27,71 @@ func TestFlagSliceSupportsChainingAndCommaSeparatedValues(t *testing.T) {
 	}
 }
 
+func TestInterfaceMapSupportsPerInterfaceBPFOptions(t *testing.T) {
+	var interfaces iprd.InterfaceMap
+	for _, value := range []string{
+		"eth1,eth0",
+		"eth0:no-root-network,ignore=aa:bb:cc:dd:ee:ff,add-network=192.168.1,exclude=10",
+		"eth0:add-network=172.16",
+	} {
+		if err := interfaces.Set(value); err != nil {
+			t.Fatalf("Set(%q): %v", value, err)
+		}
+	}
+
+	if want := []string{"eth0", "eth1"}; !reflect.DeepEqual(interfaces.Selectors(), want) {
+		t.Fatalf("selectors = %v, want %v", interfaces.Selectors(), want)
+	}
+	eth0 := interfaces["eth0"]
+	if !eth0.NoRootNetwork {
+		t.Fatal("eth0 NoRootNetwork = false, want true")
+	}
+	if want := []string{"192.168.1", "172.16"}; !reflect.DeepEqual(eth0.NetworkInclusions, want) {
+		t.Fatalf("eth0 inclusions = %v, want %v", eth0.NetworkInclusions, want)
+	}
+	if want := []string{"aa:bb:cc:dd:ee:ff"}; !reflect.DeepEqual(eth0.IgnoredDevices, want) {
+		t.Fatalf("eth0 ignored devices = %v, want %v", eth0.IgnoredDevices, want)
+	}
+	if want := []string{"10"}; !reflect.DeepEqual(eth0.NetworkExclusions, want) {
+		t.Fatalf("eth0 exclusions = %v, want %v", eth0.NetworkExclusions, want)
+	}
+}
+
+func TestInterfaceMapRejectsInvalidOptions(t *testing.T) {
+	for _, value := range []string{"eth0:unknown", "eth0:add-network=", "eth0,eth1:no-root-network"} {
+		var interfaces iprd.InterfaceMap
+		if err := interfaces.Set(value); err == nil {
+			t.Fatalf("Set(%q) returned no error", value)
+		}
+	}
+}
+
+func TestInterfaceOptionsRoundTrip(t *testing.T) {
+	cfg, err := iprd.NewIPRDConfigFromBytes([]byte(`
+[interfaces.eth1]
+no_root_network = true
+network_inclusions = ["192.168.50"]
+ignored_devices = ["aa:bb:cc:dd:ee:ff"]
+`))
+	if err != nil {
+		t.Fatalf("got error %v, want no error", err)
+	}
+	if want := []string{"eth1"}; !reflect.DeepEqual(cfg.ListenInterfaces, want) {
+		t.Fatalf("interfaces = %v, want %v", cfg.ListenInterfaces, want)
+	}
+	if override := cfg.Interfaces["eth1"]; override == nil || !override.NoRootNetwork {
+		t.Fatalf("eth1 override = %#v, want no-root-network enabled", override)
+	}
+}
+
+func TestValidateRejectsInterfaceWithoutAnyIncludedNetwork(t *testing.T) {
+	cfg := iprd.DefaultIPRDConfig()
+	cfg.Interfaces = iprd.InterfaceMap{"eth0": {NoRootNetwork: true}}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("Validate() returned no error")
+	}
+}
+
 func TestValidateForwardBind(t *testing.T) {
 	tests := []struct {
 		name    string

@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/BurntSushi/toml"
@@ -26,22 +27,148 @@ func (f *FlagSlice) Set(value string) error {
 	return nil
 }
 
+// InterfaceConfig holds the configuration for a single interface.
+type InterfaceConfig struct {
+	NoRootNetwork     bool     `toml:"no_root_network"`
+	IgnoredDevices    []string `toml:"ignored_devices"`
+	NetworkInclusions []string `toml:"network_inclusions"`
+	NetworkExclusions []string `toml:"network_exclusions"`
+}
+
+// DefaultInterfaceConfig returns the default interface configuration.
+func DefaultInterfaceConfig() *InterfaceConfig {
+	return &InterfaceConfig{
+		NoRootNetwork:     false,
+		IgnoredDevices:    []string{},
+		NetworkInclusions: []string{},
+		NetworkExclusions: []string{},
+	}
+}
+
+// InterfaceMap defines a map flag value for configuring interfaces.
+// Each key is an interface selector (e.g., "eth0", 1), with *InterfaceConfig representing supplied options.
+// Options are specified after ":" separated by commas (e.g., "eth0:no-root-network,add-network=172.16").
+type InterfaceMap map[string]*InterfaceConfig
+
+func (i *InterfaceMap) String() string {
+	return fmt.Sprintf("%v", map[string]*InterfaceConfig(*i))
+}
+
+// Selectors returns the configured interface selectors in deterministic order.
+func (i InterfaceMap) Selectors() []string {
+	selectors := make([]string, 0, len(i))
+	for selector := range i {
+		selectors = append(selectors, selector)
+	}
+	slices.Sort(selectors)
+	return selectors
+}
+
+func (i InterfaceMap) clone() InterfaceMap {
+	cloned := make(InterfaceMap, len(i))
+	for selector, cfg := range i {
+		if cfg == nil {
+			cloned[selector] = DefaultInterfaceConfig()
+			continue
+		}
+		copyCfg := *cfg
+		copyCfg.IgnoredDevices = append([]string(nil), cfg.IgnoredDevices...)
+		copyCfg.NetworkInclusions = append([]string(nil), cfg.NetworkInclusions...)
+		copyCfg.NetworkExclusions = append([]string(nil), cfg.NetworkExclusions...)
+		cloned[selector] = &copyCfg
+	}
+	return cloned
+}
+
+func (i *InterfaceMap) Set(value string) error {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil
+	}
+	if *i == nil {
+		*i = make(InterfaceMap)
+	}
+
+	var ifaceID, optionsStr string
+	if strings.Contains(value, ":") {
+		parts := strings.SplitN(value, ":", 2)
+		ifaceID = strings.TrimSpace(parts[0])
+		optionsStr = parts[1]
+	} else {
+		for _, selector := range normalizeInterfaceSelectors([]string{value}) {
+			if (*i)[selector] == nil {
+				(*i)[selector] = DefaultInterfaceConfig()
+			}
+		}
+		return nil
+	}
+	if ifaceID == "" {
+		return fmt.Errorf("interface ID cannot be empty")
+	}
+	if strings.Contains(ifaceID, ",") {
+		return fmt.Errorf("interface options must be specified separately for each interface")
+	}
+
+	if (*i)[ifaceID] == nil {
+		(*i)[ifaceID] = DefaultInterfaceConfig()
+	}
+	cfg := (*i)[ifaceID]
+
+	if optionsStr == "" {
+		return nil
+	}
+
+	options := strings.Split(optionsStr, ",")
+	for _, opt := range options {
+		opt = strings.TrimSpace(opt)
+		if opt == "" {
+			continue
+		}
+		switch {
+		case opt == "no-root-network":
+			cfg.NoRootNetwork = true
+		case strings.HasPrefix(opt, "ignore="):
+			if value := strings.TrimSpace(strings.TrimPrefix(opt, "ignore=")); value != "" {
+				cfg.IgnoredDevices = append(cfg.IgnoredDevices, value)
+			} else {
+				return fmt.Errorf("ignore option cannot be empty")
+			}
+		case strings.HasPrefix(opt, "add-network="):
+			if value := strings.TrimSpace(strings.TrimPrefix(opt, "add-network=")); value != "" {
+				cfg.NetworkInclusions = append(cfg.NetworkInclusions, value)
+			} else {
+				return fmt.Errorf("add-network option cannot be empty")
+			}
+		case strings.HasPrefix(opt, "exclude="):
+			if value := strings.TrimSpace(strings.TrimPrefix(opt, "exclude=")); value != "" {
+				cfg.NetworkExclusions = append(cfg.NetworkExclusions, value)
+			} else {
+				return fmt.Errorf("exclude option cannot be empty")
+			}
+		default:
+			return fmt.Errorf("unknown option: %q", opt)
+		}
+	}
+	return nil
+}
+
 // IPRDConfig describes a new IPR Daemon configuration
 type IPRDConfig struct {
-	Debug              bool     `toml:"debug"`
-	Auto               bool     `toml:"auto"`
-	ListenInterfaces   []string `toml:"listen_interfaces,omitempty"`
-	ListenInterface    string   `toml:"listen_interface,omitempty"` // Deprecated: use ListenInterfaces.
-	ForwardBind        string   `toml:"forward_bind"`
-	ForwardPort        int      `toml:"forward_port"`
-	ForwardKnown       bool     `toml:"forward_known"`
-	MDNS               bool     `toml:"mdns"`
-	NoRootNetwork      bool     `toml:"no_root_network"`
-	IgnoredDevices     []string `toml:"ignored_devices"`
-	NetworkInclusions  []string `toml:"network_inclusions"`
-	NetworkExclusions  []string `toml:"network_exclusions"`
-	CaptureFile        string   `toml:"capture_file"`
-	RotateCaptureFiles bool     `toml:"rotate_capture_files"`
+	Debug              bool         `toml:"debug"`
+	Auto               bool         `toml:"auto"`
+	ListenInterfaces   []string     `toml:"listen_interfaces,omitempty"`
+	ListenInterface    string       `toml:"listen_interface,omitempty"` // Deprecated: use ListenInterfaces.
+	Interfaces         InterfaceMap `toml:"interfaces,omitempty"`
+	ForwardBind        string       `toml:"forward_bind"`
+	ForwardPort        int          `toml:"forward_port"`
+	ForwardKnown       bool         `toml:"forward_known"`
+	MDNS               bool         `toml:"mdns"`
+	NoRootNetwork      bool         `toml:"no_root_network"`
+	IgnoredDevices     []string     `toml:"ignored_devices"`
+	NetworkInclusions  []string     `toml:"network_inclusions"`
+	NetworkExclusions  []string     `toml:"network_exclusions"`
+	CaptureFile        string       `toml:"capture_file"`
+	RotateCaptureFiles bool         `toml:"rotate_capture_files"`
 }
 
 // Validate returns error if IPRDConfig contains invalid values
@@ -54,6 +181,12 @@ func (cfg *IPRDConfig) Validate() error {
 	}
 	if cfg.ForwardBind != "" && net.ParseIP(cfg.ForwardBind) == nil {
 		return fmt.Errorf("ForwardBind must be a valid IP address")
+	}
+	for _, selector := range cfg.effectiveListenInterfaces() {
+		interfaceCfg := cfg.interfaceConfig(selector)
+		if interfaceCfg.NoRootNetwork && len(interfaceCfg.NetworkInclusions) == 0 {
+			return fmt.Errorf("interface %q excludes its root network but has no network inclusions", selector)
+		}
 	}
 	return nil
 }
@@ -83,6 +216,12 @@ func (cfg *IPRDConfig) Merge(target *IPRDConfig) *IPRDConfig {
 		// A supplied legacy value must override the default plural value.
 		result.ListenInterfaces = nil
 		result.ListenInterface = target.ListenInterface
+	} else if len(target.Interfaces) > 0 {
+		result.ListenInterfaces = target.Interfaces.Selectors()
+		result.ListenInterface = ""
+	}
+	if len(target.Interfaces) > 0 {
+		result.Interfaces = target.Interfaces.clone()
 	}
 	if target.ForwardBind != "" {
 		result.ForwardBind = target.ForwardBind
@@ -118,6 +257,7 @@ func DefaultIPRDConfig() *IPRDConfig {
 		Auto:               false,
 		ListenInterfaces:   []string{"eth0"},
 		ListenInterface:    "eth0",
+		Interfaces:         InterfaceMap{},
 		ForwardBind:        "",
 		ForwardPort:        7788,
 		ForwardKnown:       false,
@@ -156,6 +296,23 @@ func (cfg *IPRDConfig) normalizeListenInterfaces() {
 	} else {
 		cfg.ListenInterface = ""
 	}
+}
+
+// interfaceConfig combines the global BPF configuration with overrides for a selector.
+func (cfg *IPRDConfig) interfaceConfig(selector string) *InterfaceConfig {
+	combined := &InterfaceConfig{
+		NoRootNetwork:     cfg.NoRootNetwork,
+		IgnoredDevices:    append([]string(nil), cfg.IgnoredDevices...),
+		NetworkInclusions: append([]string(nil), cfg.NetworkInclusions...),
+		NetworkExclusions: append([]string(nil), cfg.NetworkExclusions...),
+	}
+	if override := cfg.Interfaces[selector]; override != nil {
+		combined.NoRootNetwork = combined.NoRootNetwork || override.NoRootNetwork
+		combined.IgnoredDevices = append(combined.IgnoredDevices, override.IgnoredDevices...)
+		combined.NetworkInclusions = append(combined.NetworkInclusions, override.NetworkInclusions...)
+		combined.NetworkExclusions = append(combined.NetworkExclusions, override.NetworkExclusions...)
+	}
+	return combined
 }
 
 func normalizeInterfaceSelectors(values []string) []string {
