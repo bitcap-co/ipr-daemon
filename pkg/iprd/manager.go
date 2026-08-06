@@ -16,6 +16,7 @@ type ListenerManager struct {
 	log       *IPRLogger
 	listener  *IPRListener
 	processor *PacketProcessor
+	capture   *CaptureWriter
 	broadcast chan []byte
 }
 
@@ -29,12 +30,15 @@ func NewListenerManager(cfg *IPRDConfig, logger *IPRLogger) *ListenerManager {
 	}
 	managerCfg := *cfg
 	managerCfg.normalizeListenInterfaces()
+	capture := NewCaptureWriter(managerCfg.CaptureFile, managerCfg.RotateCaptureFiles, logger)
+	managerCfg.CaptureFile = capture.Path()
 	cfg = &managerCfg
 	return &ListenerManager{
 		cfg:       cfg,
 		log:       logger,
 		listener:  NewListener(cfg, logger, nil),
 		processor: NewPacketProcessor(nil),
+		capture:   capture,
 		broadcast: make(chan []byte),
 	}
 }
@@ -47,6 +51,9 @@ func (m *ListenerManager) Broadcast() <-chan []byte {
 // Run processes captured packets while supervising the listener. It returns
 // when ctx is cancelled or the listener encounters a fatal configuration error.
 func (m *ListenerManager) Run(ctx context.Context) error {
+	if err := m.capture.Open(); err != nil {
+		return err
+	}
 	if m.cfg.Debug {
 		m.log.Debug("--- DEBUG OUTPUT ON ---")
 	}
@@ -65,13 +72,16 @@ func (m *ListenerManager) Run(ctx context.Context) error {
 	err := m.listener.Run(runCtx)
 	cancel()
 	<-processingDone
-	return err
+	return errors.Join(err, m.capture.Close())
 }
 
 func (m *ListenerManager) processPackets(ctx context.Context) {
 	for {
 		select {
 		case captured := <-m.listener.Packets():
+			if err := m.capture.Write(captured); err != nil {
+				m.log.Error(fmt.Errorf("failed to write packet to capture file: %w", err))
+			}
 			if msg := m.processCapturedPacket(captured); msg != nil {
 				select {
 				case m.broadcast <- msg:

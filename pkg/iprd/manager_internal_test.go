@@ -107,12 +107,19 @@ func TestNewListenerManagerNormalizesFirstInterface(t *testing.T) {
 	cfg := DefaultIPRDConfig()
 	cfg.ListenInterfaces = []string{"eth1", "eth2"}
 	cfg.ListenInterface = ""
+	cfg.CaptureFile = "capture.pcap"
 	manager := NewListenerManager(cfg, NewLogger())
 
 	if manager.cfg.ListenInterface != "eth1" {
 		t.Fatalf("listener interface = %q, want %q", manager.cfg.ListenInterface, "eth1")
 	}
+	if manager.cfg.CaptureFile != "capture.pcapng" {
+		t.Fatalf("capture path = %q, want %q", manager.cfg.CaptureFile, "capture.pcapng")
+	}
 	if cfg.ListenInterface != "" {
 		t.Fatalf("constructor mutated supplied config interface to %q", cfg.ListenInterface)
+	}
+	if cfg.CaptureFile != "capture.pcap" {
+		t.Fatalf("constructor mutated supplied capture path to %q", cfg.CaptureFile)
 	}
 }
