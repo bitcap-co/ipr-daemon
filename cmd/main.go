@@ -126,8 +126,8 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// initialize IPRListener on iface, passing in cfg.
-	listener := iprd.NewListener(cfg, log, nil)
+	// Initialize the capture and packet-processing manager.
+	manager := iprd.NewListenerManager(cfg, log)
 
 	// open TCP broadcast.
 	broadcaster, err := iprd.NewBroadcaster(log, cfg.ForwardBind, cfg.ForwardPort)
@@ -155,7 +155,7 @@ func main() {
 	go func() {
 		for {
 			select {
-			case msg := <-listener.Broadcast():
+			case msg := <-manager.Broadcast():
 				// send message to subscribed clients.
 				broadcaster.Msgs <- msg
 			case err := <-broadcaster.Errs:
@@ -166,9 +166,8 @@ func main() {
 	log.Info(fmt.Sprintf("set tcp forwarding -> %s", net.JoinHostPort(cfg.ForwardBind, strconv.Itoa(cfg.ForwardPort))))
 	log.Info("successfully started iprd!")
 
-	// supervise capture: activates the handle and reconnects on interface loss
-	// until the context is cancelled.
-	if err := listener.Run(ctx); err != nil {
+	// Supervise capture and packet processing until the context is cancelled.
+	if err := manager.Run(ctx); err != nil {
 		if mdnsAdvertiser != nil {
 			if closeErr := mdnsAdvertiser.Close(); closeErr != nil {
 				log.Warn(fmt.Sprintf("failed to withdraw mDNS service: %v", closeErr))

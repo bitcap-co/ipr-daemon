@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 	"github.com/gopacket/gopacket/pcap"
 	"github.com/gopacket/gopacket/pcapgo"
@@ -45,8 +44,7 @@ type IPRListener struct {
 	resolvedName    string
 	inactive        *pcap.InactiveHandle
 	handle          *pcap.Handle
-	processor       *PacketProcessor
-	ch              chan []byte
+	packets         chan CapturedPacket
 	captureFile     *os.File
 	captureW        *pcapgo.Writer
 	captureBytes    int64
@@ -69,14 +67,13 @@ func NewListener(cfg *IPRDConfig, logger *IPRLogger, iface *IPRInterface) *IPRLi
 		log:         logger,
 		iface:       iface,
 		ifacePinned: iface != nil,
-		processor:   NewPacketProcessor(nil),
-		ch:          make(chan []byte),
+		packets:     make(chan CapturedPacket),
 	}
 }
 
-// Broadcast returns a channel of messages for broadcasting.
-func (l *IPRListener) Broadcast() chan []byte {
-	return l.ch
+// Packets returns the listener's stream of raw captured packets.
+func (l *IPRListener) Packets() <-chan CapturedPacket {
+	return l.packets
 }
 
 func (l *IPRListener) setupBPF(root string) error {
@@ -174,16 +171,6 @@ func (l *IPRListener) setupHandle() error {
 	return nil
 }
 
-// logStartupModes logs enabled one-off modes (debug, forward-known).
-func (l *IPRListener) logStartupModes() {
-	if l.cfg.Debug {
-		l.log.Debug("--- DEBUG OUTPUT ON ---")
-	}
-	if l.cfg.ForwardKnown {
-		l.log.Info("fowarding known ports only")
-	}
-}
-
 // openCaptureFile opens the PCAP capture file if configured. It is idempotent:
 // once opened the writer persists across reconnects so captures are not truncated.
 // Requires an active handle (for the link type).
@@ -220,17 +207,15 @@ func (l *IPRListener) Activate() error {
 	if err := l.setupHandle(); err != nil {
 		return err
 	}
-	l.logStartupModes()
 	return l.openCaptureFile()
 }
 
 // Run supervises capture on the interface: it activates a handle, captures until the
 // handle errors (e.g. the interface goes down/away) or ctx is cancelled, and on error
 // re-resolves the interface and re-activates with exponential backoff. It returns when
-// ctx is cancelled. The broadcast channel and any downstream consumers stay intact
+// ctx is cancelled. The packet channel and any downstream consumers stay intact
 // across reconnects. Run is the resilient alternative to Activate()+Listen().
 func (l *IPRListener) Run(ctx context.Context) error {
-	l.logStartupModes()
 	defer l.closeCaptureFile()
 	defer l.closeHandle()
 
@@ -277,8 +262,9 @@ func (l *IPRListener) activateForRun() error {
 	return l.setupHandle()
 }
 
-// Listen will start reading packets from the active handle and sends the marshalled IPReportPacket to Broadcast().
-// It blocks until the handle errors. For a resilient, self-reconnecting listener use Run().
+// Listen starts reading packets from the active handle and sends raw capture
+// events to Packets(). It blocks until the handle errors. For a resilient,
+// self-reconnecting listener use Run().
 func (l *IPRListener) Listen() {
 	defer l.closeHandle()
 	defer l.closeCaptureFile()
@@ -321,47 +307,16 @@ func (l *IPRListener) capture(ctx context.Context) error {
 			}
 		}
 
-		packet := gopacket.NewPacket(data, linkType, gopacket.Default)
-		packet.Metadata().CaptureInfo = ci
-
-		// try and initialize as IPReportPacket.
-		r, _ := NewIPReportPacket(packet)
-		if r == nil {
-			// invalid layer or empty UDP paylaod.
-			continue
-		}
-		// parse IPReportPacket to validate that it is an IP Report packet.
-		if err := l.processor.ParseIPReportPacket(r); err != nil {
-			// warn on duplicate packet.
-			if errors.Is(err, ErrDuplicatePacket) {
-				l.log.Warn(fmt.Sprintf("%s - %s", r.String(), err))
-			}
-			if l.cfg.Debug {
-				l.log.Error(fmt.Errorf("%s - not valid: %w", r.String(), err))
-				l.log.Debug("--- PACKET DUMP ---")
-				l.log.Debug(fmt.Sprintf("%s\n", packet.Dump()))
-			}
-			continue
-		}
-		if l.cfg.ForwardKnown {
-			if r.MinerHint == UnknownType {
-				l.log.Warn(fmt.Sprintf("received unknown IP Report %s", r.String()))
-				continue
-			}
-		}
-		l.log.Info(fmt.Sprintf("received IP Report %s", r.String()))
-		if l.cfg.Debug {
-			l.log.Debug(fmt.Sprintf("UDP Payload (%d) -> %s", r.CaptureLength, r.Payload))
-		}
-
-		// prepare new broadcast message.
-		msg, err := r.Marshal()
-		if err != nil {
-			l.log.Error(fmt.Errorf("failed to marshal packet: %w", err))
-			continue
+		eventCI := ci
+		eventCI.InterfaceIndex = l.iface.Index
+		captured := CapturedPacket{
+			Data:        data,
+			CaptureInfo: eventCI,
+			LinkType:    linkType,
+			Interface:   *l.iface,
 		}
 		select {
-		case l.ch <- msg:
+		case l.packets <- captured:
 		case <-ctx.Done():
 			return nil
 		}

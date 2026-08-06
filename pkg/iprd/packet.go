@@ -10,6 +10,15 @@ import (
 	"github.com/gopacket/gopacket/layers"
 )
 
+// CapturedPacket is a raw packet and the interface metadata associated with its
+// capture. The listener emits these events without parsing their contents.
+type CapturedPacket struct {
+	Data        []byte
+	CaptureInfo gopacket.CaptureInfo
+	LinkType    layers.LinkType
+	Interface   IPRInterface
+}
+
 // IPRBroadcastMessage describes the JSON message structure of a IPReportPacket.
 type IPRBroadcastMessage struct {
 	Timestamp int64         `json:"timestamp"`
