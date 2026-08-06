@@ -38,7 +38,7 @@ var (
 	flNetworkInclusions  iprd.FlagSlice
 	flNetworkExclusions  iprd.FlagSlice
 	flIgnoredDevices     iprd.FlagSlice
-	flCaptureFile        = flag.String("capture-file", "", "Path to write received packets to in PCAP format for replay/debugging.")
+	flCaptureFile        = flag.String("capture-file", "", "Path to write received packets to in PCAP-NG format for replay/debugging.")
 	flRotateCaptureFiles = flag.Bool("rotate-capture", false, "Rotate up to four capture files instead of flushing the active file at its size limit.")
 	flConfig             = flag.String("c", "", "Path to TOML config file. Overrides any other supplied flags.")
 	flWrite              = flag.String("w", "", "Path to new TOML config file. Writes the supplied arguments to new config path.")
