@@ -30,7 +30,8 @@ func (f *FlagSlice) Set(value string) error {
 type IPRDConfig struct {
 	Debug              bool     `toml:"debug"`
 	Auto               bool     `toml:"auto"`
-	ListenInterface    string   `toml:"listen_interface"`
+	ListenInterfaces   []string `toml:"listen_interfaces,omitempty"`
+	ListenInterface    string   `toml:"listen_interface,omitempty"` // Deprecated: use ListenInterfaces.
 	ForwardBind        string   `toml:"forward_bind"`
 	ForwardPort        int      `toml:"forward_port"`
 	ForwardKnown       bool     `toml:"forward_known"`
@@ -45,8 +46,8 @@ type IPRDConfig struct {
 
 // Validate returns error if IPRDConfig contains invalid values
 func (cfg *IPRDConfig) Validate() error {
-	if cfg.ListenInterface == "" {
-		return fmt.Errorf("ListenInterface must be present")
+	if len(cfg.effectiveListenInterfaces()) == 0 {
+		return fmt.Errorf("at least one listen interface must be present")
 	}
 	if cfg.ForwardPort <= 0 {
 		return fmt.Errorf("ForwardPort must be positive")
@@ -76,7 +77,11 @@ func (cfg *IPRDConfig) Merge(target *IPRDConfig) *IPRDConfig {
 	if target.MDNS {
 		result.MDNS = target.MDNS
 	}
-	if target.ListenInterface != "" {
+	if len(target.ListenInterfaces) > 0 {
+		result.ListenInterfaces = append([]string(nil), target.ListenInterfaces...)
+	} else if target.ListenInterface != "" {
+		// A supplied legacy value must override the default plural value.
+		result.ListenInterfaces = nil
 		result.ListenInterface = target.ListenInterface
 	}
 	if target.ForwardBind != "" {
@@ -111,6 +116,7 @@ func DefaultIPRDConfig() *IPRDConfig {
 	return &IPRDConfig{
 		Debug:              false,
 		Auto:               false,
+		ListenInterfaces:   []string{"eth0"},
 		ListenInterface:    "eth0",
 		ForwardBind:        "",
 		ForwardPort:        7788,
@@ -128,7 +134,47 @@ func DefaultIPRDConfig() *IPRDConfig {
 // ParseConfig returns a IPRDConfig along with error from Validate
 func ParseConfig(supplied *IPRDConfig) (*IPRDConfig, error) {
 	cfg := DefaultIPRDConfig().Merge(supplied)
+	cfg.normalizeListenInterfaces()
 	return cfg, cfg.Validate()
+}
+
+// effectiveListenInterfaces returns normalized interface selectors, preferring
+// the plural configuration while retaining support for listen_interface.
+func (cfg *IPRDConfig) effectiveListenInterfaces() []string {
+	if len(cfg.ListenInterfaces) > 0 {
+		return normalizeInterfaceSelectors(cfg.ListenInterfaces)
+	}
+	return normalizeInterfaceSelectors([]string{cfg.ListenInterface})
+}
+
+// normalizeListenInterfaces stores the canonical plural selectors and keeps the
+// first selector in ListenInterface until the single-listener runtime is removed.
+func (cfg *IPRDConfig) normalizeListenInterfaces() {
+	cfg.ListenInterfaces = cfg.effectiveListenInterfaces()
+	if len(cfg.ListenInterfaces) > 0 {
+		cfg.ListenInterface = cfg.ListenInterfaces[0]
+	} else {
+		cfg.ListenInterface = ""
+	}
+}
+
+func normalizeInterfaceSelectors(values []string) []string {
+	selectors := make([]string, 0, len(values))
+	seen := make(map[string]struct{}, len(values))
+	for _, value := range values {
+		for _, selector := range strings.Split(value, ",") {
+			selector = strings.TrimSpace(selector)
+			if selector == "" {
+				continue
+			}
+			if _, exists := seen[selector]; exists {
+				continue
+			}
+			seen[selector] = struct{}{}
+			selectors = append(selectors, selector)
+		}
+	}
+	return selectors
 }
 
 // NewIPRDConfigFromBytes unmarshals TOML data into IPRDConfig
@@ -169,8 +215,12 @@ func WriteIPRDConfigToFile(supplied *IPRDConfig, filePath string) error {
 		return err
 	}
 	defer file.Close()
+	// New files use the plural key. ListenInterface remains populated in memory
+	// only as a compatibility bridge for the current single-listener runtime.
+	output := *cfg
+	output.ListenInterface = ""
 	encoder := toml.NewEncoder(file)
-	err = encoder.Encode(cfg)
+	err = encoder.Encode(&output)
 	if err != nil {
 		return err
 	}

@@ -1,7 +1,10 @@
 package iprd_test
 
 import (
+	"os"
+	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
@@ -46,6 +49,68 @@ func TestValidateForwardBind(t *testing.T) {
 				t.Fatalf("Validate() with bind %q: got err=%v, wantErr=%v", tt.bind, err, tt.wantErr)
 			}
 		})
+	}
+}
+
+func TestListenInterfacesRoundTrip(t *testing.T) {
+	cfg, err := iprd.NewIPRDConfigFromBytes([]byte(`listen_interfaces = ["eth0", "eth1, wlan0", "eth0"]`))
+	if err != nil {
+		t.Fatalf("got error %v, want no error", err)
+	}
+	want := []string{"eth0", "eth1", "wlan0"}
+	if !reflect.DeepEqual(cfg.ListenInterfaces, want) {
+		t.Fatalf("got interfaces %v, want %v", cfg.ListenInterfaces, want)
+	}
+	if cfg.ListenInterface != "eth0" {
+		t.Fatalf("got compatibility interface %q, want %q", cfg.ListenInterface, "eth0")
+	}
+}
+
+func TestLegacyListenInterface(t *testing.T) {
+	cfg, err := iprd.NewIPRDConfigFromBytes([]byte(`listen_interface = "eth1"`))
+	if err != nil {
+		t.Fatalf("got error %v, want no error", err)
+	}
+	want := []string{"eth1"}
+	if !reflect.DeepEqual(cfg.ListenInterfaces, want) {
+		t.Fatalf("got interfaces %v, want %v", cfg.ListenInterfaces, want)
+	}
+	if cfg.ListenInterface != "eth1" {
+		t.Fatalf("got compatibility interface %q, want %q", cfg.ListenInterface, "eth1")
+	}
+}
+
+func TestPluralListenInterfacesTakePrecedence(t *testing.T) {
+	cfg, err := iprd.NewIPRDConfigFromBytes([]byte(`
+listen_interface = "legacy0"
+listen_interfaces = ["eth0", "eth1"]
+`))
+	if err != nil {
+		t.Fatalf("got error %v, want no error", err)
+	}
+	want := []string{"eth0", "eth1"}
+	if !reflect.DeepEqual(cfg.ListenInterfaces, want) {
+		t.Fatalf("got interfaces %v, want %v", cfg.ListenInterfaces, want)
+	}
+}
+
+func TestWriteConfigUsesPluralListenInterfaces(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "iprd.toml")
+	cfg := iprd.DefaultIPRDConfig()
+	cfg.ListenInterfaces = []string{"eth0", "eth1"}
+	if err := iprd.WriteIPRDConfigToFile(cfg, path); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if !strings.Contains(text, `listen_interfaces = ["eth0", "eth1"]`) {
+		t.Fatalf("written config is missing plural interfaces:\n%s", text)
+	}
+	if strings.Contains(text, "listen_interface =") {
+		t.Fatalf("written config contains deprecated singular interface:\n%s", text)
 	}
 }
 
