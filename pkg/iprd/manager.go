@@ -118,6 +118,11 @@ func newManagedListeners(cfg *IPRDConfig, logger *IPRLogger) []*IPRListener {
 		listenerCfg := *cfg
 		listenerCfg.ListenInterfaces = []string{selector}
 		listenerCfg.ListenInterface = selector
+		bpfCfg := cfg.interfaceConfig(selector)
+		listenerCfg.NoRootNetwork = bpfCfg.NoRootNetwork
+		listenerCfg.IgnoredDevices = bpfCfg.IgnoredDevices
+		listenerCfg.NetworkInclusions = bpfCfg.NetworkInclusions
+		listenerCfg.NetworkExclusions = bpfCfg.NetworkExclusions
 		listeners = append(listeners, NewListener(&listenerCfg, logger, nil))
 	}
 	return listeners

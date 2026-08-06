@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net"
+	"reflect"
 	"testing"
 	"time"
 
@@ -135,6 +136,44 @@ func TestNewListenerManagerCreatesListenerPerInterface(t *testing.T) {
 	}
 	if cfg.CaptureFile != "capture.pcap" {
 		t.Fatalf("constructor mutated supplied capture path to %q", cfg.CaptureFile)
+	}
+}
+
+func TestNewListenerManagerAppliesInterfaceBPFOptions(t *testing.T) {
+	cfg := DefaultIPRDConfig()
+	cfg.ListenInterfaces = []string{"eth1", "eth2"}
+	cfg.IgnoredDevices = []string{"global-mac"}
+	cfg.NetworkInclusions = []string{"10"}
+	cfg.NetworkExclusions = []string{"172.16"}
+	cfg.Interfaces = InterfaceMap{
+		"eth2": {
+			NoRootNetwork:     true,
+			IgnoredDevices:    []string{"interface-mac"},
+			NetworkInclusions: []string{"192.168.2"},
+			NetworkExclusions: []string{"192.168.3"},
+		},
+	}
+
+	manager := NewListenerManager(cfg, NewLogger())
+	eth1 := manager.listeners[0].cfg
+	eth2 := manager.listeners[1].cfg
+	if eth1.NoRootNetwork {
+		t.Fatal("eth1 unexpectedly excludes its root network")
+	}
+	if eth2.NoRootNetwork != true {
+		t.Fatal("eth2 does not exclude its root network")
+	}
+	if want := []string{"global-mac", "interface-mac"}; !reflect.DeepEqual(eth2.IgnoredDevices, want) {
+		t.Fatalf("eth2 ignored devices = %v, want %v", eth2.IgnoredDevices, want)
+	}
+	if want := []string{"10", "192.168.2"}; !reflect.DeepEqual(eth2.NetworkInclusions, want) {
+		t.Fatalf("eth2 inclusions = %v, want %v", eth2.NetworkInclusions, want)
+	}
+	if want := []string{"172.16", "192.168.3"}; !reflect.DeepEqual(eth2.NetworkExclusions, want) {
+		t.Fatalf("eth2 exclusions = %v, want %v", eth2.NetworkExclusions, want)
+	}
+	if !reflect.DeepEqual(cfg.IgnoredDevices, []string{"global-mac"}) {
+		t.Fatalf("constructor mutated global ignored devices: %v", cfg.IgnoredDevices)
 	}
 }
 
