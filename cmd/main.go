@@ -29,7 +29,7 @@ var (
 	flList               = flag.Bool("list", false, "Lists all available network interfaces that can be listened on.")
 	flDebug              = flag.Bool("d", false, "Switch to enable packet debugging output.")
 	flAuto               = flag.Bool("a", false, "Switch to use the defined LAN interface (description matching 'lan' or 'LAN') for listening. Overrides -i flag.")
-	flInterfaces         iprd.FlagSlice
+	flInterfaces         = make(iprd.InterfaceMap)
 	flForwardBind        = flag.String("b", "", "IP address to bind the TCP broadcast stream to. Empty binds all interfaces.")
 	flForwardPort        = flag.Int("p", 7788, "TCP stream/broadcast port for forwarding IP report packet data.")
 	flForwardKnown       = flag.Bool("known", false, "Switch to only forward IP reports from known miner types/ports over forward port.")
@@ -45,7 +45,7 @@ var (
 )
 
 func main() {
-	flag.Var(&flInterfaces, "i", "Names or indexes of interfaces to listen/capture on.\nThis flag supports chaining or comma-separated values.")
+	flag.Var(&flInterfaces, "i", "Interface name/index, optionally followed by BPF options (for example: eth0:no-root-network,add-network=192.168.1). This flag supports chaining; plain interface names may also be comma-separated.")
 	flag.Var(&flIgnoredDevices, "ignore", "List of source MAC addresses to exclude in BPF filter.\nThis flag supports chaining or comma-separated string.")
 	flag.Var(&flNetworkInclusions, "add-network", "List of networks to append to BPF filter. Networks are IPv4 network numbers that can be written as a dotted quad, triple, pair or a single number.\nThis flag supports chaining or comma-separated string.")
 	flag.Var(&flNetworkExclusions, "exclude", "List of networks to additionally exclude from BPF filter.\nThis flag supports chaining or comma-separated string.")
@@ -75,23 +75,19 @@ func main() {
 		os.Exit(0)
 	}
 
-	if *flNoRootNetwork && flNetworkInclusions.String() == "" {
-		log.Fatal(fmt.Errorf("no networks supplied. Use -add-network to add a network"))
-	}
-
 	// build/read configuration.
 	var err error
-	var cfg *iprd.IPRDConfig
-	listenInterfaces := []string(flInterfaces)
+	listenInterfaces := flInterfaces.Selectors()
 	if len(listenInterfaces) == 0 {
 		listenInterfaces = append([]string(nil), iprd.DefaultIPRDConfig().ListenInterfaces...)
 	}
-	cfg = &iprd.IPRDConfig{
+	cfg, err := iprd.ParseConfig(&iprd.IPRDConfig{
 		Debug:            *flDebug,
 		Auto:             *flAuto,
 		ListenInterfaces: listenInterfaces,
 		// Keep the first selector available through the legacy singular field.
 		ListenInterface:    listenInterfaces[0],
+		Interfaces:         flInterfaces,
 		ForwardBind:        *flForwardBind,
 		ForwardPort:        *flForwardPort,
 		ForwardKnown:       *flForwardKnown,
@@ -102,12 +98,14 @@ func main() {
 		NetworkExclusions:  []string(flNetworkExclusions),
 		CaptureFile:        *flCaptureFile,
 		RotateCaptureFiles: *flRotateCaptureFiles,
+	})
+	if err != nil {
+		log.Fatal(err)
 	}
 	if *flWrite != "" {
 		*flWrite = strings.Split(*flWrite, ".")[0]
 		*flWrite = *flWrite + ".toml"
-		err = iprd.WriteIPRDConfigToFile(cfg, *flWrite)
-		if err != nil {
+		if err := iprd.WriteIPRDConfigToFile(cfg, *flWrite); err != nil {
 			log.Fatal(err)
 		}
 		log.Info(fmt.Sprintf("successfully wrote -> %s", *flWrite))
