@@ -4,23 +4,24 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/gopacket/gopacket"
 )
 
-// ListenerManager coordinates capture and packet processing. It currently
-// supervises the first configured interface; additional listeners will be
-// added after capture-file ownership moves out of IPRListener.
+// ListenerManager coordinates interface listeners, capture writing, packet
+// processing, and a single combined broadcast stream.
 type ListenerManager struct {
 	cfg       *IPRDConfig
 	log       *IPRLogger
-	listener  *IPRListener
+	listeners []*IPRListener
 	processor *PacketProcessor
 	capture   *CaptureWriter
 	broadcast chan []byte
 }
 
-// NewListenerManager returns a manager for the first configured interface.
+// NewListenerManager returns a manager with one listener per configured
+// interface. Auto mode creates one listener and ignores explicit selectors.
 func NewListenerManager(cfg *IPRDConfig, logger *IPRLogger) *ListenerManager {
 	if cfg == nil {
 		cfg = DefaultIPRDConfig()
@@ -36,7 +37,7 @@ func NewListenerManager(cfg *IPRDConfig, logger *IPRLogger) *ListenerManager {
 	return &ListenerManager{
 		cfg:       cfg,
 		log:       logger,
-		listener:  NewListener(cfg, logger, nil),
+		listeners: newManagedListeners(cfg, logger),
 		processor: NewPacketProcessor(nil),
 		capture:   capture,
 		broadcast: make(chan []byte),
@@ -48,9 +49,13 @@ func (m *ListenerManager) Broadcast() <-chan []byte {
 	return m.broadcast
 }
 
-// Run processes captured packets while supervising the listener. It returns
-// when ctx is cancelled or the listener encounters a fatal configuration error.
+// Run processes captured packets while supervising every listener. Each
+// listener reconnects independently; an unexpected listener termination stops
+// the manager. Run returns when ctx is cancelled or a fatal error occurs.
 func (m *ListenerManager) Run(ctx context.Context) error {
+	if len(m.listeners) == 0 {
+		return fmt.Errorf("no interfaces configured")
+	}
 	if err := m.capture.Open(); err != nil {
 		return err
 	}
@@ -63,22 +68,80 @@ func (m *ListenerManager) Run(ctx context.Context) error {
 
 	runCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
+	captures := make(chan CapturedPacket)
+	results := make(chan error, len(m.listeners))
+	var listenersDone sync.WaitGroup
+	for _, listener := range m.listeners {
+		listenersDone.Add(2)
+		go func() {
+			defer listenersDone.Done()
+			results <- listener.Run(runCtx)
+		}()
+		go func() {
+			defer listenersDone.Done()
+			forwardCapturedPackets(runCtx, listener.Packets(), captures)
+		}()
+	}
+
 	processingDone := make(chan struct{})
 	go func() {
 		defer close(processingDone)
-		m.processPackets(runCtx)
+		m.processPackets(runCtx, captures)
 	}()
+	m.log.Info(fmt.Sprintf("supervising %d interface listener(s)", len(m.listeners)))
 
-	err := m.listener.Run(runCtx)
+	var runErr error
+	select {
+	case <-ctx.Done():
+	case err := <-results:
+		if ctx.Err() == nil {
+			if err == nil {
+				runErr = fmt.Errorf("interface listener stopped unexpectedly")
+			} else {
+				runErr = fmt.Errorf("interface listener stopped: %w", err)
+			}
+		}
+	}
 	cancel()
+	listenersDone.Wait()
 	<-processingDone
-	return errors.Join(err, m.capture.Close())
+	return errors.Join(runErr, m.capture.Close())
 }
 
-func (m *ListenerManager) processPackets(ctx context.Context) {
+func newManagedListeners(cfg *IPRDConfig, logger *IPRLogger) []*IPRListener {
+	selectors := cfg.ListenInterfaces
+	if cfg.Auto && len(selectors) > 1 {
+		selectors = selectors[:1]
+	}
+	listeners := make([]*IPRListener, 0, len(selectors))
+	for _, selector := range selectors {
+		listenerCfg := *cfg
+		listenerCfg.ListenInterfaces = []string{selector}
+		listenerCfg.ListenInterface = selector
+		listeners = append(listeners, NewListener(&listenerCfg, logger, nil))
+	}
+	return listeners
+}
+
+func forwardCapturedPackets(ctx context.Context, packets <-chan CapturedPacket, captures chan<- CapturedPacket) {
 	for {
 		select {
-		case captured := <-m.listener.Packets():
+		case captured := <-packets:
+			select {
+			case captures <- captured:
+			case <-ctx.Done():
+				return
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (m *ListenerManager) processPackets(ctx context.Context, captures <-chan CapturedPacket) {
+	for {
+		select {
+		case captured := <-captures:
 			if err := m.capture.Write(captured); err != nil {
 				m.log.Error(fmt.Errorf("failed to write packet to capture file: %w", err))
 			}

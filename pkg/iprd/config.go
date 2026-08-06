@@ -148,7 +148,7 @@ func (cfg *IPRDConfig) effectiveListenInterfaces() []string {
 }
 
 // normalizeListenInterfaces stores the canonical plural selectors and keeps the
-// first selector in ListenInterface until the single-listener runtime is removed.
+// first selector in ListenInterface for legacy callers.
 func (cfg *IPRDConfig) normalizeListenInterfaces() {
 	cfg.ListenInterfaces = cfg.effectiveListenInterfaces()
 	if len(cfg.ListenInterfaces) > 0 {
@@ -216,7 +216,7 @@ func WriteIPRDConfigToFile(supplied *IPRDConfig, filePath string) error {
 	}
 	defer file.Close()
 	// New files use the plural key. ListenInterface remains populated in memory
-	// only as a compatibility bridge for the current single-listener runtime.
+	// only as a compatibility bridge for legacy callers.
 	output := *cfg
 	output.ListenInterface = ""
 	encoder := toml.NewEncoder(file)

@@ -1,7 +1,9 @@
 package iprd
 
 import (
+	"context"
 	"encoding/json"
+	"fmt"
 	"net"
 	"testing"
 	"time"
@@ -103,15 +105,27 @@ func TestListenerManagerFiltersUnknownMiners(t *testing.T) {
 	}
 }
 
-func TestNewListenerManagerNormalizesFirstInterface(t *testing.T) {
+func TestNewListenerManagerCreatesListenerPerInterface(t *testing.T) {
 	cfg := DefaultIPRDConfig()
 	cfg.ListenInterfaces = []string{"eth1", "eth2"}
 	cfg.ListenInterface = ""
 	cfg.CaptureFile = "capture.pcap"
 	manager := NewListenerManager(cfg, NewLogger())
 
+	if len(manager.listeners) != 2 {
+		t.Fatalf("listener count = %d, want 2", len(manager.listeners))
+	}
+	for index, selector := range []string{"eth1", "eth2"} {
+		listenerCfg := manager.listeners[index].cfg
+		if listenerCfg.ListenInterface != selector {
+			t.Fatalf("listener %d selector = %q, want %q", index, listenerCfg.ListenInterface, selector)
+		}
+		if len(listenerCfg.ListenInterfaces) != 1 || listenerCfg.ListenInterfaces[0] != selector {
+			t.Fatalf("listener %d interfaces = %v, want [%s]", index, listenerCfg.ListenInterfaces, selector)
+		}
+	}
 	if manager.cfg.ListenInterface != "eth1" {
-		t.Fatalf("listener interface = %q, want %q", manager.cfg.ListenInterface, "eth1")
+		t.Fatalf("compatibility interface = %q, want %q", manager.cfg.ListenInterface, "eth1")
 	}
 	if manager.cfg.CaptureFile != "capture.pcapng" {
 		t.Fatalf("capture path = %q, want %q", manager.cfg.CaptureFile, "capture.pcapng")
@@ -121,5 +135,61 @@ func TestNewListenerManagerNormalizesFirstInterface(t *testing.T) {
 	}
 	if cfg.CaptureFile != "capture.pcap" {
 		t.Fatalf("constructor mutated supplied capture path to %q", cfg.CaptureFile)
+	}
+}
+
+func TestNewListenerManagerAutoModeCreatesOneListener(t *testing.T) {
+	cfg := DefaultIPRDConfig()
+	cfg.Auto = true
+	cfg.ListenInterfaces = []string{"eth1", "eth2"}
+	manager := NewListenerManager(cfg, NewLogger())
+
+	if len(manager.listeners) != 1 {
+		t.Fatalf("listener count = %d, want 1", len(manager.listeners))
+	}
+	if !manager.listeners[0].cfg.Auto {
+		t.Fatal("auto listener does not have auto mode enabled")
+	}
+}
+
+func TestForwardCapturedPacketsFansInListeners(t *testing.T) {
+	cfg := DefaultIPRDConfig()
+	cfg.ListenInterfaces = []string{"eth1", "eth2"}
+	manager := NewListenerManager(cfg, NewLogger())
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	captures := make(chan CapturedPacket)
+	done := make(chan struct{}, len(manager.listeners))
+	for _, listener := range manager.listeners {
+		go func() {
+			defer func() { done <- struct{}{} }()
+			forwardCapturedPackets(ctx, listener.Packets(), captures)
+		}()
+	}
+
+	for index, listener := range manager.listeners {
+		want := capturedIPReport(t, fmt.Sprintf("aa:bb:cc:dd:ee:%02x", index+20), 14235, index+1)
+		select {
+		case listener.packets <- want:
+		case <-time.After(time.Second):
+			t.Fatal("timed out sending captured packet")
+		}
+		select {
+		case got := <-captures:
+			if got.CaptureInfo.InterfaceIndex != want.CaptureInfo.InterfaceIndex {
+				t.Fatalf("capture interface index = %d, want %d", got.CaptureInfo.InterfaceIndex, want.CaptureInfo.InterfaceIndex)
+			}
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for captured packet")
+		}
+	}
+
+	cancel()
+	for range manager.listeners {
+		select {
+		case <-done:
+		case <-time.After(time.Second):
+			t.Fatal("timed out waiting for fan-in shutdown")
+		}
 	}
 }

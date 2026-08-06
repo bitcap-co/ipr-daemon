@@ -147,11 +147,14 @@ To see all available network interfaces that the daemon can listen on, run with 
    Hardware:aa:bb:cc:dd:ee:ff
    IPv4:192.168.1.xx
 ```
-Using the interface index (3) or the name ("eth0"), can specifiy which interface to listen on with the `-i` option
+Using an interface index or name, specify one or more interfaces with `-i`.
+The flag supports chaining and comma-separated values:
 ```bash
-sudo ./iprd -i "eth0"
+sudo ./iprd -i "eth0" -i "eth1"
+sudo ./iprd -i "eth0,eth1"
 ```
-where, `-i` is specifying the system interface name or index to listen on.
+Each interface has an independent capture and reconnect loop. Packets are
+processed through one duplicate record, capture file, and TCP broadcast stream.
 
 It also worth noting that `iprd` requires running under the `root` user to run.
 

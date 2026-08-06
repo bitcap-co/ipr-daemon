@@ -90,8 +90,7 @@ func main() {
 		Debug:            *flDebug,
 		Auto:             *flAuto,
 		ListenInterfaces: listenInterfaces,
-		// Keep the first selector available to the single-listener runtime until
-		// ListenerManager starts one listener for each configured interface.
+		// Keep the first selector available through the legacy singular field.
 		ListenInterface:    listenInterfaces[0],
 		ForwardBind:        *flForwardBind,
 		ForwardPort:        *flForwardPort,
