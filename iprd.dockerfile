@@ -19,10 +19,10 @@ RUN cat <<EOF > /home/iprd.toml
 # debug is a switch to enable packet debugging output.
 debug = false
 # auto is a switch to find and use the defined LAN interface (description matching 'lan/LAN') for listening.
-# overrides listen_inteface.
+# overrides listen_interfaces.
 auto = false
-# listen_inteface is the name or index of interface for listen/capture.
-listen_interface = "eth0"
+# listen_interfaces contains the names or indexes of interfaces for listen/capture.
+listen_interfaces = ["eth0"]
 # forward_port is the TCP stream/broadcast port for forwarding IP report packet data.
 forward_port = 7788
 # forward_known is a switch to only forward IP reports from known miner types/ports over forward_port.

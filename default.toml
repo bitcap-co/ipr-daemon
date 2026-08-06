@@ -1,10 +1,10 @@
 # debug is a switch to enable packet debugging output.
 debug = false
 # auto is a switch to find and use the defined LAN interface (description matching 'lan/LAN') for listening.
-# overrides listen_inteface.
+# overrides listen_interfaces.
 auto = false
-# listen_inteface is the name or index of interface for listen/capture.
-listen_interface = "eth0"
+# listen_interfaces contains the names or indexes of interfaces for listen/capture.
+listen_interfaces = ["eth0"]
 # forward_bind is the local IP address to bind the TCP broadcast stream to.
 # empty binds all interfaces (default).
 forward_bind = ""
