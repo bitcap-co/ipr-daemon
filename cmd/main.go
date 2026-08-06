@@ -29,7 +29,7 @@ var (
 	flList               = flag.Bool("list", false, "Lists all available network interfaces that can be listened on.")
 	flDebug              = flag.Bool("d", false, "Switch to enable packet debugging output.")
 	flAuto               = flag.Bool("a", false, "Switch to use the defined LAN interface (description matching 'lan' or 'LAN') for listening. Overrides -i flag.")
-	flInterface          = flag.String("i", "eth0", "Name or index of interface to listen/capture on.")
+	flInterfaces         iprd.FlagSlice
 	flForwardBind        = flag.String("b", "", "IP address to bind the TCP broadcast stream to. Empty binds all interfaces.")
 	flForwardPort        = flag.Int("p", 7788, "TCP stream/broadcast port for forwarding IP report packet data.")
 	flForwardKnown       = flag.Bool("known", false, "Switch to only forward IP reports from known miner types/ports over forward port.")
@@ -45,6 +45,7 @@ var (
 )
 
 func main() {
+	flag.Var(&flInterfaces, "i", "Names or indexes of interfaces to listen/capture on.\nThis flag supports chaining or comma-separated values.")
 	flag.Var(&flIgnoredDevices, "ignore", "List of source MAC addresses to exclude in BPF filter.\nThis flag supports chaining or comma-separated string.")
 	flag.Var(&flNetworkInclusions, "add-network", "List of networks to append to BPF filter. Networks are IPv4 network numbers that can be written as a dotted quad, triple, pair or a single number.\nThis flag supports chaining or comma-separated string.")
 	flag.Var(&flNetworkExclusions, "exclude", "List of networks to additionally exclude from BPF filter.\nThis flag supports chaining or comma-separated string.")
@@ -81,10 +82,17 @@ func main() {
 	// build/read configuration.
 	var err error
 	var cfg *iprd.IPRDConfig
+	listenInterfaces := []string(flInterfaces)
+	if len(listenInterfaces) == 0 {
+		listenInterfaces = append([]string(nil), iprd.DefaultIPRDConfig().ListenInterfaces...)
+	}
 	cfg = &iprd.IPRDConfig{
-		Debug:              *flDebug,
-		Auto:               *flAuto,
-		ListenInterface:    *flInterface,
+		Debug:            *flDebug,
+		Auto:             *flAuto,
+		ListenInterfaces: listenInterfaces,
+		// Keep the first selector available to the single-listener runtime until
+		// ListenerManager starts one listener for each configured interface.
+		ListenInterface:    listenInterfaces[0],
 		ForwardBind:        *flForwardBind,
 		ForwardPort:        *flForwardPort,
 		ForwardKnown:       *flForwardKnown,
