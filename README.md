@@ -1,25 +1,25 @@
 ## ipr-daemon
-IPR Daemon (later referred to as iprd) is an ASIC miner listener, sniffing IP report messages live on the wire from a LAN.
+IPR Daemon (later referred to as IPRD) is an ASIC miner listener, sniffing IP report messages live on the wire from a LAN.
 
 ## Overview
 iprd serves as a LAN-wide listening backend for ASIC miners by sniffing IP report packets sent by the miners. It captures the received IP & MAC addresses along with the miner type over an TCP stream for easy reading and integration with front-ends/applications like its sister project [bitcap-ipr](https://github.com/bitcap-co/bitcap-ipr).
 
 ## How it works
-iprd is designed to run on a local server/PC with direct access to the LAN. Instead of running UDP listeners on specific ports, it looks at ALL local UDP packets in real-time and processes each one to determine if its a valid IP report packet.
+IPRD is designed to run on a local server/container with direct access to the LAN. Instead of running UDP listeners on specific ports, it looks at ALL local UDP packets in real-time and processes each one to determine if its a valid IP report packet.
 
 Effectively, works exactly like [WireShark](https://www.wireshark.org/) but specificly for IP Report packets.
 
 As it receives IP Report messages, it will send the data over a TCP broadcast/stream that is accessible over an configurable port (default: port 7788).
 
-## Highlights of iprd
+## Highlights of IPRD
  - IP Report listening/sniffing across LAN (even miners within VLANS!)
  - TCP Broadcasting for easy front-end/app integration
  - Duplicate packet handling
  - Wide OS support
 
 ## Building
-Currently, it supports UNIX-based distros (FreeBSD/pfSense/OPNsense, Ubuntu, MacOS) and Windows!
-Pre-built binaries are available in Releases!
+Currently, IPRD is available for UNIX-based distros (FreeBSD/pfSense/OPNsense, Ubuntu, MacOS) and Windows!
+Pre-built binaries and packages are available in [Releases](https://github.com/bitcap-co/ipr-daemon/releases)!
 
 ### Build dependencies
   - Go (>=1.24.0)
@@ -33,36 +33,39 @@ make
 ```
 
 ## Getting started
-The pre-built binaries in Release are statically built whereever possible. meaning that all the needed libraries/dependencies are already included with the binary. However, on some operating systems, static binaries are not supported which means that some dependencies may be required to be installed manually
+Binaries are built statically wherever possible, meaning that all the needed libraries/dependencies (e.g. `libpcap`) are already included in the binary itself. However, particularly Windows and MacOS/darwin, dependencies may need to be installed manually.
 
-If using Windows or MacOS/darwin binaries, `libpcap` is required on the system to run succussfully.
+Below shows necessary steps for each operating system:
 
-### Windows setup
-It recommended to install [Npcap for Windows](https://npcap.com/#download)
+### Windows Prerequisites
+For best support for Windows, install [Npcap for Windows](https://npcap.com/#download)
 
-### MacOS/darwin setup
-Install `libpcap` via Brew:
+### MacOS/darwin Prerequisites
+For best support for MacOS, install `libpcap` via Brew:
 ```bash
 brew install libpcap
 ```
 
-### Linux/Debian setup
-The Linux binary is statically built (no `libpcap` needed on the target) and can be
-installed as a systemd service via a `.deb` package.
+### Linux (Debian/RedHat) Setup
+Linux binaries are statically built (no `libpcap` needed on the target) and can be
+installed as a systemd service via a `.deb`/`.rpm` package.
 
-Build the package (compiles the static Linux/amd64 binary in Docker first):
+Build the package (compiles the static Linux amd64/arm64 binary in Docker first):
 ```bash
 make deb-package            # produces dist/iprd_<version>_amd64.deb
+make rpm-package            # produces dist/iprd-<version>-1.x86_64.rpm
+make deb-package-arm64      # produces dist/iprd_<version>_arm64.deb
+make rpm-package-arm64      # produces dist/iprd-<version>-1.arm64.rpm
 ```
-then copy it to the target and install:
+then install:
 ```bash
-scp dist/iprd_<version>_amd64.deb target:
-ssh target
-sudo dpkg -i ./iprd_<version>_amd64.deb
+sudo dpkg -i ./iprd_<version>_<arch>.deb
+# or
+sudo rpm -i ./iprd-<version>-<arch>.rpm
 ```
 This installs `/usr/bin/iprd`, the systemd unit `/etc/systemd/system/iprd.service`,
 and the config `/etc/iprd.conf`, then enables + starts the service. Remove with
-`sudo dpkg -r iprd`.
+`sudo dpkg -r iprd` or `sudo rpm -e iprd`.
 
 Once installed, the service is controlled with `sudo systemctl {start|stop|status} iprd`.
 Arguments are passed via the `ARGS=` line in `/etc/iprd.conf` (defaults to `-a`); run
@@ -71,17 +74,15 @@ preserved across package upgrades.
 
 ### FreeBSD/pfSense/OPNsense setup
 The FreeBSD binary is statically built (no `libpcap` needed on the target) and can
-be installed as an rc service two ways.
+be installed as an rc service.
 
-**Packaged install (recommended).** Build a native `.pkg` from the Vagrant VM:
+Build a native `.pkg` from the Vagrant VM:
 ```bash
-make freebsd-package        # produces dist/iprd-<version>.pkg
+make freebsd-package        # produces both amd64/arm64 packages in dist/iprd-<version>-<arch>.pkg
 ```
-then copy it to the target and install:
+then install:
 ```bash
-scp dist/iprd-<version>.pkg target:
-ssh target
-pkg add ./iprd-<version>.pkg
+pkg add ./iprd-<version>-<arch>.pkg
 ```
 This installs `/usr/local/sbin/iprd`, registers the rc service at
 `/usr/local/etc/rc.d/iprd`, and enables + starts it. Remove with `pkg delete iprd`.
@@ -90,23 +91,8 @@ This installs `/usr/local/sbin/iprd`, registers the rc service at
 > `pkg add` refuses on an ABI mismatch (e.g. a different FreeBSD major, or some
 > pfSense builds). Use `pkg add -f ./iprd-<version>.pkg` to force the install.
 
-**Manual install.** Copy the binary and the installer script to the target and run
-it as root:
-```bash
-scp dist/iprd-<version>-freebsd-amd64 target:iprd
-scp resources/freebsd/install-freebsd.sh target:
-ssh target
-su -
-./install-freebsd.sh
-```
-This lands the binary in `/usr/local/sbin/`, writes the rc service, enables it via
-`sysrc iprd_enable=YES`, and starts it.
-
-Once installed, the service is controlled with `service iprd {start|stop|status}`.
-Extra arguments can be passed via `iprd_flags="..."` in `/etc/rc.conf`.
-
-### Docker
-A pre-built image is published to Docker Hub at
+### Docker container
+Prebuilt Linux amd64/arm64 images are published to Docker Hub at
 [`mattwert/ipr-daemon`](https://hub.docker.com/r/mattwert/ipr-daemon).
 
 Because iprd sniffs packets across the LAN, the container must run on the **host
@@ -135,9 +121,9 @@ CONFIG_PATH=./default.toml docker compose up -d
 > fails, the container may also need the `NET_ADMIN` capability
 > (`--cap-add=NET_ADMIN`) to put the interface into promiscuous mode.
 
-## Usage
+## IPR Daemon CLI
 
-### Finding network interfaces to listen on
+### Finding interfaces
 To see all available network interfaces that the daemon can listen on, run with the `-list` argument:
 ```
 ./iprd -list
@@ -158,6 +144,23 @@ processed through one duplicate record, capture file, and TCP broadcast stream.
 
 It also worth noting that `iprd` requires running under the `root` user to run.
 
+### Modifying BPF filters
+IPRD CLI allows direct modification of BPF filters for interfaces to add/exclude networks and ignoring specific devices on the network.
+
+Available global BPF interface (applies to all interfaces):
+ - `-add-network <NETWORK>` - Append a IPv4 network number to BPF filter. (i.e. -add-network 172.16,192.168.1,10). Can be used multple times or comma-separated values.
+ - `-no-root-network` - By default, the "root" network of interface is included in the BPF filter. Use this flag to exclude it. `add-network` must follow this flag if supplied.
+ - `-exclude <NETWORK>` - Exclude a IPv4 network number from BPF filter. Can be used multple times or comma-separated values.
+ - `-ignore <MAC_ADDR>` - Ignore a specific network device (MAC Address) from BPF filter. Can be used multple times or comma-separated values.
+
+ For configuring interface-specific BPF filters, options similar to the global flags can be used like so:
+```bash
+sudo ./iprd -i eth0:no-root-network,add-network=172.16 \ # exclude root network and add 172.16 for eth0
+    -i eth1:add-network=10,exclude=192.168.1 \ # exclude 192.168.1 for eth1
+    -ignore "aa:bb:cc:dd:ee:ff" # global flags can also be used in conjuntction! ignore MAC address aa:bb:cc:dd:ee:ff for both interfaces.
+```
+
+### Configuring TCP Stream/Broadcast
 To configure the TCP stream port, use `-p` to supply:
 ```bash
 sudo ./iprd -i "eth0" -p <SOME_PORT>
@@ -168,18 +171,8 @@ it to a single local IP with `-b`:
 ```bash
 sudo ./iprd -i "eth0" -b 192.168.1.10
 ```
-To retain capture history, enable capture rotation together with a capture path:
-```bash
-sudo ./iprd -i "eth0" -capture-file /var/log/iprd/capture.pcapng -rotate-capture
-```
-Captures are written in PCAP-NG format so packets retain their source interface.
-A supplied extension such as `.pcap` is normalized to `.pcapng`. Each capture is
-limited to 4 MiB. Rotation keeps four files total: the active `capture.pcapng`,
-then `capture.1.pcapng` through `capture.3.pcapng` from newest to oldest. Without
-`-rotate-capture`, the active capture is flushed at 4 MiB. TOML configurations
-can enable the same behavior with `rotate_capture_files = true`. Existing classic
-PCAP captures remain readable with `iprd-offline`.
 
+### Enabling MDNS Advertisement
 To make the TCP endpoint discoverable by applications on the same LAN, enable
 mDNS/DNS-SD advertisement:
 ```bash
@@ -196,6 +189,19 @@ dns-sd -B _iprd._tcp local.
 mDNS is link-local multicast, so discovery normally stays within the same
 LAN/VLAN unless the network has an mDNS reflector. No secrets are included in
 the advertised TXT records.
+
+### Capturing
+To retain capture history, enable capture rotation together with a capture path:
+```bash
+sudo ./iprd -i "eth0" -capture-file /var/log/iprd/capture.pcapng -rotate-capture
+```
+Captures are written in PCAP-NG format so packets retain their source interface.
+A supplied extension such as `.pcap` is normalized to `.pcapng`. Each capture is
+limited to 4 MiB. Rotation keeps four files total: the active `capture.pcapng`,
+then `capture.1.pcapng` through `capture.3.pcapng` from newest to oldest. Without
+`-rotate-capture`, the active capture is flushed at 4 MiB. TOML configurations
+can enable the same behavior with `rotate_capture_files = true`. Existing classic
+PCAP captures remain readable with `iprd-offline`.
 
 Also see `iprd -h` for a list of all available options.
 
@@ -233,6 +239,7 @@ minerPorts  = map[int]MinerTypeHint{
 	18650: Sealminer,
 	9999:  Elphapex,
 	12345: Auradine,
+	54321: IPollo,
 }
 ```
 
