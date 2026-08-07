@@ -5,4 +5,4 @@ This package serves as the core library for the IP Reporter daemon (iprd). It pr
 Run `go doc -http` for more information on what is included.
 
 #### Example Usage
-See [cmd/example/starter/main.go](cmd/example/starter/main.go) for an basic example program.
+See [cmd/example/starter/main.go](https://github.com/bitcap-co/ipr-daemon/cmd/example/starter/main.go) for an basic example program.
