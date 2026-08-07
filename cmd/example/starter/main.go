@@ -28,7 +28,6 @@ func processPacket(captured iprd.CapturedPacket, processor *iprd.PacketProcessor
 		return
 	}
 	log.Info(fmt.Sprintf("received IP Report %s", packet.String()))
-	return
 }
 
 func main() {
@@ -45,11 +44,8 @@ func main() {
 		log.Fatal(err)
 	}
 	go func() {
-		for {
-			select {
-			case captured := <-listener.Packets():
-				processPacket(captured, processor)
-			}
+		for captured := range listener.Packets() {
+			processPacket(captured, processor)
 		}
 	}()
 	// start listening for packets
