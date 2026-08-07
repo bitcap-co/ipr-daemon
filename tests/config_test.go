@@ -27,8 +27,8 @@ func TestFlagSliceSupportsChainingAndCommaSeparatedValues(t *testing.T) {
 	}
 }
 
-func TestInterfaceMapSupportsPerInterfaceBPFOptions(t *testing.T) {
-	var interfaces iprd.InterfaceMap
+func TestFlagInterfaceSupportsPerInterfaceBPFOptions(t *testing.T) {
+	var interfaces iprd.FlagInterface
 	for _, value := range []string{
 		"eth1,eth0",
 		"eth0:no-root-network,ignore=aa:bb:cc:dd:ee:ff,add-network=192.168.1,exclude=10",
@@ -57,9 +57,9 @@ func TestInterfaceMapSupportsPerInterfaceBPFOptions(t *testing.T) {
 	}
 }
 
-func TestInterfaceMapRejectsInvalidOptions(t *testing.T) {
+func TestFlagInterfaceRejectsInvalidOptions(t *testing.T) {
 	for _, value := range []string{"eth0:unknown", "eth0:add-network=", "eth0,eth1:no-root-network"} {
-		var interfaces iprd.InterfaceMap
+		var interfaces iprd.FlagInterface
 		if err := interfaces.Set(value); err == nil {
 			t.Fatalf("Set(%q) returned no error", value)
 		}
@@ -86,7 +86,7 @@ ignored_devices = ["aa:bb:cc:dd:ee:ff"]
 
 func TestValidateRejectsInterfaceWithoutAnyIncludedNetwork(t *testing.T) {
 	cfg := iprd.DefaultIPRDConfig()
-	cfg.Interfaces = iprd.InterfaceMap{"eth0": {NoRootNetwork: true}}
+	cfg.Interfaces = iprd.FlagInterface{"eth0": {NoRootNetwork: true}}
 	if err := cfg.Validate(); err == nil {
 		t.Fatal("Validate() returned no error")
 	}

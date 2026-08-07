@@ -11,7 +11,7 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-// FlagSlice defines a slice flag value that supports chaining and comma-separated values.
+// FlagSlice is a flag value that supports multiple comma-separated values and chaining.
 type FlagSlice []string
 
 func (f *FlagSlice) String() string {
@@ -19,7 +19,7 @@ func (f *FlagSlice) String() string {
 }
 
 func (f *FlagSlice) Set(value string) error {
-	for _, v := range strings.Split(value, ",") {
+	for v := range strings.SplitSeq(value, ",") {
 		if v = strings.TrimSpace(v); v != "" {
 			*f = append(*f, v)
 		}
@@ -27,17 +27,17 @@ func (f *FlagSlice) Set(value string) error {
 	return nil
 }
 
-// InterfaceConfig holds the configuration for a single interface.
-type InterfaceConfig struct {
+// IPRDInterfaceConfig describes BPF configuration for a specific interface.
+type IPRDInterfaceConfig struct {
 	NoRootNetwork     bool     `toml:"no_root_network"`
 	IgnoredDevices    []string `toml:"ignored_devices"`
 	NetworkInclusions []string `toml:"network_inclusions"`
 	NetworkExclusions []string `toml:"network_exclusions"`
 }
 
-// DefaultInterfaceConfig returns the default interface configuration.
-func DefaultInterfaceConfig() *InterfaceConfig {
-	return &InterfaceConfig{
+// DefaultIPRDInterfaceConfig returns a default IPRDInterfaceConfig
+func DefaultIPRDInterfaceConfig() *IPRDInterfaceConfig {
+	return &IPRDInterfaceConfig{
 		NoRootNetwork:     false,
 		IgnoredDevices:    []string{},
 		NetworkInclusions: []string{},
@@ -45,59 +45,33 @@ func DefaultInterfaceConfig() *InterfaceConfig {
 	}
 }
 
-// InterfaceMap defines a map flag value for configuring interfaces.
-// Each key is an interface selector (e.g., "eth0", 1), with *InterfaceConfig representing supplied options.
+// FlagInterface is a flag value representing a interface configuration.
+// Each key is an interface selector (e.g. "eth0" or 1), with attached IPRDInterfaceConfig representing supplied options.
 // Options are specified after ":" separated by commas (e.g., "eth0:no-root-network,add-network=172.16").
-type InterfaceMap map[string]*InterfaceConfig
+type FlagInterface map[string]*IPRDInterfaceConfig
 
-func (i *InterfaceMap) String() string {
-	return fmt.Sprintf("%v", map[string]*InterfaceConfig(*i))
+func (f *FlagInterface) String() string {
+	return fmt.Sprintf("%v", map[string]*IPRDInterfaceConfig(*f))
 }
 
-// Selectors returns the configured interface selectors in deterministic order.
-func (i InterfaceMap) Selectors() []string {
-	selectors := make([]string, 0, len(i))
-	for selector := range i {
-		selectors = append(selectors, selector)
-	}
-	slices.Sort(selectors)
-	return selectors
-}
-
-func (i InterfaceMap) clone() InterfaceMap {
-	cloned := make(InterfaceMap, len(i))
-	for selector, cfg := range i {
-		if cfg == nil {
-			cloned[selector] = DefaultInterfaceConfig()
-			continue
-		}
-		copyCfg := *cfg
-		copyCfg.IgnoredDevices = append([]string(nil), cfg.IgnoredDevices...)
-		copyCfg.NetworkInclusions = append([]string(nil), cfg.NetworkInclusions...)
-		copyCfg.NetworkExclusions = append([]string(nil), cfg.NetworkExclusions...)
-		cloned[selector] = &copyCfg
-	}
-	return cloned
-}
-
-func (i *InterfaceMap) Set(value string) error {
+func (f *FlagInterface) Set(value string) error {
 	value = strings.TrimSpace(value)
 	if value == "" {
 		return nil
 	}
-	if *i == nil {
-		*i = make(InterfaceMap)
+	if *f == nil {
+		*f = make(FlagInterface)
 	}
 
-	var ifaceID, optionsStr string
+	var ifaceID, options string
 	if strings.Contains(value, ":") {
 		parts := strings.SplitN(value, ":", 2)
 		ifaceID = strings.TrimSpace(parts[0])
-		optionsStr = parts[1]
+		options = parts[1]
 	} else {
 		for _, selector := range normalizeInterfaceSelectors([]string{value}) {
-			if (*i)[selector] == nil {
-				(*i)[selector] = DefaultInterfaceConfig()
+			if (*f)[selector] == nil {
+				(*f)[selector] = DefaultIPRDInterfaceConfig()
 			}
 		}
 		return nil
@@ -109,17 +83,16 @@ func (i *InterfaceMap) Set(value string) error {
 		return fmt.Errorf("interface options must be specified separately for each interface")
 	}
 
-	if (*i)[ifaceID] == nil {
-		(*i)[ifaceID] = DefaultInterfaceConfig()
+	if (*f)[ifaceID] == nil {
+		(*f)[ifaceID] = DefaultIPRDInterfaceConfig()
 	}
-	cfg := (*i)[ifaceID]
+	cfg := (*f)[ifaceID]
 
-	if optionsStr == "" {
+	if options == "" {
 		return nil
 	}
-
-	options := strings.Split(optionsStr, ",")
-	for _, opt := range options {
+	opts := strings.SplitSeq(options, ",")
+	for opt := range opts {
 		opt = strings.TrimSpace(opt)
 		if opt == "" {
 			continue
@@ -152,23 +125,49 @@ func (i *InterfaceMap) Set(value string) error {
 	return nil
 }
 
+// Selectors returns the configured interface selectors in deterministic order.
+func (f FlagInterface) Selectors() []string {
+	selectors := make([]string, 0, len(f))
+	for selector := range f {
+		selectors = append(selectors, selector)
+	}
+	slices.Sort(selectors)
+	return selectors
+}
+
+func (f FlagInterface) clone() FlagInterface {
+	cloned := make(FlagInterface, len(f))
+	for selector, cfg := range f {
+		if cfg == nil {
+			cloned[selector] = DefaultIPRDInterfaceConfig()
+			continue
+		}
+		copyCfg := *cfg
+		copyCfg.IgnoredDevices = slices.Clone(cfg.IgnoredDevices)
+		copyCfg.NetworkInclusions = slices.Clone(cfg.NetworkInclusions)
+		copyCfg.NetworkExclusions = slices.Clone(cfg.NetworkExclusions)
+		cloned[selector] = &copyCfg
+	}
+	return cloned
+}
+
 // IPRDConfig describes a new IPR Daemon configuration
 type IPRDConfig struct {
-	Debug              bool         `toml:"debug"`
-	Auto               bool         `toml:"auto"`
-	ListenInterfaces   []string     `toml:"listen_interfaces,omitempty"`
-	ListenInterface    string       `toml:"listen_interface,omitempty"` // Deprecated: use ListenInterfaces.
-	Interfaces         InterfaceMap `toml:"interfaces,omitempty"`
-	ForwardBind        string       `toml:"forward_bind"`
-	ForwardPort        int          `toml:"forward_port"`
-	ForwardKnown       bool         `toml:"forward_known"`
-	MDNS               bool         `toml:"mdns"`
-	NoRootNetwork      bool         `toml:"no_root_network"`
-	IgnoredDevices     []string     `toml:"ignored_devices"`
-	NetworkInclusions  []string     `toml:"network_inclusions"`
-	NetworkExclusions  []string     `toml:"network_exclusions"`
-	CaptureFile        string       `toml:"capture_file"`
-	RotateCaptureFiles bool         `toml:"rotate_capture_files"`
+	Debug              bool          `toml:"debug"`
+	Auto               bool          `toml:"auto"`
+	ListenInterfaces   []string      `toml:"listen_interfaces,omitempty"`
+	ListenInterface    string        `toml:"listen_interface,omitempty"` // Deprecated: use ListenInterfaces.
+	Interfaces         FlagInterface `toml:"interfaces,omitempty"`
+	ForwardBind        string        `toml:"forward_bind"`
+	ForwardPort        int           `toml:"forward_port"`
+	ForwardKnown       bool          `toml:"forward_known"`
+	MDNS               bool          `toml:"mdns"`
+	NoRootNetwork      bool          `toml:"no_root_network"`
+	IgnoredDevices     []string      `toml:"ignored_devices"`
+	NetworkInclusions  []string      `toml:"network_inclusions"`
+	NetworkExclusions  []string      `toml:"network_exclusions"`
+	CaptureFile        string        `toml:"capture_file"`
+	RotateCaptureFiles bool          `toml:"rotate_capture_files"`
 }
 
 // Validate returns error if IPRDConfig contains invalid values
@@ -211,7 +210,7 @@ func (cfg *IPRDConfig) Merge(target *IPRDConfig) *IPRDConfig {
 		result.MDNS = target.MDNS
 	}
 	if len(target.ListenInterfaces) > 0 {
-		result.ListenInterfaces = append([]string(nil), target.ListenInterfaces...)
+		result.ListenInterfaces = slices.Clone(target.ListenInterfaces)
 	} else if target.ListenInterface != "" {
 		// A supplied legacy value must override the default plural value.
 		result.ListenInterfaces = nil
@@ -257,7 +256,7 @@ func DefaultIPRDConfig() *IPRDConfig {
 		Auto:               false,
 		ListenInterfaces:   []string{"eth0"},
 		ListenInterface:    "eth0",
-		Interfaces:         InterfaceMap{},
+		Interfaces:         FlagInterface{},
 		ForwardBind:        "",
 		ForwardPort:        7788,
 		ForwardKnown:       false,
@@ -299,12 +298,12 @@ func (cfg *IPRDConfig) normalizeListenInterfaces() {
 }
 
 // interfaceConfig combines the global BPF configuration with overrides for a selector.
-func (cfg *IPRDConfig) interfaceConfig(selector string) *InterfaceConfig {
-	combined := &InterfaceConfig{
+func (cfg *IPRDConfig) interfaceConfig(selector string) *IPRDInterfaceConfig {
+	combined := &IPRDInterfaceConfig{
 		NoRootNetwork:     cfg.NoRootNetwork,
-		IgnoredDevices:    append([]string(nil), cfg.IgnoredDevices...),
-		NetworkInclusions: append([]string(nil), cfg.NetworkInclusions...),
-		NetworkExclusions: append([]string(nil), cfg.NetworkExclusions...),
+		IgnoredDevices:    slices.Clone(cfg.IgnoredDevices),
+		NetworkInclusions: slices.Clone(cfg.NetworkInclusions),
+		NetworkExclusions: slices.Clone(cfg.NetworkExclusions),
 	}
 	if override := cfg.Interfaces[selector]; override != nil {
 		combined.NoRootNetwork = combined.NoRootNetwork || override.NoRootNetwork
@@ -319,7 +318,7 @@ func normalizeInterfaceSelectors(values []string) []string {
 	selectors := make([]string, 0, len(values))
 	seen := make(map[string]struct{}, len(values))
 	for _, value := range values {
-		for _, selector := range strings.Split(value, ",") {
+		for selector := range strings.SplitSeq(value, ",") {
 			selector = strings.TrimSpace(selector)
 			if selector == "" {
 				continue

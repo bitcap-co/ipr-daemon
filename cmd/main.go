@@ -29,7 +29,7 @@ var (
 	flList               = flag.Bool("list", false, "Lists all available network interfaces that can be listened on.")
 	flDebug              = flag.Bool("d", false, "Switch to enable packet debugging output.")
 	flAuto               = flag.Bool("a", false, "Switch to use the defined LAN interface (description matching 'lan' or 'LAN') for listening. Overrides -i flag.")
-	flInterfaces         = make(iprd.InterfaceMap)
+	flInterfaces         = make(iprd.FlagInterface)
 	flForwardBind        = flag.String("b", "", "IP address to bind the TCP broadcast stream to. Empty binds all interfaces.")
 	flForwardPort        = flag.Int("p", 7788, "TCP stream/broadcast port for forwarding IP report packet data.")
 	flForwardKnown       = flag.Bool("known", false, "Switch to only forward IP reports from known miner types/ports over forward port.")
