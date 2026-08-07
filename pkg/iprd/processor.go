@@ -8,6 +8,8 @@ import (
 	"io"
 	"time"
 	"unicode/utf8"
+
+	"github.com/gopacket/gopacket"
 )
 
 const (
@@ -111,4 +113,15 @@ func (p *PacketProcessor) ParseIPReportPacket(packet *IPReportPacket) error {
 		CreatedAt: packet.Timestamp.UnixMilli(),
 	})
 	return nil
+}
+
+// CaptureToIPRPacket decodes a captured packet into an IPReportPacket.
+func (p *PacketProcessor) CaptureToIPRPacket(captured CapturedPacket) (*IPReportPacket, error) {
+	packet := gopacket.NewPacket(captured.Data, captured.LinkType, gopacket.Default)
+	packet.Metadata().CaptureInfo = captured.CaptureInfo
+	ipr, err := NewIPReportPacket(packet)
+	if err != nil {
+		return nil, err
+	}
+	return ipr, nil
 }
