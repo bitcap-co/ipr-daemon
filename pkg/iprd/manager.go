@@ -13,7 +13,7 @@ import (
 // processing, and a single combined IP report stream.
 type ListenerManager struct {
 	cfg       *IPRDConfig
-	log       *IPRLogger
+	log       Logger
 	listeners []*IPRListener
 	processor *PacketProcessor
 	capture   *CaptureWriter
@@ -23,7 +23,7 @@ type ListenerManager struct {
 
 // NewListenerManager returns a manager with one listener per configured
 // interface. Auto mode creates one listener and ignores explicit selectors.
-func NewListenerManager(cfg *IPRDConfig, logger *IPRLogger) *ListenerManager {
+func NewListenerManager(cfg *IPRDConfig, logger Logger) *ListenerManager {
 	if cfg == nil {
 		cfg = DefaultIPRDConfig()
 	}
@@ -119,7 +119,7 @@ func (m *ListenerManager) Run(ctx context.Context) error {
 	return errors.Join(runErr, m.capture.Close())
 }
 
-func newManagedListeners(cfg *IPRDConfig, logger *IPRLogger) []*IPRListener {
+func newManagedListeners(cfg *IPRDConfig, logger Logger) []*IPRListener {
 	selectors := cfg.ListenInterfaces
 	if cfg.Auto && len(selectors) > 1 {
 		selectors = selectors[:1]

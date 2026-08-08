@@ -20,7 +20,7 @@ type TCPCommand struct {
 }
 
 type IPRBroadcast struct {
-	logger   *IPRLogger
+	logger   Logger
 	listener net.Listener
 	counter  uint64
 	mu       sync.RWMutex
@@ -31,7 +31,7 @@ type IPRBroadcast struct {
 
 // NewBroadcaster returns a new IPRBroadcast at specified port. bind is the local
 // IP address to listen on; an empty bind binds all interfaces.
-func NewBroadcaster(logger *IPRLogger, bind string, port int) (*IPRBroadcast, error) {
+func NewBroadcaster(logger Logger, bind string, port int) (*IPRBroadcast, error) {
 	if logger == nil {
 		logger = NewLogger()
 	}

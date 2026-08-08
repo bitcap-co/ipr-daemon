@@ -26,7 +26,7 @@ const (
 
 type IPRListener struct {
 	cfg          *IPRDConfig
-	log          *IPRLogger
+	log          Logger
 	iface        *IPRInterface
 	ifacePinned  bool
 	resolvedName string
@@ -37,7 +37,7 @@ type IPRListener struct {
 
 // NewListener returns a new IPRListener, taking in a IPRDConfig to configure behavior. If logger is nil, a new IPRLogger is created.
 // If iface is supplied it is pinned and reused; otherwise the interface is resolved from cfg (and re-resolved on each reconnect).
-func NewListener(cfg *IPRDConfig, logger *IPRLogger, iface *IPRInterface) *IPRListener {
+func NewListener(cfg *IPRDConfig, logger Logger, iface *IPRInterface) *IPRListener {
 	if cfg == nil {
 		// pass in default config if not supplied
 		cfg = DefaultIPRDConfig()

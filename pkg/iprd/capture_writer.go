@@ -38,7 +38,7 @@ type captureInterfaceKey struct {
 type CaptureWriter struct {
 	path       string
 	rotate     bool
-	log        *IPRLogger
+	log        Logger
 	file       *os.File
 	counter    *countingWriter
 	writer     *pcapgo.NgWriter
@@ -46,7 +46,7 @@ type CaptureWriter struct {
 }
 
 // NewCaptureWriter returns a PCAP-NG writer. An empty path disables capture.
-func NewCaptureWriter(path string, rotate bool, logger *IPRLogger) *CaptureWriter {
+func NewCaptureWriter(path string, rotate bool, logger Logger) *CaptureWriter {
 	if logger == nil {
 		logger = NewLogger()
 	}
