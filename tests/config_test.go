@@ -42,6 +42,10 @@ func TestFlagInterfaceSupportsPerInterfaceBPFOptions(t *testing.T) {
 	if want := []string{"eth0", "eth1"}; !reflect.DeepEqual(interfaces.Selectors(), want) {
 		t.Fatalf("selectors = %v, want %v", interfaces.Selectors(), want)
 	}
+	configs := interfaces.Configs()
+	if len(configs) != 2 || configs[0].Selector != "eth0" || configs[1].Selector != "eth1" {
+		t.Fatalf("configs = %#v, want deterministic eth0/eth1 list", configs)
+	}
 	eth0 := interfaces["eth0"]
 	if !eth0.NoRootNetwork {
 		t.Fatal("eth0 NoRootNetwork = false, want true")
@@ -68,7 +72,8 @@ func TestFlagInterfaceRejectsInvalidOptions(t *testing.T) {
 
 func TestInterfaceOptionsRoundTrip(t *testing.T) {
 	cfg, err := iprd.NewIPRDConfigFromBytes([]byte(`
-[interfaces.eth1]
+[[interfaces]]
+selector = "eth1"
 no_root_network = true
 network_inclusions = ["192.168.50"]
 ignored_devices = ["aa:bb:cc:dd:ee:ff"]
@@ -79,14 +84,42 @@ ignored_devices = ["aa:bb:cc:dd:ee:ff"]
 	if want := []string{"eth1"}; !reflect.DeepEqual(cfg.ListenInterfaces, want) {
 		t.Fatalf("interfaces = %v, want %v", cfg.ListenInterfaces, want)
 	}
-	if override := cfg.Interfaces["eth1"]; override == nil || !override.NoRootNetwork {
-		t.Fatalf("eth1 override = %#v, want no-root-network enabled", override)
+	if len(cfg.Interfaces) != 1 || cfg.Interfaces[0].Selector != "eth1" || !cfg.Interfaces[0].NoRootNetwork {
+		t.Fatalf("interface configs = %#v, want eth1 with no-root-network enabled", cfg.Interfaces)
+	}
+}
+
+func TestValidateRejectsInvalidInterfaceConfigSelectors(t *testing.T) {
+	tests := []struct {
+		name       string
+		interfaces []iprd.InterfaceConfig
+	}{
+		{
+			name:       "empty selector",
+			interfaces: []iprd.InterfaceConfig{{}},
+		},
+		{
+			name: "duplicate selector",
+			interfaces: []iprd.InterfaceConfig{
+				{Selector: "eth0"},
+				{Selector: " eth0 "},
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cfg := iprd.DefaultListenerConfig()
+			cfg.Interfaces = tt.interfaces
+			if err := cfg.Validate(); err == nil {
+				t.Fatal("Validate() returned no error")
+			}
+		})
 	}
 }
 
 func TestValidateRejectsInterfaceWithoutAnyIncludedNetwork(t *testing.T) {
 	cfg := iprd.DefaultIPRDConfig()
-	cfg.Interfaces = iprd.FlagInterface{"eth0": {NoRootNetwork: true}}
+	cfg.Interfaces = []iprd.InterfaceConfig{{Selector: "eth0", NoRootNetwork: true}}
 	if err := cfg.Validate(); err == nil {
 		t.Fatal("Validate() returned no error")
 	}

@@ -155,8 +155,9 @@ func TestNewListenerManagerAppliesInterfaceBPFOptions(t *testing.T) {
 	cfg.IgnoredDevices = []string{"global-mac"}
 	cfg.NetworkInclusions = []string{"10"}
 	cfg.NetworkExclusions = []string{"172.16"}
-	cfg.Interfaces = FlagInterface{
-		"eth2": {
+	cfg.Interfaces = []InterfaceConfig{
+		{
+			Selector:          "eth2",
 			NoRootNetwork:     true,
 			IgnoredDevices:    []string{"interface-mac"},
 			NetworkInclusions: []string{"192.168.2"},

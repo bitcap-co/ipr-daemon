@@ -27,17 +27,19 @@ func (f *FlagSlice) Set(value string) error {
 	return nil
 }
 
-// IPRDInterfaceConfig describes BPF configuration for a specific interface.
-type IPRDInterfaceConfig struct {
+// InterfaceConfig describes BPF configuration for a specific interface.
+type InterfaceConfig struct {
+	Selector          string   `toml:"selector" json:"selector"`
 	NoRootNetwork     bool     `toml:"no_root_network" json:"no_root_network"`
 	IgnoredDevices    []string `toml:"ignored_devices" json:"ignored_devices"`
 	NetworkInclusions []string `toml:"network_inclusions" json:"network_inclusions"`
 	NetworkExclusions []string `toml:"network_exclusions" json:"network_exclusions"`
 }
 
-// DefaultIPRDInterfaceConfig returns a default IPRDInterfaceConfig
-func DefaultIPRDInterfaceConfig() *IPRDInterfaceConfig {
-	return &IPRDInterfaceConfig{
+// DefaultInterfaceConfig returns a default InterfaceConfig
+func DefaultInterfaceConfig() *InterfaceConfig {
+	return &InterfaceConfig{
+		Selector:          "",
 		NoRootNetwork:     false,
 		IgnoredDevices:    []string{},
 		NetworkInclusions: []string{},
@@ -45,13 +47,36 @@ func DefaultIPRDInterfaceConfig() *IPRDInterfaceConfig {
 	}
 }
 
+func cloneInterfaceConfig(cfg InterfaceConfig) InterfaceConfig {
+	cfg.IgnoredDevices = slices.Clone(cfg.IgnoredDevices)
+	cfg.NetworkInclusions = slices.Clone(cfg.NetworkInclusions)
+	cfg.NetworkExclusions = slices.Clone(cfg.NetworkExclusions)
+	return cfg
+}
+
+func cloneInterfaceConfigs(configs []InterfaceConfig) []InterfaceConfig {
+	cloned := make([]InterfaceConfig, len(configs))
+	for i, cfg := range configs {
+		cloned[i] = cloneInterfaceConfig(cfg)
+	}
+	return cloned
+}
+
+func interfaceConfigSelectors(configs []InterfaceConfig) []string {
+	selectors := make([]string, 0, len(configs))
+	for _, cfg := range configs {
+		selectors = append(selectors, cfg.Selector)
+	}
+	return normalizeInterfaceSelectors(selectors)
+}
+
 // FlagInterface is a flag value representing a interface configuration.
-// Each key is an interface selector (e.g. "eth0" or 1), with attached IPRDInterfaceConfig representing supplied options.
+// Each key is an interface selector (e.g. "eth0" or 1), with attached InterfaceConfig representing supplied options.
 // Options are specified after ":" separated by commas (e.g., "eth0:no-root-network,add-network=172.16").
-type FlagInterface map[string]*IPRDInterfaceConfig
+type FlagInterface map[string]*InterfaceConfig
 
 func (f *FlagInterface) String() string {
-	return fmt.Sprintf("%v", map[string]*IPRDInterfaceConfig(*f))
+	return fmt.Sprintf("%v", map[string]*InterfaceConfig(*f))
 }
 
 func (f *FlagInterface) Set(value string) error {
@@ -71,7 +96,7 @@ func (f *FlagInterface) Set(value string) error {
 	} else {
 		for _, selector := range normalizeInterfaceSelectors([]string{value}) {
 			if (*f)[selector] == nil {
-				(*f)[selector] = DefaultIPRDInterfaceConfig()
+				(*f)[selector] = DefaultInterfaceConfig()
 			}
 		}
 		return nil
@@ -84,7 +109,7 @@ func (f *FlagInterface) Set(value string) error {
 	}
 
 	if (*f)[ifaceID] == nil {
-		(*f)[ifaceID] = DefaultIPRDInterfaceConfig()
+		(*f)[ifaceID] = DefaultInterfaceConfig()
 	}
 	cfg := (*f)[ifaceID]
 
@@ -135,42 +160,53 @@ func (f FlagInterface) Selectors() []string {
 	return selectors
 }
 
-func (f FlagInterface) clone() FlagInterface {
-	cloned := make(FlagInterface, len(f))
-	for selector, cfg := range f {
+// Configs returns the flag values as a deterministic list of interface configurations.
+func (f FlagInterface) Configs() []InterfaceConfig {
+	selectors := f.Selectors()
+	configs := make([]InterfaceConfig, 0, len(selectors))
+	for _, selector := range selectors {
+		cfg := f[selector]
 		if cfg == nil {
-			cloned[selector] = DefaultIPRDInterfaceConfig()
-			continue
+			cfg = DefaultInterfaceConfig()
 		}
-		copyCfg := *cfg
-		copyCfg.IgnoredDevices = slices.Clone(cfg.IgnoredDevices)
-		copyCfg.NetworkInclusions = slices.Clone(cfg.NetworkInclusions)
-		copyCfg.NetworkExclusions = slices.Clone(cfg.NetworkExclusions)
-		cloned[selector] = &copyCfg
+		copyCfg := cloneInterfaceConfig(*cfg)
+		copyCfg.Selector = selector
+		configs = append(configs, copyCfg)
 	}
-	return cloned
+	return configs
 }
 
 // ListenerConfig describes packet capture and IP report processing behavior.
 type ListenerConfig struct {
-	Debug              bool          `toml:"debug" json:"debug"`
-	Auto               bool          `toml:"auto" json:"auto"`
-	ListenInterfaces   []string      `toml:"listen_interfaces,omitempty" json:"listen_interfaces,omitempty"`
-	ListenInterface    string        `toml:"listen_interface,omitempty" json:"listen_interface,omitempty"` // Deprecated: use ListenInterfaces.
-	Interfaces         FlagInterface `toml:"interfaces,omitempty" json:"interfaces,omitempty"`
-	ForwardKnown       bool          `toml:"forward_known" json:"forward_known"`
-	NoRootNetwork      bool          `toml:"no_root_network" json:"no_root_network"`
-	IgnoredDevices     []string      `toml:"ignored_devices" json:"ignored_devices"`
-	NetworkInclusions  []string      `toml:"network_inclusions" json:"network_inclusions"`
-	NetworkExclusions  []string      `toml:"network_exclusions" json:"network_exclusions"`
-	CaptureFile        string        `toml:"capture_file" json:"capture_file"`
-	RotateCaptureFiles bool          `toml:"rotate_capture_files" json:"rotate_capture_files"`
+	Debug              bool              `toml:"debug" json:"debug"`
+	Auto               bool              `toml:"auto" json:"auto"`
+	ListenInterfaces   []string          `toml:"listen_interfaces,omitempty" json:"listen_interfaces,omitempty"`
+	ListenInterface    string            `toml:"listen_interface,omitempty" json:"listen_interface,omitempty"` // Deprecated: use ListenInterfaces.
+	Interfaces         []InterfaceConfig `toml:"interfaces,omitempty" json:"interfaces,omitempty"`
+	ForwardKnown       bool              `toml:"forward_known" json:"forward_known"`
+	NoRootNetwork      bool              `toml:"no_root_network" json:"no_root_network"`
+	IgnoredDevices     []string          `toml:"ignored_devices" json:"ignored_devices"`
+	NetworkInclusions  []string          `toml:"network_inclusions" json:"network_inclusions"`
+	NetworkExclusions  []string          `toml:"network_exclusions" json:"network_exclusions"`
+	CaptureFile        string            `toml:"capture_file" json:"capture_file"`
+	RotateCaptureFiles bool              `toml:"rotate_capture_files" json:"rotate_capture_files"`
 }
 
 // Validate returns an error if ListenerConfig contains invalid values.
 func (cfg *ListenerConfig) Validate() error {
 	if len(cfg.effectiveListenInterfaces()) == 0 {
 		return fmt.Errorf("at least one listen interface must be present")
+	}
+	seen := make(map[string]struct{}, len(cfg.Interfaces))
+	for i, interfaceCfg := range cfg.Interfaces {
+		selector := strings.TrimSpace(interfaceCfg.Selector)
+		if selector == "" {
+			return fmt.Errorf("interface config %d has an empty selector", i)
+		}
+		if _, exists := seen[selector]; exists {
+			return fmt.Errorf("duplicate interface config selector %q", selector)
+		}
+		seen[selector] = struct{}{}
 	}
 	for _, selector := range cfg.effectiveListenInterfaces() {
 		interfaceCfg := cfg.interfaceConfig(selector)
@@ -204,11 +240,11 @@ func (cfg *ListenerConfig) Merge(target *ListenerConfig) *ListenerConfig {
 		result.ListenInterfaces = nil
 		result.ListenInterface = target.ListenInterface
 	} else if len(target.Interfaces) > 0 {
-		result.ListenInterfaces = target.Interfaces.Selectors()
+		result.ListenInterfaces = interfaceConfigSelectors(target.Interfaces)
 		result.ListenInterface = ""
 	}
 	if len(target.Interfaces) > 0 {
-		result.Interfaces = target.Interfaces.clone()
+		result.Interfaces = cloneInterfaceConfigs(target.Interfaces)
 	}
 	if len(target.IgnoredDevices) > 0 {
 		result.IgnoredDevices = slices.Clone(target.IgnoredDevices)
@@ -237,7 +273,10 @@ func (cfg *ListenerConfig) effectiveListenInterfaces() []string {
 	if len(cfg.ListenInterfaces) > 0 {
 		return normalizeInterfaceSelectors(cfg.ListenInterfaces)
 	}
-	return normalizeInterfaceSelectors([]string{cfg.ListenInterface})
+	if cfg.ListenInterface != "" {
+		return normalizeInterfaceSelectors([]string{cfg.ListenInterface})
+	}
+	return interfaceConfigSelectors(cfg.Interfaces)
 }
 
 // normalizeListenInterfaces stores the canonical plural selectors and keeps the
@@ -252,18 +291,22 @@ func (cfg *ListenerConfig) normalizeListenInterfaces() {
 }
 
 // interfaceConfig combines the global BPF configuration with overrides for a selector.
-func (cfg *ListenerConfig) interfaceConfig(selector string) *IPRDInterfaceConfig {
-	combined := &IPRDInterfaceConfig{
+func (cfg *ListenerConfig) interfaceConfig(selector string) *InterfaceConfig {
+	combined := &InterfaceConfig{
 		NoRootNetwork:     cfg.NoRootNetwork,
 		IgnoredDevices:    slices.Clone(cfg.IgnoredDevices),
 		NetworkInclusions: slices.Clone(cfg.NetworkInclusions),
 		NetworkExclusions: slices.Clone(cfg.NetworkExclusions),
 	}
-	if override := cfg.Interfaces[selector]; override != nil {
+	for _, override := range cfg.Interfaces {
+		if strings.TrimSpace(override.Selector) != selector {
+			continue
+		}
 		combined.NoRootNetwork = combined.NoRootNetwork || override.NoRootNetwork
 		combined.IgnoredDevices = append(combined.IgnoredDevices, override.IgnoredDevices...)
 		combined.NetworkInclusions = append(combined.NetworkInclusions, override.NetworkInclusions...)
 		combined.NetworkExclusions = append(combined.NetworkExclusions, override.NetworkExclusions...)
+		break
 	}
 	return combined
 }
@@ -275,7 +318,7 @@ func DefaultListenerConfig() *ListenerConfig {
 		Auto:               false,
 		ListenInterfaces:   []string{"eth0"},
 		ListenInterface:    "eth0",
-		Interfaces:         FlagInterface{},
+		Interfaces:         []InterfaceConfig{},
 		ForwardKnown:       false,
 		NoRootNetwork:      false,
 		IgnoredDevices:     []string{},

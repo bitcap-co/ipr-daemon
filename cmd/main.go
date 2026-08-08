@@ -88,7 +88,7 @@ func main() {
 			ListenInterfaces: listenInterfaces,
 			// Keep the first selector available through the legacy singular field.
 			ListenInterface:    listenInterfaces[0],
-			Interfaces:         flInterfaces,
+			Interfaces:         flInterfaces.Configs(),
 			ForwardKnown:       *flForwardKnown,
 			NoRootNetwork:      *flNoRootNetwork,
 			IgnoredDevices:     []string(flIgnoredDevices),
