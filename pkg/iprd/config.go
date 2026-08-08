@@ -347,10 +347,10 @@ type ForwardConfig struct {
 // Validate returns an error if ForwardConfig contains invalid endpoint values.
 func (cfg *ForwardConfig) Validate() error {
 	if cfg.Bind != "" && net.ParseIP(cfg.Bind) == nil {
-		return fmt.Errorf("Bind must be a valid IP address")
+		return fmt.Errorf("bind must be a valid IP address")
 	}
 	if cfg.Port <= 0 {
-		return fmt.Errorf("Port must be positive")
+		return fmt.Errorf("port must be positive")
 	}
 	return nil
 }
@@ -423,7 +423,7 @@ func DefaultIPRDConfig() *IPRDConfig {
 // ParseConfig applies daemon defaults, normalizes interface selectors, and validates the result.
 func ParseConfig(supplied *IPRDConfig) (*IPRDConfig, error) {
 	cfg := DefaultIPRDConfig().Merge(supplied)
-	cfg.ListenerConfig.normalizeListenInterfaces()
+	cfg.normalizeListenInterfaces()
 	return cfg, cfg.Validate()
 }
 
