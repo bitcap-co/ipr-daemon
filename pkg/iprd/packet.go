@@ -60,21 +60,29 @@ func (r IPReportPacket) String() string {
 		r.CaptureLength, r.MinerHint)
 }
 
-// Marshal returns the IPReportPacket data to marshalled IPRBroadcastMessage.
-func (r *IPReportPacket) Marshal() ([]byte, error) {
+// BroadcastMessage returns the IPReportPacket data as an IPRBroadcastMessage.
+func (r *IPReportPacket) BroadcastMessage() (IPRBroadcastMessage, error) {
 	packetID, err := uuid.NewV7()
 	if err != nil {
-		return nil, err
+		return IPRBroadcastMessage{}, err
 	}
-	broadcastData := IPRBroadcastMessage{
+	return IPRBroadcastMessage{
 		Timestamp: r.Timestamp.UnixMilli(),
 		PacketID:  packetID.String(),
 		DstPort:   r.DstPort,
 		SrcIP:     r.SrcIP,
 		SrcMAC:    r.SrcMAC,
 		MinerHint: r.MinerHint,
+	}, nil
+}
+
+// Marshal returns the IPReportPacket data to marshalled IPRBroadcastMessage.
+func (r *IPReportPacket) Marshal() ([]byte, error) {
+	b, err := r.BroadcastMessage()
+	if err != nil {
+		return nil, err
 	}
-	msg, err := json.Marshal(broadcastData)
+	msg, err := json.Marshal(b)
 	if err != nil {
 		return nil, err
 	}
