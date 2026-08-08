@@ -152,8 +152,13 @@ func main() {
 	go func() {
 		for {
 			select {
-			case msg := <-manager.Broadcast():
+			case report := <-manager.Reports():
 				// send message to subscribed clients.
+				msg, err := report.Marshal()
+				if err != nil {
+					log.Error(err)
+					continue
+				}
 				broadcaster.Msgs <- msg
 			case err := <-broadcaster.Errs:
 				log.Error(err)

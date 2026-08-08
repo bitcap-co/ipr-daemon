@@ -10,14 +10,14 @@ import (
 )
 
 // ListenerManager coordinates interface listeners, capture writing, packet
-// processing, and a single combined broadcast stream.
+// processing, and a single combined IP report stream.
 type ListenerManager struct {
 	cfg       *IPRDConfig
 	log       *IPRLogger
 	listeners []*IPRListener
 	processor *PacketProcessor
 	capture   *CaptureWriter
-	broadcast chan []byte
+	reports   chan *IPReportPacket
 }
 
 // NewListenerManager returns a manager with one listener per configured
@@ -40,13 +40,13 @@ func NewListenerManager(cfg *IPRDConfig, logger *IPRLogger) *ListenerManager {
 		listeners: newManagedListeners(cfg, logger),
 		processor: NewPacketProcessor(nil),
 		capture:   capture,
-		broadcast: make(chan []byte),
+		reports:   make(chan *IPReportPacket, 256),
 	}
 }
 
-// Broadcast returns the manager's combined stream of marshalled IP reports.
-func (m *ListenerManager) Broadcast() <-chan []byte {
-	return m.broadcast
+// Reports returns the manager's combined stream of validated IP reports.
+func (m *ListenerManager) Reports() <-chan *IPReportPacket {
+	return m.reports
 }
 
 // Run processes captured packets while supervising every listener. Each
@@ -150,9 +150,9 @@ func (m *ListenerManager) processPackets(ctx context.Context, captures <-chan Ca
 			if err := m.capture.Write(captured); err != nil {
 				m.log.Error(fmt.Errorf("failed to write packet to capture file: %w", err))
 			}
-			if msg := m.processCapturedPacket(captured); msg != nil {
+			if report := m.processCapturedPacket(captured); report != nil {
 				select {
-				case m.broadcast <- msg:
+				case m.reports <- report:
 				case <-ctx.Done():
 					return
 				}
@@ -163,7 +163,7 @@ func (m *ListenerManager) processPackets(ctx context.Context, captures <-chan Ca
 	}
 }
 
-func (m *ListenerManager) processCapturedPacket(captured CapturedPacket) []byte {
+func (m *ListenerManager) processCapturedPacket(captured CapturedPacket) *IPReportPacket {
 	packet := gopacket.NewPacket(captured.Data, captured.LinkType, gopacket.Default)
 	packet.Metadata().CaptureInfo = captured.CaptureInfo
 
@@ -198,10 +198,5 @@ func (m *ListenerManager) processCapturedPacket(captured CapturedPacket) []byte 
 	if m.cfg.Debug {
 		m.log.Debug(fmt.Sprintf("UDP Payload (%d) -> %s", ipr.CaptureLength, ipr.Payload))
 	}
-	msg, err := ipr.Marshal()
-	if err != nil {
-		m.log.Error(fmt.Errorf("failed to marshal packet: %w", err))
-		return nil
-	}
-	return msg
+	return ipr
 }

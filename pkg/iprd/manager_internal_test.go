@@ -2,7 +2,6 @@ package iprd
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"net"
 	"reflect"
@@ -69,30 +68,26 @@ func TestListenerManagerProcessesCapturedPacket(t *testing.T) {
 	manager := NewListenerManager(DefaultIPRDConfig(), NewLogger())
 	captured := capturedIPReport(t, "aa:bb:cc:dd:ee:01", 14235, 3)
 
-	msg := manager.processCapturedPacket(captured)
-	if msg == nil {
-		t.Fatal("processCapturedPacket() returned no broadcast message")
+	report := manager.processCapturedPacket(captured)
+	if report == nil {
+		t.Fatal("processCapturedPacket() returned no IP report")
 	}
-	var broadcast IPRBroadcastMessage
-	if err := json.Unmarshal(msg, &broadcast); err != nil {
-		t.Fatal(err)
+	if report.SrcMAC != "aa:bb:cc:dd:ee:01" {
+		t.Fatalf("source MAC = %q, want %q", report.SrcMAC, "aa:bb:cc:dd:ee:01")
 	}
-	if broadcast.SrcMAC != "aa:bb:cc:dd:ee:01" {
-		t.Fatalf("source MAC = %q, want %q", broadcast.SrcMAC, "aa:bb:cc:dd:ee:01")
-	}
-	if broadcast.MinerHint != Antminer {
-		t.Fatalf("miner hint = %v, want %v", broadcast.MinerHint, Antminer)
+	if report.MinerHint != Antminer {
+		t.Fatalf("miner hint = %v, want %v", report.MinerHint, Antminer)
 	}
 }
 
 func TestListenerManagerDeduplicatesAcrossCapturedInterfaces(t *testing.T) {
 	manager := NewListenerManager(DefaultIPRDConfig(), NewLogger())
 	mac := "aa:bb:cc:dd:ee:02"
-	if msg := manager.processCapturedPacket(capturedIPReport(t, mac, 14235, 1)); msg == nil {
-		t.Fatal("first capture returned no broadcast message")
+	if report := manager.processCapturedPacket(capturedIPReport(t, mac, 14235, 1)); report == nil {
+		t.Fatal("first capture returned no IP report")
 	}
-	if msg := manager.processCapturedPacket(capturedIPReport(t, mac, 14235, 2)); msg != nil {
-		t.Fatal("duplicate capture from another interface was broadcast")
+	if report := manager.processCapturedPacket(capturedIPReport(t, mac, 14235, 2)); report != nil {
+		t.Fatal("duplicate capture from another interface was reported")
 	}
 }
 
@@ -101,8 +96,8 @@ func TestListenerManagerFiltersUnknownMiners(t *testing.T) {
 	cfg.ForwardKnown = true
 	manager := NewListenerManager(cfg, NewLogger())
 
-	if msg := manager.processCapturedPacket(capturedIPReport(t, "aa:bb:cc:dd:ee:03", 7777, 1)); msg != nil {
-		t.Fatal("unknown miner was broadcast with ForwardKnown enabled")
+	if report := manager.processCapturedPacket(capturedIPReport(t, "aa:bb:cc:dd:ee:03", 7777, 1)); report != nil {
+		t.Fatal("unknown miner was reported with ForwardKnown enabled")
 	}
 }
 
