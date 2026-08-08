@@ -64,6 +64,21 @@ func mustHardwareAddr(t *testing.T, value string) net.HardwareAddr {
 	return addr
 }
 
+func TestListenerManagerRunIsOneShotAndClosesReports(t *testing.T) {
+	manager := NewListenerManager(DefaultIPRDConfig(), NewLogger())
+	manager.listeners = nil
+
+	if err := manager.Run(context.Background()); err == nil {
+		t.Fatal("Run() returned nil error with no configured listeners")
+	}
+	if _, ok := <-manager.Reports(); ok {
+		t.Fatal("Reports() remained open after Run() returned")
+	}
+	if err := manager.Run(context.Background()); err == nil {
+		t.Fatal("second Run() returned nil error")
+	}
+}
+
 func TestListenerManagerProcessesCapturedPacket(t *testing.T) {
 	manager := NewListenerManager(DefaultIPRDConfig(), NewLogger())
 	captured := capturedIPReport(t, "aa:bb:cc:dd:ee:01", 14235, 3)

@@ -18,6 +18,7 @@ type ListenerManager struct {
 	processor *PacketProcessor
 	capture   *CaptureWriter
 	reports   chan *IPReportPacket
+	runOnce   sync.Once
 }
 
 // NewListenerManager returns a manager with one listener per configured
@@ -52,7 +53,17 @@ func (m *ListenerManager) Reports() <-chan *IPReportPacket {
 // Run processes captured packets while supervising every listener. Each
 // listener reconnects independently; an unexpected listener termination stops
 // the manager. Run returns when ctx is cancelled or a fatal error occurs.
+// A manager may only be run once; Reports is closed before the first call returns.
 func (m *ListenerManager) Run(ctx context.Context) error {
+	started := false
+	m.runOnce.Do(func() {
+		started = true
+	})
+	if !started {
+		return fmt.Errorf("listener manager may only be run once")
+	}
+	defer close(m.reports)
+
 	if len(m.listeners) == 0 {
 		return fmt.Errorf("no interfaces configured")
 	}
