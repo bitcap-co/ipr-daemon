@@ -30,9 +30,10 @@ capture_file = ""
 # rotate_capture_files keeps the active capture plus three numbered history files instead of flushing it.
 rotate_capture_files = false
 
-# Per-interface BPF options overlay the global options above. The interface
-# should also appear in listen_interfaces. Quote selectors containing dots or spaces.
-# [interfaces.eth0]
+# Per-interface BPF options overlay the global options above. The selector
+# should also appear in listen_interfaces. Repeat [[interfaces]] for each interface.
+# [[interfaces]]
+# selector = "eth0"
 # no_root_network = true
 # ignored_devices = ["aa:bb:cc:dd:ee:ff"]
 # network_inclusions = ["192.168.1"]
