@@ -29,10 +29,10 @@ func (f *FlagSlice) Set(value string) error {
 
 // IPRDInterfaceConfig describes BPF configuration for a specific interface.
 type IPRDInterfaceConfig struct {
-	NoRootNetwork     bool     `toml:"no_root_network"`
-	IgnoredDevices    []string `toml:"ignored_devices"`
-	NetworkInclusions []string `toml:"network_inclusions"`
-	NetworkExclusions []string `toml:"network_exclusions"`
+	NoRootNetwork     bool     `toml:"no_root_network" json:"no_root_network"`
+	IgnoredDevices    []string `toml:"ignored_devices" json:"ignored_devices"`
+	NetworkInclusions []string `toml:"network_inclusions" json:"network_inclusions"`
+	NetworkExclusions []string `toml:"network_exclusions" json:"network_exclusions"`
 }
 
 // DefaultIPRDInterfaceConfig returns a default IPRDInterfaceConfig
@@ -153,21 +153,21 @@ func (f FlagInterface) clone() FlagInterface {
 
 // IPRDConfig describes a new IPR Daemon configuration
 type IPRDConfig struct {
-	Debug              bool          `toml:"debug"`
-	Auto               bool          `toml:"auto"`
-	ListenInterfaces   []string      `toml:"listen_interfaces,omitempty"`
-	ListenInterface    string        `toml:"listen_interface,omitempty"` // Deprecated: use ListenInterfaces.
-	Interfaces         FlagInterface `toml:"interfaces,omitempty"`
-	ForwardBind        string        `toml:"forward_bind"`
-	ForwardPort        int           `toml:"forward_port"`
-	ForwardKnown       bool          `toml:"forward_known"`
-	MDNS               bool          `toml:"mdns"`
-	NoRootNetwork      bool          `toml:"no_root_network"`
-	IgnoredDevices     []string      `toml:"ignored_devices"`
-	NetworkInclusions  []string      `toml:"network_inclusions"`
-	NetworkExclusions  []string      `toml:"network_exclusions"`
-	CaptureFile        string        `toml:"capture_file"`
-	RotateCaptureFiles bool          `toml:"rotate_capture_files"`
+	Debug              bool          `toml:"debug" json:"debug"`
+	Auto               bool          `toml:"auto" json:"auto"`
+	ListenInterfaces   []string      `toml:"listen_interfaces,omitempty" json:"listen_interfaces,omitempty"`
+	ListenInterface    string        `toml:"listen_interface,omitempty" json:"listen_interface,omitempty"` // Deprecated: use ListenInterfaces.
+	Interfaces         FlagInterface `toml:"interfaces,omitempty" json:"interfaces,omitempty"`
+	ForwardBind        string        `toml:"forward_bind" json:"forward_bind"`
+	ForwardPort        int           `toml:"forward_port" json:"forward_port"`
+	ForwardKnown       bool          `toml:"forward_known" json:"forward_known"`
+	MDNS               bool          `toml:"mdns" json:"mdns"`
+	NoRootNetwork      bool          `toml:"no_root_network" json:"no_root_network"`
+	IgnoredDevices     []string      `toml:"ignored_devices" json:"ignored_devices"`
+	NetworkInclusions  []string      `toml:"network_inclusions" json:"network_inclusions"`
+	NetworkExclusions  []string      `toml:"network_exclusions" json:"network_exclusions"`
+	CaptureFile        string        `toml:"capture_file" json:"capture_file"`
+	RotateCaptureFiles bool          `toml:"rotate_capture_files" json:"rotate_capture_files"`
 }
 
 // Validate returns error if IPRDConfig contains invalid values
