@@ -82,22 +82,26 @@ func main() {
 		listenInterfaces = append([]string(nil), iprd.DefaultIPRDConfig().ListenInterfaces...)
 	}
 	cfg, err := iprd.ParseConfig(&iprd.IPRDConfig{
-		Debug:            *flDebug,
-		Auto:             *flAuto,
-		ListenInterfaces: listenInterfaces,
-		// Keep the first selector available through the legacy singular field.
-		ListenInterface:    listenInterfaces[0],
-		Interfaces:         flInterfaces,
-		ForwardBind:        *flForwardBind,
-		ForwardPort:        *flForwardPort,
-		ForwardKnown:       *flForwardKnown,
-		MDNS:               *flMDNS,
-		NoRootNetwork:      *flNoRootNetwork,
-		IgnoredDevices:     []string(flIgnoredDevices),
-		NetworkInclusions:  []string(flNetworkInclusions),
-		NetworkExclusions:  []string(flNetworkExclusions),
-		CaptureFile:        *flCaptureFile,
-		RotateCaptureFiles: *flRotateCaptureFiles,
+		ListenerConfig: iprd.ListenerConfig{
+			Debug:            *flDebug,
+			Auto:             *flAuto,
+			ListenInterfaces: listenInterfaces,
+			// Keep the first selector available through the legacy singular field.
+			ListenInterface:    listenInterfaces[0],
+			Interfaces:         flInterfaces,
+			ForwardKnown:       *flForwardKnown,
+			NoRootNetwork:      *flNoRootNetwork,
+			IgnoredDevices:     []string(flIgnoredDevices),
+			NetworkInclusions:  []string(flNetworkInclusions),
+			NetworkExclusions:  []string(flNetworkExclusions),
+			CaptureFile:        *flCaptureFile,
+			RotateCaptureFiles: *flRotateCaptureFiles,
+		},
+		ForwardConfig: iprd.ForwardConfig{
+			Bind: *flForwardBind,
+			Port: *flForwardPort,
+			MDNS: *flMDNS,
+		},
 	})
 	if err != nil {
 		log.Fatal(err)
@@ -124,10 +128,10 @@ func main() {
 	defer stop()
 
 	// Initialize the capture and packet-processing manager.
-	manager := iprd.NewListenerManager(cfg, log)
+	manager := iprd.NewListenerManager(&cfg.ListenerConfig, log)
 
 	// open TCP broadcast.
-	broadcaster, err := iprd.NewBroadcaster(log, cfg.ForwardBind, cfg.ForwardPort)
+	broadcaster, err := iprd.NewBroadcaster(log, cfg.Bind, cfg.Port)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -136,7 +140,7 @@ func main() {
 
 	var mdnsAdvertiser *iprd.MDNSAdvertiser
 	if cfg.MDNS {
-		mdnsAdvertiser, err = iprd.NewMDNSAdvertiser(cfg.ForwardBind, cfg.ForwardPort, VERSION)
+		mdnsAdvertiser, err = iprd.NewMDNSAdvertiser(cfg.Bind, cfg.Port, VERSION)
 		if err != nil {
 			log.Warn(fmt.Sprintf("failed to advertise mDNS service: %v", err))
 		} else {
@@ -145,7 +149,7 @@ func main() {
 					log.Warn(fmt.Sprintf("failed to withdraw mDNS service: %v", err))
 				}
 			}()
-			log.Info(fmt.Sprintf("advertising mDNS service -> %s.local. port %d", iprd.MDNSServiceType, cfg.ForwardPort))
+			log.Info(fmt.Sprintf("advertising mDNS service -> %s.local. port %d", iprd.MDNSServiceType, cfg.Port))
 		}
 	}
 	// handle channel messages.
@@ -174,7 +178,7 @@ func main() {
 			}
 		}
 	}()
-	log.Info(fmt.Sprintf("set tcp forwarding -> %s", net.JoinHostPort(cfg.ForwardBind, strconv.Itoa(cfg.ForwardPort))))
+	log.Info(fmt.Sprintf("set tcp forwarding -> %s", net.JoinHostPort(cfg.Bind, strconv.Itoa(cfg.Port))))
 	log.Info("successfully started iprd!")
 
 	// Supervise capture and packet processing until the context is cancelled.

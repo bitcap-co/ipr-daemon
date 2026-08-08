@@ -108,7 +108,7 @@ func TestValidateForwardBind(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			cfg := iprd.DefaultIPRDConfig()
-			cfg.ForwardBind = tt.bind
+			cfg.Bind = tt.bind
 			err := cfg.Validate()
 			if (err != nil) != tt.wantErr {
 				t.Fatalf("Validate() with bind %q: got err=%v, wantErr=%v", tt.bind, err, tt.wantErr)
@@ -204,7 +204,7 @@ func TestForwardBindRoundTrip(t *testing.T) {
 	if err != nil {
 		t.Fatalf("got error %v, want no error", err)
 	}
-	if cfg.ForwardBind != "127.0.0.1" {
-		t.Fatalf("got ForwardBind %q, want %q", cfg.ForwardBind, "127.0.0.1")
+	if cfg.Bind != "127.0.0.1" {
+		t.Fatalf("got ForwardBind %q, want %q", cfg.Bind, "127.0.0.1")
 	}
 }

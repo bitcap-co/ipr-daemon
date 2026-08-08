@@ -65,7 +65,7 @@ func mustHardwareAddr(t *testing.T, value string) net.HardwareAddr {
 }
 
 func TestListenerManagerRunIsOneShotAndClosesReports(t *testing.T) {
-	manager := NewListenerManager(DefaultIPRDConfig(), NewLogger())
+	manager := NewListenerManager(DefaultListenerConfig(), NewLogger())
 	manager.listeners = nil
 
 	if err := manager.Run(context.Background()); err == nil {
@@ -80,7 +80,7 @@ func TestListenerManagerRunIsOneShotAndClosesReports(t *testing.T) {
 }
 
 func TestListenerManagerProcessesCapturedPacket(t *testing.T) {
-	manager := NewListenerManager(DefaultIPRDConfig(), NewLogger())
+	manager := NewListenerManager(DefaultListenerConfig(), NewLogger())
 	captured := capturedIPReport(t, "aa:bb:cc:dd:ee:01", 14235, 3)
 
 	report := manager.processCapturedPacket(captured)
@@ -96,7 +96,7 @@ func TestListenerManagerProcessesCapturedPacket(t *testing.T) {
 }
 
 func TestListenerManagerDeduplicatesAcrossCapturedInterfaces(t *testing.T) {
-	manager := NewListenerManager(DefaultIPRDConfig(), NewLogger())
+	manager := NewListenerManager(DefaultListenerConfig(), NewLogger())
 	mac := "aa:bb:cc:dd:ee:02"
 	if report := manager.processCapturedPacket(capturedIPReport(t, mac, 14235, 1)); report == nil {
 		t.Fatal("first capture returned no IP report")
@@ -107,7 +107,7 @@ func TestListenerManagerDeduplicatesAcrossCapturedInterfaces(t *testing.T) {
 }
 
 func TestListenerManagerFiltersUnknownMiners(t *testing.T) {
-	cfg := DefaultIPRDConfig()
+	cfg := DefaultListenerConfig()
 	cfg.ForwardKnown = true
 	manager := NewListenerManager(cfg, NewLogger())
 
@@ -117,7 +117,7 @@ func TestListenerManagerFiltersUnknownMiners(t *testing.T) {
 }
 
 func TestNewListenerManagerCreatesListenerPerInterface(t *testing.T) {
-	cfg := DefaultIPRDConfig()
+	cfg := DefaultListenerConfig()
 	cfg.ListenInterfaces = []string{"eth1", "eth2"}
 	cfg.ListenInterface = ""
 	cfg.CaptureFile = "capture.pcap"
@@ -150,7 +150,7 @@ func TestNewListenerManagerCreatesListenerPerInterface(t *testing.T) {
 }
 
 func TestNewListenerManagerAppliesInterfaceBPFOptions(t *testing.T) {
-	cfg := DefaultIPRDConfig()
+	cfg := DefaultListenerConfig()
 	cfg.ListenInterfaces = []string{"eth1", "eth2"}
 	cfg.IgnoredDevices = []string{"global-mac"}
 	cfg.NetworkInclusions = []string{"10"}
@@ -188,7 +188,7 @@ func TestNewListenerManagerAppliesInterfaceBPFOptions(t *testing.T) {
 }
 
 func TestNewListenerManagerAutoModeCreatesOneListener(t *testing.T) {
-	cfg := DefaultIPRDConfig()
+	cfg := DefaultListenerConfig()
 	cfg.Auto = true
 	cfg.ListenInterfaces = []string{"eth1", "eth2"}
 	manager := NewListenerManager(cfg, NewLogger())
@@ -202,7 +202,7 @@ func TestNewListenerManagerAutoModeCreatesOneListener(t *testing.T) {
 }
 
 func TestForwardCapturedPacketsFansInListeners(t *testing.T) {
-	cfg := DefaultIPRDConfig()
+	cfg := DefaultListenerConfig()
 	cfg.ListenInterfaces = []string{"eth1", "eth2"}
 	manager := NewListenerManager(cfg, NewLogger())
 	ctx, cancel := context.WithCancel(context.Background())

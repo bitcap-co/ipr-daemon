@@ -151,17 +151,14 @@ func (f FlagInterface) clone() FlagInterface {
 	return cloned
 }
 
-// IPRDConfig describes a new IPR Daemon configuration
-type IPRDConfig struct {
+// ListenerConfig describes packet capture and IP report processing behavior.
+type ListenerConfig struct {
 	Debug              bool          `toml:"debug" json:"debug"`
 	Auto               bool          `toml:"auto" json:"auto"`
 	ListenInterfaces   []string      `toml:"listen_interfaces,omitempty" json:"listen_interfaces,omitempty"`
 	ListenInterface    string        `toml:"listen_interface,omitempty" json:"listen_interface,omitempty"` // Deprecated: use ListenInterfaces.
 	Interfaces         FlagInterface `toml:"interfaces,omitempty" json:"interfaces,omitempty"`
-	ForwardBind        string        `toml:"forward_bind" json:"forward_bind"`
-	ForwardPort        int           `toml:"forward_port" json:"forward_port"`
 	ForwardKnown       bool          `toml:"forward_known" json:"forward_known"`
-	MDNS               bool          `toml:"mdns" json:"mdns"`
 	NoRootNetwork      bool          `toml:"no_root_network" json:"no_root_network"`
 	IgnoredDevices     []string      `toml:"ignored_devices" json:"ignored_devices"`
 	NetworkInclusions  []string      `toml:"network_inclusions" json:"network_inclusions"`
@@ -170,16 +167,10 @@ type IPRDConfig struct {
 	RotateCaptureFiles bool          `toml:"rotate_capture_files" json:"rotate_capture_files"`
 }
 
-// Validate returns error if IPRDConfig contains invalid values
-func (cfg *IPRDConfig) Validate() error {
+// Validate returns an error if ListenerConfig contains invalid values.
+func (cfg *ListenerConfig) Validate() error {
 	if len(cfg.effectiveListenInterfaces()) == 0 {
 		return fmt.Errorf("at least one listen interface must be present")
-	}
-	if cfg.ForwardPort <= 0 {
-		return fmt.Errorf("ForwardPort must be positive")
-	}
-	if cfg.ForwardBind != "" && net.ParseIP(cfg.ForwardBind) == nil {
-		return fmt.Errorf("ForwardBind must be a valid IP address")
 	}
 	for _, selector := range cfg.effectiveListenInterfaces() {
 		interfaceCfg := cfg.interfaceConfig(selector)
@@ -190,24 +181,21 @@ func (cfg *IPRDConfig) Validate() error {
 	return nil
 }
 
-// Merge returns a new IPRDConfig from target config
-func (cfg *IPRDConfig) Merge(target *IPRDConfig) *IPRDConfig {
+// Merge returns a new ListenerConfig with non-zero values from target applied.
+func (cfg *ListenerConfig) Merge(target *ListenerConfig) *ListenerConfig {
 	result := *cfg
 	if target == nil {
 		return &result
 	}
 
 	if target.Debug {
-		result.Debug = target.Debug
+		result.Debug = true
 	}
 	if target.Auto {
-		result.Auto = target.Auto
+		result.Auto = true
 	}
 	if target.ForwardKnown {
-		result.ForwardKnown = target.ForwardKnown
-	}
-	if target.MDNS {
-		result.MDNS = target.MDNS
+		result.ForwardKnown = true
 	}
 	if len(target.ListenInterfaces) > 0 {
 		result.ListenInterfaces = slices.Clone(target.ListenInterfaces)
@@ -222,64 +210,30 @@ func (cfg *IPRDConfig) Merge(target *IPRDConfig) *IPRDConfig {
 	if len(target.Interfaces) > 0 {
 		result.Interfaces = target.Interfaces.clone()
 	}
-	if target.ForwardBind != "" {
-		result.ForwardBind = target.ForwardBind
-	}
-	if target.ForwardPort > 0 {
-		result.ForwardPort = target.ForwardPort
-	}
 	if len(target.IgnoredDevices) > 0 {
-		result.IgnoredDevices = target.IgnoredDevices
+		result.IgnoredDevices = slices.Clone(target.IgnoredDevices)
 	}
 	if len(target.NetworkInclusions) > 0 {
-		result.NetworkInclusions = target.NetworkInclusions
+		result.NetworkInclusions = slices.Clone(target.NetworkInclusions)
 	}
 	if len(target.NetworkExclusions) > 0 {
-		result.NetworkExclusions = target.NetworkExclusions
+		result.NetworkExclusions = slices.Clone(target.NetworkExclusions)
 	}
 	if target.CaptureFile != "" {
 		result.CaptureFile = target.CaptureFile
 	}
 	if target.RotateCaptureFiles {
-		result.RotateCaptureFiles = target.RotateCaptureFiles
+		result.RotateCaptureFiles = true
 	}
 	if target.NoRootNetwork {
-		result.NoRootNetwork = target.NoRootNetwork
+		result.NoRootNetwork = true
 	}
 	return &result
 }
 
-// DefaultIPRDConfig returns a default IPRDConfig
-func DefaultIPRDConfig() *IPRDConfig {
-	return &IPRDConfig{
-		Debug:              false,
-		Auto:               false,
-		ListenInterfaces:   []string{"eth0"},
-		ListenInterface:    "eth0",
-		Interfaces:         FlagInterface{},
-		ForwardBind:        "",
-		ForwardPort:        7788,
-		ForwardKnown:       false,
-		MDNS:               false,
-		NoRootNetwork:      false,
-		IgnoredDevices:     []string{},
-		NetworkInclusions:  []string{},
-		NetworkExclusions:  []string{},
-		CaptureFile:        "",
-		RotateCaptureFiles: false,
-	}
-}
-
-// ParseConfig returns a IPRDConfig along with error from Validate
-func ParseConfig(supplied *IPRDConfig) (*IPRDConfig, error) {
-	cfg := DefaultIPRDConfig().Merge(supplied)
-	cfg.normalizeListenInterfaces()
-	return cfg, cfg.Validate()
-}
-
 // effectiveListenInterfaces returns normalized interface selectors, preferring
 // the plural configuration while retaining support for listen_interface.
-func (cfg *IPRDConfig) effectiveListenInterfaces() []string {
+func (cfg *ListenerConfig) effectiveListenInterfaces() []string {
 	if len(cfg.ListenInterfaces) > 0 {
 		return normalizeInterfaceSelectors(cfg.ListenInterfaces)
 	}
@@ -288,7 +242,7 @@ func (cfg *IPRDConfig) effectiveListenInterfaces() []string {
 
 // normalizeListenInterfaces stores the canonical plural selectors and keeps the
 // first selector in ListenInterface for legacy callers.
-func (cfg *IPRDConfig) normalizeListenInterfaces() {
+func (cfg *ListenerConfig) normalizeListenInterfaces() {
 	cfg.ListenInterfaces = cfg.effectiveListenInterfaces()
 	if len(cfg.ListenInterfaces) > 0 {
 		cfg.ListenInterface = cfg.ListenInterfaces[0]
@@ -298,7 +252,7 @@ func (cfg *IPRDConfig) normalizeListenInterfaces() {
 }
 
 // interfaceConfig combines the global BPF configuration with overrides for a selector.
-func (cfg *IPRDConfig) interfaceConfig(selector string) *IPRDInterfaceConfig {
+func (cfg *ListenerConfig) interfaceConfig(selector string) *IPRDInterfaceConfig {
 	combined := &IPRDInterfaceConfig{
 		NoRootNetwork:     cfg.NoRootNetwork,
 		IgnoredDevices:    slices.Clone(cfg.IgnoredDevices),
@@ -312,6 +266,122 @@ func (cfg *IPRDConfig) interfaceConfig(selector string) *IPRDInterfaceConfig {
 		combined.NetworkExclusions = append(combined.NetworkExclusions, override.NetworkExclusions...)
 	}
 	return combined
+}
+
+// DefaultListenerConfig returns the default packet listener configuration.
+func DefaultListenerConfig() *ListenerConfig {
+	return &ListenerConfig{
+		Debug:              false,
+		Auto:               false,
+		ListenInterfaces:   []string{"eth0"},
+		ListenInterface:    "eth0",
+		Interfaces:         FlagInterface{},
+		ForwardKnown:       false,
+		NoRootNetwork:      false,
+		IgnoredDevices:     []string{},
+		NetworkInclusions:  []string{},
+		NetworkExclusions:  []string{},
+		CaptureFile:        "",
+		RotateCaptureFiles: false,
+	}
+}
+
+// ParseListenerConfig applies listener defaults, normalizes interface selectors,
+// and validates the resulting configuration.
+func ParseListenerConfig(supplied *ListenerConfig) (*ListenerConfig, error) {
+	cfg := DefaultListenerConfig().Merge(supplied)
+	cfg.normalizeListenInterfaces()
+	return cfg, cfg.Validate()
+}
+
+// ForwardConfig describes the daemon's TCP forwarding endpoint and service advertisement.
+type ForwardConfig struct {
+	Bind string `toml:"forward_bind" json:"forward_bind"`
+	Port int    `toml:"forward_port" json:"forward_port"`
+	MDNS bool   `toml:"mdns" json:"mdns"`
+}
+
+// Validate returns an error if ForwardConfig contains invalid endpoint values.
+func (cfg *ForwardConfig) Validate() error {
+	if cfg.Bind != "" && net.ParseIP(cfg.Bind) == nil {
+		return fmt.Errorf("Bind must be a valid IP address")
+	}
+	if cfg.Port <= 0 {
+		return fmt.Errorf("Port must be positive")
+	}
+	return nil
+}
+
+// Merge returns a new ForwardConfig with non-zero values from target applied.
+func (cfg *ForwardConfig) Merge(target *ForwardConfig) *ForwardConfig {
+	result := *cfg
+	if target == nil {
+		return &result
+	}
+	if target.Bind != "" {
+		result.Bind = target.Bind
+	}
+	if target.Port != 0 {
+		result.Port = target.Port
+	}
+	if target.MDNS {
+		result.MDNS = target.MDNS
+	}
+	return &result
+}
+
+// DefaultForwardConfig returns the default daemon forwarding configuration.
+func DefaultForwardConfig() *ForwardConfig {
+	return &ForwardConfig{
+		Bind: "",
+		Port: 7788,
+		MDNS: false,
+	}
+}
+
+// IPRDConfig combines reusable listener settings with daemon forwarding settings.
+// ListenerConfig is embedded so existing flat TOML and JSON formats are preserved.
+type IPRDConfig struct {
+	ListenerConfig
+	ForwardConfig
+}
+
+// Validate returns an error if IPRDConfig contains invalid listener or forwarding values.
+func (cfg *IPRDConfig) Validate() error {
+	if err := cfg.ListenerConfig.Validate(); err != nil {
+		return err
+	}
+	if err := cfg.ForwardConfig.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
+// Merge returns a new IPRDConfig with non-zero values from target applied.
+func (cfg *IPRDConfig) Merge(target *IPRDConfig) *IPRDConfig {
+	result := *cfg
+	if target == nil {
+		return &result
+	}
+
+	result.ListenerConfig = *cfg.ListenerConfig.Merge(&target.ListenerConfig)
+	result.ForwardConfig = *cfg.ForwardConfig.Merge(&target.ForwardConfig)
+	return &result
+}
+
+// DefaultIPRDConfig returns the default daemon configuration.
+func DefaultIPRDConfig() *IPRDConfig {
+	return &IPRDConfig{
+		ListenerConfig: *DefaultListenerConfig(),
+		ForwardConfig:  *DefaultForwardConfig(),
+	}
+}
+
+// ParseConfig applies daemon defaults, normalizes interface selectors, and validates the result.
+func ParseConfig(supplied *IPRDConfig) (*IPRDConfig, error) {
+	cfg := DefaultIPRDConfig().Merge(supplied)
+	cfg.ListenerConfig.normalizeListenInterfaces()
+	return cfg, cfg.Validate()
 }
 
 func normalizeInterfaceSelectors(values []string) []string {

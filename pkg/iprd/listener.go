@@ -25,7 +25,7 @@ const (
 )
 
 type IPRListener struct {
-	cfg          *IPRDConfig
+	cfg          *ListenerConfig
 	log          Logger
 	iface        *IPRInterface
 	ifacePinned  bool
@@ -35,12 +35,11 @@ type IPRListener struct {
 	packets      chan CapturedPacket
 }
 
-// NewListener returns a new IPRListener, taking in a IPRDConfig to configure behavior. If logger is nil, a new IPRLogger is created.
+// NewListener returns a new IPRListener configured by ListenerConfig. If logger is nil, a new IPRLogger is created.
 // If iface is supplied it is pinned and reused; otherwise the interface is resolved from cfg (and re-resolved on each reconnect).
-func NewListener(cfg *IPRDConfig, logger Logger, iface *IPRInterface) *IPRListener {
+func NewListener(cfg *ListenerConfig, logger Logger, iface *IPRInterface) *IPRListener {
 	if cfg == nil {
-		// pass in default config if not supplied
-		cfg = DefaultIPRDConfig()
+		cfg = DefaultListenerConfig()
 	}
 	if logger == nil {
 		logger = NewLogger()
