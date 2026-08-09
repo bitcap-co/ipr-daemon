@@ -1,9 +1,10 @@
-// starter is an example program that demonstrates how to use the ipr-daemon library.
 package main
 
 import (
-	"errors"
+	"context"
 	"fmt"
+	"os/signal"
+	"syscall"
 
 	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
 )
@@ -12,42 +13,47 @@ var (
 	log = iprd.NewLogger()
 )
 
-func processPacket(captured iprd.CapturedPacket, processor *iprd.PacketProcessor) {
-	// decode captured packet into IPReportPacket
-	packet, err := processor.CaptureToIPRPacket(captured)
-	if err != nil {
-		log.Error(fmt.Errorf("failed to decode packet: %w", err))
-		return
-	}
-	// parse IPReportPacket
-	if err := processor.ParseIPReportPacket(packet); err != nil {
-		// check for duplicate packets with ErrDuplicatePacket
-		if errors.Is(err, iprd.ErrDuplicatePacket) {
-			log.Warn(fmt.Sprintf("%s - %s", packet.String(), err))
-		}
-		return
-	}
-	log.Info(fmt.Sprintf("received IP Report %s", packet.String()))
-}
-
 func main() {
-	// get interface by name
-	iface, err := iprd.GetInterfaceByName("eth0")
+	// Listener config
+	cfg := iprd.DefaultListenerConfig()
+	cfg.ListenInterfaces = []string{"eth0"} // set list of interface names/indexes to listen on
+	// configure interface BPF filters
+	cfg.Interfaces = []iprd.InterfaceConfig{
+		{
+			Selector:          "eth0",     // set to the name/index of the interface to apply configuration
+			NoRootNetwork:     false,      // set to true to exclude the root IPv4 network of interface (If true, must set at least one NetworkInclusions)
+			IgnoredDevices:    []string{}, // set to ignore a list of devices by MAC addresses
+			NetworkInclusions: []string{}, // Append a list of networks to include FORMAT: IPv4 dotted quad, triple, pair or single (e.g. 192.168.1.0, 192.168.1, 172.16, 10)
+			NetworkExclusions: []string{}, // Append a list of networks to exclude
+		},
+		// ...
+	}
+
+	// cancel on SIGINT/SIGTERM for a clean shutdown of the reconnect loop.
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
+	// initialize listener manager with listener config
+	manager, err := iprd.NewListenerManager(cfg, log)
 	if err != nil {
 		log.Fatal(err)
 	}
-	// initialize packet processer
-	processor := iprd.NewPacketProcessor(nil)
-	// initialize & activate single IPRListener on iface
-	listener := iprd.NewListener(nil, log, iface)
-	if err := listener.Activate(); err != nil {
-		log.Fatal(err)
-	}
+
 	go func() {
-		for captured := range listener.Packets() {
-			processPacket(captured, processor)
+		if err := manager.Run(ctx); err != nil {
+			log.Error(fmt.Errorf("listener stopped: %v", err))
 		}
 	}()
-	// start listening for packets
-	listener.Listen()
+
+	for {
+		select {
+		case report, ok := <-manager.Reports():
+			if !ok {
+				return
+			}
+			// process reports...
+			fmt.Println(report)
+		case <-ctx.Done():
+			return
+		}
+	}
 }
