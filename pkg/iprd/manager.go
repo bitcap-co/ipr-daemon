@@ -9,6 +9,8 @@ import (
 	"github.com/gopacket/gopacket"
 )
 
+var ErrListenerManagerAlreadyStarted = errors.New("listener manager may only be run once")
+
 // ListenerManager coordinates interface listeners, capture writing, packet
 // processing, and a single combined IP report stream.
 type ListenerManager struct {
@@ -64,7 +66,7 @@ func (m *ListenerManager) Run(ctx context.Context) error {
 		started = true
 	})
 	if !started {
-		return fmt.Errorf("listener manager may only be run once")
+		return ErrListenerManagerAlreadyStarted
 	}
 	defer close(m.reports)
 
