@@ -23,6 +23,9 @@ debug = false
 auto = false
 # listen_interfaces contains the names or indexes of interfaces for listen/capture.
 listen_interfaces = ["eth0"]
+# forward_bind is the local IP address to bind the TCP broadcast stream to.
+# empty binds all interfaces (default).
+forward_bind = ""
 # forward_port is the TCP stream/broadcast port for forwarding IP report packet data.
 forward_port = 7788
 # forward_known is a switch to only forward IP reports from known miner types/ports over forward_port.
@@ -44,6 +47,15 @@ network_exclusions = [""]
 capture_file = ""
 # rotate_capture_files keeps the active capture plus three numbered history files instead of flushing it.
 rotate_capture_files = false
+
+# Per-interface BPF options overlay the global options above. The selector
+# should also appear in listen_interfaces. Repeat [[interfaces]] for each interface.
+# [[interfaces]]
+# selector = "eth0"
+# no_root_network = true
+# ignored_devices = ["aa:bb:cc:dd:ee:ff"]
+# network_inclusions = ["192.168.1"]
+# network_exclusions = ["10"]
 EOF
 
 ENV ARGS=""
