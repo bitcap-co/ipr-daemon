@@ -163,8 +163,13 @@ func main() {
 				if !ok {
 					return
 				}
-				// send message to subscribed clients.
-				msg, err := report.Marshal()
+				// Create the transport message once so its packet ID remains stable.
+				broadcast, err := iprd.NewIPRBroadcastMessage(report)
+				if err != nil {
+					log.Error(err)
+					continue
+				}
+				msg, err := broadcast.Marshal()
 				if err != nil {
 					log.Error(err)
 					continue

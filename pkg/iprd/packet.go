@@ -31,6 +31,9 @@ type IPRBroadcastMessage struct {
 
 // NewIPRBroadcastMessage creates a new IPRBroadcastMessage from an IPReportPacket.
 func NewIPRBroadcastMessage(report *IPReportPacket) (IPRBroadcastMessage, error) {
+	if report == nil {
+		return IPRBroadcastMessage{}, fmt.Errorf("report must not be nil")
+	}
 	packetID, err := uuid.NewV7()
 	if err != nil {
 		return IPRBroadcastMessage{}, err
@@ -43,6 +46,11 @@ func NewIPRBroadcastMessage(report *IPReportPacket) (IPRBroadcastMessage, error)
 		SrcMAC:    report.SrcMAC,
 		MinerHint: report.MinerHint,
 	}, nil
+}
+
+// Marshal serializes the broadcast message without changing its packet ID.
+func (m IPRBroadcastMessage) Marshal() ([]byte, error) {
+	return json.Marshal(m)
 }
 
 // IPReportPacket represents a IP Report packet.
@@ -76,17 +84,15 @@ func (r IPReportPacket) String() string {
 		r.CaptureLength, r.MinerHint)
 }
 
-// Marshal returns the IPReportPacket data to marshalled IPRBroadcastMessage.
+// Marshal creates and serializes an IPRBroadcastMessage.
+// Deprecated: call NewIPRBroadcastMessage and marshal the returned message when
+// the generated packet ID must remain stable across multiple serializations.
 func (r *IPReportPacket) Marshal() ([]byte, error) {
-	b, err := NewIPRBroadcastMessage(r)
+	message, err := NewIPRBroadcastMessage(r)
 	if err != nil {
 		return nil, err
 	}
-	msg, err := json.Marshal(b)
-	if err != nil {
-		return nil, err
-	}
-	return msg, nil
+	return message.Marshal()
 }
 
 // NewIPReportPacket initializes packet into IPReportPacket. Returns an error on failure.
