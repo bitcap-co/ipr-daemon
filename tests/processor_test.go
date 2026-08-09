@@ -82,6 +82,7 @@ func TestPacketProcessorAllowsStaticElphapexPacket(t *testing.T) {
 	record := iprd.NewRecord(5)
 	processor := iprd.NewPacketProcessor(record)
 	packet := validIPReportPacket("aa:bb:cc:dd:ee:00", 1, 9999)
+	packet.Datagram = []byte("DG_IPREPORT_ONLY")
 	if err := processor.ParseIPReportPacket(packet); err != nil {
 		t.Fatalf("ParseIPReportPacket() should return valid for Elphapex packet")
 	}

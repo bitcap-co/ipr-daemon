@@ -88,19 +88,11 @@ func (p *PacketProcessor) ParseIPReportPacket(packet *IPReportPacket) error {
 	}
 
 	packet.Payload = string(packet.Datagram)
-	// ignore packet if it doesn't contain source IP within UDP datagram.
+	// Ignore packets that don't contain their source IP, except for the static
+	// Elphapex report payload.
 	if !bytes.Contains(packet.Datagram, []byte(packet.SrcIP)) {
-		switch packet.MinerHint {
-		case Elphapex:
-			// ignore Elphapex packets that don't contain source IP within UDP datagram.
-			pattern, _ := GetMsgPatternFromHint(Elphapex)
-			if pattern != nil {
-				if !pattern.Match(packet.Datagram) {
-					return errNoSourceIPInDatagram
-				}
-			}
-			fallthrough
-		default:
+		pattern, ok := GetMsgPatternFromHint(Elphapex)
+		if packet.MinerHint != Elphapex || !ok || !pattern.Match(packet.Datagram) {
 			return errNoSourceIPInDatagram
 		}
 	}
