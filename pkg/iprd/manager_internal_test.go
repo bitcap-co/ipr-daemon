@@ -65,7 +65,10 @@ func mustHardwareAddr(t *testing.T, value string) net.HardwareAddr {
 }
 
 func TestListenerManagerRunIsOneShotAndClosesReports(t *testing.T) {
-	manager := NewListenerManager(DefaultListenerConfig(), NewLogger())
+	manager, err := NewListenerManager(DefaultListenerConfig(), NewLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
 	manager.listeners = nil
 
 	if err := manager.Run(context.Background()); err == nil {
@@ -80,7 +83,10 @@ func TestListenerManagerRunIsOneShotAndClosesReports(t *testing.T) {
 }
 
 func TestListenerManagerProcessesCapturedPacket(t *testing.T) {
-	manager := NewListenerManager(DefaultListenerConfig(), NewLogger())
+	manager, err := NewListenerManager(DefaultListenerConfig(), NewLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
 	captured := capturedIPReport(t, "aa:bb:cc:dd:ee:01", 14235, 3)
 
 	report := manager.processCapturedPacket(captured)
@@ -96,7 +102,10 @@ func TestListenerManagerProcessesCapturedPacket(t *testing.T) {
 }
 
 func TestListenerManagerDeduplicatesAcrossCapturedInterfaces(t *testing.T) {
-	manager := NewListenerManager(DefaultListenerConfig(), NewLogger())
+	manager, err := NewListenerManager(DefaultListenerConfig(), NewLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
 	mac := "aa:bb:cc:dd:ee:02"
 	if report := manager.processCapturedPacket(capturedIPReport(t, mac, 14235, 1)); report == nil {
 		t.Fatal("first capture returned no IP report")
@@ -109,7 +118,10 @@ func TestListenerManagerDeduplicatesAcrossCapturedInterfaces(t *testing.T) {
 func TestListenerManagerFiltersUnknownMiners(t *testing.T) {
 	cfg := DefaultListenerConfig()
 	cfg.ForwardKnown = true
-	manager := NewListenerManager(cfg, NewLogger())
+	manager, err := NewListenerManager(cfg, NewLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if report := manager.processCapturedPacket(capturedIPReport(t, "aa:bb:cc:dd:ee:03", 7777, 1)); report != nil {
 		t.Fatal("unknown miner was reported with ForwardKnown enabled")
@@ -121,7 +133,10 @@ func TestNewListenerManagerCreatesListenerPerInterface(t *testing.T) {
 	cfg.ListenInterfaces = []string{"eth1", "eth2"}
 	cfg.ListenInterface = ""
 	cfg.CaptureFile = "capture.pcap"
-	manager := NewListenerManager(cfg, NewLogger())
+	manager, err := NewListenerManager(cfg, NewLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if len(manager.listeners) != 2 {
 		t.Fatalf("listener count = %d, want 2", len(manager.listeners))
@@ -165,7 +180,10 @@ func TestNewListenerManagerAppliesInterfaceBPFOptions(t *testing.T) {
 		},
 	}
 
-	manager := NewListenerManager(cfg, NewLogger())
+	manager, err := NewListenerManager(cfg, NewLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
 	eth1 := manager.listeners[0].cfg
 	eth2 := manager.listeners[1].cfg
 	if eth1.NoRootNetwork {
@@ -192,7 +210,10 @@ func TestNewListenerManagerAutoModeCreatesOneListener(t *testing.T) {
 	cfg := DefaultListenerConfig()
 	cfg.Auto = true
 	cfg.ListenInterfaces = []string{"eth1", "eth2"}
-	manager := NewListenerManager(cfg, NewLogger())
+	manager, err := NewListenerManager(cfg, NewLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if len(manager.listeners) != 1 {
 		t.Fatalf("listener count = %d, want 1", len(manager.listeners))
@@ -205,7 +226,10 @@ func TestNewListenerManagerAutoModeCreatesOneListener(t *testing.T) {
 func TestForwardCapturedPacketsFansInListeners(t *testing.T) {
 	cfg := DefaultListenerConfig()
 	cfg.ListenInterfaces = []string{"eth1", "eth2"}
-	manager := NewListenerManager(cfg, NewLogger())
+	manager, err := NewListenerManager(cfg, NewLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	captures := make(chan CapturedPacket)

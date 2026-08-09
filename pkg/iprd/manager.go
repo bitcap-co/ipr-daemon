@@ -23,7 +23,7 @@ type ListenerManager struct {
 
 // NewListenerManager returns a manager with one listener per configured
 // interface. Auto mode creates one listener and ignores explicit selectors.
-func NewListenerManager(cfg *ListenerConfig, logger Logger) *ListenerManager {
+func NewListenerManager(cfg *ListenerConfig, logger Logger) (*ListenerManager, error) {
 	if cfg == nil {
 		cfg = DefaultListenerConfig()
 	}
@@ -32,6 +32,10 @@ func NewListenerManager(cfg *ListenerConfig, logger Logger) *ListenerManager {
 	}
 	managerCfg := *cfg
 	managerCfg.normalizeListenInterfaces()
+
+	if err := managerCfg.Validate(); err != nil {
+		return nil, fmt.Errorf("listener config: %w", err)
+	}
 	capture := NewCaptureWriter(managerCfg.CaptureFile, managerCfg.RotateCaptureFiles, logger)
 	managerCfg.CaptureFile = capture.Path()
 	cfg = &managerCfg
@@ -42,7 +46,7 @@ func NewListenerManager(cfg *ListenerConfig, logger Logger) *ListenerManager {
 		processor: NewPacketProcessor(nil),
 		capture:   capture,
 		reports:   make(chan *IPReportPacket, 256),
-	}
+	}, nil
 }
 
 // Reports returns the manager's combined stream of validated IP reports.

@@ -128,7 +128,10 @@ func main() {
 	defer stop()
 
 	// Initialize the capture and packet-processing manager.
-	manager := iprd.NewListenerManager(&cfg.ListenerConfig, log)
+	manager, err := iprd.NewListenerManager(&cfg.ListenerConfig, log)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// open TCP broadcast.
 	broadcaster, err := iprd.NewBroadcaster(log, cfg.Bind, cfg.Port)
