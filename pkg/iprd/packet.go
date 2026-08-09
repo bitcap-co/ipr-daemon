@@ -29,6 +29,22 @@ type IPRBroadcastMessage struct {
 	MinerHint MinerTypeHint `json:"minerHint"`
 }
 
+// NewIPRBroadcastMessage creates a new IPRBroadcastMessage from an IPReportPacket.
+func NewIPRBroadcastMessage(report *IPReportPacket) (IPRBroadcastMessage, error) {
+	packetID, err := uuid.NewV7()
+	if err != nil {
+		return IPRBroadcastMessage{}, err
+	}
+	return IPRBroadcastMessage{
+		Timestamp: report.Timestamp.UnixMilli(),
+		PacketID:  packetID.String(),
+		DstPort:   report.DstPort,
+		SrcIP:     report.SrcIP,
+		SrcMAC:    report.SrcMAC,
+		MinerHint: report.MinerHint,
+	}, nil
+}
+
 // IPReportPacket represents a IP Report packet.
 type IPReportPacket struct {
 	Timestamp      time.Time
@@ -60,25 +76,9 @@ func (r IPReportPacket) String() string {
 		r.CaptureLength, r.MinerHint)
 }
 
-// BroadcastMessage returns the IPReportPacket data as an IPRBroadcastMessage.
-func (r *IPReportPacket) BroadcastMessage() (IPRBroadcastMessage, error) {
-	packetID, err := uuid.NewV7()
-	if err != nil {
-		return IPRBroadcastMessage{}, err
-	}
-	return IPRBroadcastMessage{
-		Timestamp: r.Timestamp.UnixMilli(),
-		PacketID:  packetID.String(),
-		DstPort:   r.DstPort,
-		SrcIP:     r.SrcIP,
-		SrcMAC:    r.SrcMAC,
-		MinerHint: r.MinerHint,
-	}, nil
-}
-
 // Marshal returns the IPReportPacket data to marshalled IPRBroadcastMessage.
 func (r *IPReportPacket) Marshal() ([]byte, error) {
-	b, err := r.BroadcastMessage()
+	b, err := NewIPRBroadcastMessage(r)
 	if err != nil {
 		return nil, err
 	}
