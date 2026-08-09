@@ -26,20 +26,33 @@ const (
 )
 
 var (
-	ValidIP     = regexp.MustCompile(`\b(?:(?:2(?:[0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9])\.){3}(?:(?:2([0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9]))\b`)
-	ValidMAC    = regexp.MustCompile(`([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})`)
-	MsgPatterns = map[string]*regexp.Regexp{
-		"common":     regexp.MustCompile(fmt.Sprintf(`^%s,%s`, ValidIP, ValidMAC)),
-		"iceriver":   regexp.MustCompile(fmt.Sprintf(`^addr:%s`, ValidIP)),
-		"whatsminer": regexp.MustCompile(fmt.Sprintf(`^IP:%sMAC:%s`, ValidIP, ValidMAC)),
-		"elphapex":   regexp.MustCompile(`^DG_IPREPORT_ONLY`),
-		"ipollo":     regexp.MustCompile(fmt.Sprintf(`^IP Addr:\[%s\].*?MAC Addr:\[%s\]`, ValidIP, ValidMAC)),
-		"hivegpu":    regexp.MustCompile(fmt.Sprintf(`^HiveOS %s`, ValidIP)),
+	// MinerPorts is a map of UDP destination ports to MinerTypeHint.
+	MinerPorts = map[int]MinerTypeHint{
+		14235: Antminer, // This is a known common port for multiple miner types (i.e. Volcminer, Hammer)
+		11503: Iceriver,
+		8888:  Whatsminer,
+		1314:  Goldshell,
+		18650: Sealminer,
+		9999:  Elphapex,
+		12345: Auradine,
+		54321: IPollo,
+		42069: HiveGPU,
+	}
+	ValidIP  = regexp.MustCompile(`\b(?:(?:2(?:[0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9])\.){3}(?:(?:2([0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9]))\b`)
+	ValidMAC = regexp.MustCompile(`([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})`)
+	// MsgPatterns is a map of regex UDP payload patterns for MinerTypeHint.
+	MsgPatterns = map[MinerTypeHint]*regexp.Regexp{
+		Antminer:   regexp.MustCompile(fmt.Sprintf(`^%s,%s`, ValidIP, ValidMAC)),
+		Iceriver:   regexp.MustCompile(fmt.Sprintf(`^addr:%s`, ValidIP)),
+		Whatsminer: regexp.MustCompile(fmt.Sprintf(`^IP:%sMAC:%s`, ValidIP, ValidMAC)),
+		Elphapex:   regexp.MustCompile(`^DG_IPREPORT_ONLY`),
+		IPollo:     regexp.MustCompile(fmt.Sprintf(`^IP Addr:\[%s\].*?MAC Addr:\[%s\]`, ValidIP, ValidMAC)),
+		HiveGPU:    regexp.MustCompile(fmt.Sprintf(`^HiveOS %s`, ValidIP)),
 	}
 )
 
-// IPReportGoldshell represents the JSON payload of IP report packet for Goldshell miners.
-type IPReportGoldshell struct {
+// GoldshellIPReport represents the IP report JSON payload from Goldshell miners.
+type GoldshellIPReport struct {
 	Version     string          `json:"version"`
 	IPAddress   string          `json:"ip"`
 	DHCP        string          `json:"dhcp"`
@@ -55,102 +68,8 @@ type IPReportGoldshell struct {
 	LEDStatus   bool            `json:"ledstatus"`
 }
 
-type SealMinerBoard struct {
-	Serial     string `json:"SN"`
-	BinVersion int    `json:"BinVer"`
-	BinNumber  int    `json:"BinNum"`
-}
-
-type SealMinerInfo struct {
-	MACAddress     string           `json:"MAC"`
-	Type           string           `json:"Type"`
-	Firmware       string           `json:"Firmware"`
-	CtrlBoard      string           `json:"CtrlBoardVersion"`
-	InterfaceCount int              `json:"NetInterfaceCnt"`
-	Upgrade        int              `json:"UpgradeStatus"`
-	CtrlBoardSN    string           `json:"MainBoardSN"`
-	RatedPower     int              `json:"RatedInputPower"`
-	PowerLimit     int              `json:"InputPowerLimit"`
-	Boards         []SealMinerBoard `json:"BoardSNArray"`
-}
-
-type SealMinerInterface struct {
-	Interface  string `json:"Interface"`
-	Active     bool   `json:"Active"`
-	DHCP       bool   `json:"DHCP"`
-	IPAddress  string `json:"IPV4"`
-	Netmask    string `json:"Netmask"`
-	Gateway    string `json:"Gateway"`
-	DNS1       string `json:"DNS1"`
-	DNS2       string `json:"DNS2"`
-	AutoReboot bool   `json:"AutoReboot"`
-}
-
-// IPReportSealminer represents the JSON payload of IP Report packet for SealMiners
-type IPReportSealminer struct {
-	Info       SealMinerInfo
-	Interfaces []SealMinerInterface
-}
-
-func (i *IPReportSealminer) getMinerInfo(data []interface{}) (*SealMinerInfo, error) {
-	var sminfo *SealMinerInfo
-	info_data, err := json.Marshal(data[1])
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal miner info: %W", err)
-	}
-	if err := json.Unmarshal(info_data, &sminfo); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal miner info: %W", err)
-	}
-	return sminfo, nil
-}
-
-func (i *IPReportSealminer) getInterfaces(data []interface{}) (*[]SealMinerInterface, error) {
-	var sminterfaces *[]SealMinerInterface
-	interface_data, err := json.Marshal(data[2:4])
-	if err != nil {
-		return nil, fmt.Errorf("failed to marshal interfaces: %W", err)
-	}
-	if err := json.Unmarshal(interface_data, &sminterfaces); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal interfaces: %W", err)
-	}
-	return sminterfaces, nil
-}
-
-func (i *IPReportSealminer) UnmarshalJSON(data []byte) error {
-	// remove null bytes
-	data = bytes.ReplaceAll(data, []byte(`\x00`), []byte{})
-	// // fix commas
-	data = bytes.ReplaceAll(data, []byte("}{"), []byte("}, {"))
-	// // fix booleans
-	data = bytes.ReplaceAll(data, []byte("TRUE"), []byte("true"))
-	data = bytes.ReplaceAll(data, []byte("FALSE"), []byte("false"))
-
-	var temp []interface{}
-	if err := json.Unmarshal(data, &temp); err != nil {
-		return fmt.Errorf("failed to unmarshal payload: %W", err)
-	}
-
-	if len(temp) != 7 {
-		return fmt.Errorf("expected 7 elements in array, got %d", len(temp))
-	}
-
-	sminfo, err := i.getMinerInfo(temp)
-	if err != nil {
-		return err
-	}
-	i.Info = *sminfo
-
-	sminterfaces, err := i.getInterfaces(temp)
-	if err != nil {
-		return err
-	}
-	i.Interfaces = *sminterfaces
-
-	return nil
-}
-
-// IPReportAuradine represents the JSON payload of IP Report packet from Auradine miners
-type IPReportAuradine struct {
+// AuradineIPReport represents the IP report JSON payload from Auradine miners.
+type AuradineIPReport struct {
 	Command      string `json:"command"`
 	SerialNo     string `json:"SerialNo"`
 	IPAddress    string `json:"ip"`
@@ -161,66 +80,143 @@ type IPReportAuradine struct {
 	InternalType string `json:"InternalType"`
 }
 
-// ParseMACAddress parses macAddress as a new MAC address.
-func ParseMACAddress(macAddress string) string {
-	if macAddress == "" {
+type sealminerInfo struct {
+	MACAddress       string          `json:"MAC"`
+	Type             string          `json:"Type"`
+	Firmware         string          `json:"Firmware"`
+	CtrlBoardVersion string          `json:"CtrlBoardVersion"`
+	NetInterfaceCnt  int             `json:"NetInterfaceCnt"`
+	UpgradeStatus    int             `json:"UpgradeStatus"`
+	MainBoardSN      string          `json:"MainBoardSN"`
+	RatedInputPower  int             `json:"RatedInputPower"`
+	InputPowerLimit  int             `json:"InputPowerLimit"`
+	BoardSNArray     json.RawMessage `json:"BoardSNArray"`
+}
+
+type sealminerInterface struct {
+	Interface  string `json:"Interface"`
+	Active     bool   `json:"Active"`
+	DHCP       bool   `json:"DHCP"`
+	IPV4       string `json:"IPV4"`
+	Netmask    string `json:"Netmask"`
+	Gateway    string `json:"Gateway"`
+	DNS1       string `json:"DNS1"`
+	DNS2       string `json:"DNS2"`
+	AutoReboot bool   `json:"AutoReboot"`
+}
+
+// SealminerIPReport represents the IP report JSON payload from Sealminer miners.
+type SealminerIPReport struct {
+	Info       sealminerInfo
+	Interfaces []sealminerInterface
+}
+
+func (r *SealminerIPReport) parseInfo(data []any) (*sealminerInfo, error) {
+	var info *sealminerInfo
+	raw, err := json.Marshal(data[1])
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal info: %W", err)
+	}
+	if err := json.Unmarshal(raw, &info); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal info: %W", err)
+	}
+	return info, nil
+}
+
+func (r *SealminerIPReport) parseInterfaces(data []any) (*[]sealminerInterface, error) {
+	var interfaces *[]sealminerInterface
+	raw, err := json.Marshal(data[2:4])
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal interfaces: %W", err)
+	}
+	if err := json.Unmarshal(raw, &interfaces); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal interfaces: %W", err)
+	}
+	return interfaces, nil
+}
+
+func (r *SealminerIPReport) UnmarshalJSON(data []byte) error {
+	// remove null bytes
+	data = bytes.ReplaceAll(data, []byte(`\x00`), []byte{})
+	// add commas between objects
+	data = bytes.ReplaceAll(data, []byte("}{"), []byte("}, {"))
+	// fix JSON booleans
+	data = bytes.ReplaceAll(data, []byte("TRUE"), []byte("true"))
+	data = bytes.ReplaceAll(data, []byte("FALSE"), []byte("false"))
+
+	var t []any
+	if err := json.Unmarshal(data, &t); err != nil {
+		return fmt.Errorf("failed to unmarshal: %W", err)
+	}
+	if len(t) != 7 {
+		return fmt.Errorf("invalid number of elements in array: got %d, want 7", len(t))
+	}
+	info, err := r.parseInfo(t)
+	if err != nil {
+		return err
+	}
+	r.Info = *info
+	interfaces, err := r.parseInterfaces(t)
+	if err != nil {
+		return err
+	}
+	r.Interfaces = *interfaces
+	return nil
+}
+
+// ParseMACAddress parses address and returns a normalized MAC address.
+func ParseMACAddress(address string) string {
+	if address == "" {
 		return ""
 	}
-	macAddress = strings.ToLower(macAddress)
-	switch len(macAddress) {
+	address = strings.ToLower(address)
+	switch len(address) {
 	case 17:
-		macAddress = strings.ReplaceAll(macAddress, "-", ":")
+		address = strings.ReplaceAll(address, "-", ":")
 	case 12:
-		var newMacAddress strings.Builder
-		newMacAddress.Grow(17)
+		var newAddress strings.Builder
+		newAddress.Grow(17)
 		for i := 0; i < 12; i += 2 {
-			newMacAddress.WriteString(macAddress[i : i+2])
+			newAddress.WriteString(address[i : i+2])
 			if i < 10 {
-				newMacAddress.WriteString(":")
+				newAddress.WriteString(":")
 			}
 		}
-		macAddress = newMacAddress.String()
+		address = newAddress.String()
 	default:
 		return ""
 	}
 
-	if !ValidMAC.MatchString(macAddress) {
+	if !ValidMAC.MatchString(address) {
 		return ""
 	}
 
-	return macAddress
+	return address
 }
 
-// ParseBPFNetwork returns net on successful parse, empty if not.
-// net is a BPF IPv4 network number that can be written as a dotted quad (192.168.1.0), dotted triple (192.168.1),
+// ParseBPFNetwork returns the parsed BPF network, or an empty string if invalid.
+// network is a BPF IPv4 network number that can be written as a dotted quad (192.168.1.0), dotted triple (192.168.1),
 // dotted pair (192.168) or single number (10).
-func ParseBPFNetwork(net string) string {
-	if net == "" {
+func ParseBPFNetwork(network string) string {
+	if network == "" {
 		return ""
 	}
-	// max dotted quad/IPv4 has length of 15
-	if len(net) > 15 {
+	network = strings.TrimSpace(network)
+	if len(network) > 15 {
 		return ""
 	}
-	octets := strings.Split(net, ".")
+	octets := strings.Split(network, ".")
 	if len(octets) > 4 {
 		return ""
 	}
-
-	validNet := func() bool {
-		for _, octet := range octets {
-			if o, err := strconv.Atoi(octet); err != nil {
-				return false
-			} else {
-				if o < 0 || o > 255 {
-					return false
-				}
-			}
+	for _, octet := range octets {
+		if octet == "" {
+			return ""
 		}
-		return true
-	}()
-	if !validNet {
-		return ""
+		if o, err := strconv.Atoi(octet); err != nil || o < 0 || o > 255 {
+			return ""
+		}
 	}
-	return net
+
+	return network
 }

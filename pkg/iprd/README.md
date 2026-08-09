@@ -5,19 +5,4 @@ This package serves as the core library for the IP Reporter daemon (iprd). It pr
 Run `go doc -http` for more information on what is included.
 
 #### Example Usage
-```go
-func main() {
-	// getting a network interface
-	iface, err := iprd.GetInterfaceByName("eth0")
-	if err != nil {
-			log.Fatal(err)
-	}
-	// initializing and activating a IPRListener on iface
-	listener := iprd.NewListener(nil, false, iface)
-	if err := listener.Activate(); err != nil {
-			log.Fatal(err)
-	}
-	// start listening
-	listener.Listen()
-}
-```
+See [cmd/example/starter/main.go](https://github.com/bitcap-co/ipr-daemon/cmd/example/starter/main.go) for an basic example program.

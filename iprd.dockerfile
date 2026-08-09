@@ -19,10 +19,10 @@ RUN cat <<EOF > /home/iprd.toml
 # debug is a switch to enable packet debugging output.
 debug = false
 # auto is a switch to find and use the defined LAN interface (description matching 'lan/LAN') for listening.
-# overrides listen_inteface.
+# overrides listen_interfaces.
 auto = false
-# listen_inteface is the name or index of interface for listen/capture.
-listen_interface = "eth0"
+# listen_interfaces contains the names or indexes of interfaces for listen/capture.
+listen_interfaces = ["eth0"]
 # forward_port is the TCP stream/broadcast port for forwarding IP report packet data.
 forward_port = 7788
 # forward_known is a switch to only forward IP reports from known miner types/ports over forward_port.
@@ -40,7 +40,7 @@ network_inclusions = [""]
 # network_exclusions is a list of networks to additionally exclude in BPF filter.
 # these get appended after network_inclusions.
 network_exclusions = [""]
-# capture_file is a path to write received packets to in PCAP format for replay/debugging.
+# capture_file is a path to write received packets to in PCAP-NG format for replay/debugging.
 capture_file = ""
 # rotate_capture_files keeps the active capture plus three numbered history files instead of flushing it.
 rotate_capture_files = false

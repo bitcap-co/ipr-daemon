@@ -4,24 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
 
-	"github.com/gopacket/gopacket"
-	"github.com/gopacket/gopacket/layers"
 	"github.com/gopacket/gopacket/pcap"
-	"github.com/gopacket/gopacket/pcapgo"
-)
-
-const (
-	captureSnapLen     uint32 = 1600
-	maxCaptureFileSize int64  = 4 * 1024 * 1024 // max capture file size of 4mb
-	pcapFileHeaderSize int64  = 24
-	pcapRecordHeader   int64  = 16
-	maxCaptureFiles           = 4
 )
 
 const (
@@ -38,26 +25,21 @@ const (
 )
 
 type IPRListener struct {
-	cfg             *IPRDConfig
-	log             *IPRLogger
-	iface           *IPRInterface
-	ifacePinned     bool
-	resolvedName    string
-	inactive        *pcap.InactiveHandle
-	handle          *pcap.Handle
-	ch              chan []byte
-	captureFile     *os.File
-	captureW        *pcapgo.Writer
-	captureBytes    int64
-	captureLinkType layers.LinkType
+	cfg          *ListenerConfig
+	log          Logger
+	iface        *IPRInterface
+	ifacePinned  bool
+	resolvedName string
+	inactive     *pcap.InactiveHandle
+	handle       *pcap.Handle
+	packets      chan CapturedPacket
 }
 
-// NewListener returns a new IPRListener, taking in a IPRDConfig to configure behavior. If logger is nil, a new IPRLogger is created.
+// NewListener returns a new IPRListener configured by ListenerConfig. If logger is nil, a new IPRLogger is created.
 // If iface is supplied it is pinned and reused; otherwise the interface is resolved from cfg (and re-resolved on each reconnect).
-func NewListener(cfg *IPRDConfig, logger *IPRLogger, iface *IPRInterface) *IPRListener {
+func NewListener(cfg *ListenerConfig, logger Logger, iface *IPRInterface) *IPRListener {
 	if cfg == nil {
-		// pass in default config if not supplied
-		cfg = DefaultIPRDConfig()
+		cfg = DefaultListenerConfig()
 	}
 	if logger == nil {
 		logger = NewLogger()
@@ -68,13 +50,13 @@ func NewListener(cfg *IPRDConfig, logger *IPRLogger, iface *IPRInterface) *IPRLi
 		log:         logger,
 		iface:       iface,
 		ifacePinned: iface != nil,
-		ch:          make(chan []byte),
+		packets:     make(chan CapturedPacket),
 	}
 }
 
-// Broadcast returns a channel of messages for broadcasting.
-func (l *IPRListener) Broadcast() chan []byte {
-	return l.ch
+// Packets returns the listener's stream of raw captured packets.
+func (l *IPRListener) Packets() <-chan CapturedPacket {
+	return l.packets
 }
 
 func (l *IPRListener) setupBPF(root string) error {
@@ -172,40 +154,6 @@ func (l *IPRListener) setupHandle() error {
 	return nil
 }
 
-// logStartupModes logs enabled one-off modes (debug, forward-known).
-func (l *IPRListener) logStartupModes() {
-	if l.cfg.Debug {
-		l.log.Debug("--- DEBUG OUTPUT ON ---")
-	}
-	if l.cfg.ForwardKnown {
-		l.log.Info("fowarding known ports only")
-	}
-}
-
-// openCaptureFile opens the PCAP capture file if configured. It is idempotent:
-// once opened the writer persists across reconnects so captures are not truncated.
-// Requires an active handle (for the link type).
-func (l *IPRListener) openCaptureFile() error {
-	if l.cfg.CaptureFile == "" || l.captureFile != nil {
-		return nil
-	}
-	l.cfg.CaptureFile = normalizeCapturePath(l.cfg.CaptureFile)
-	l.captureLinkType = l.handle.LinkType()
-	if err := l.createCaptureFile(); err != nil {
-		return err
-	}
-	l.log.Info(fmt.Sprintf("capturing packets to -> %s", l.cfg.CaptureFile))
-	return nil
-}
-
-func (l *IPRListener) closeCaptureFile() {
-	if l.captureFile != nil {
-		l.captureFile.Close()
-		l.captureFile = nil
-		l.captureW = nil
-	}
-}
-
 func (l *IPRListener) closeHandle() {
 	if l.handle != nil {
 		l.handle.Close()
@@ -215,21 +163,15 @@ func (l *IPRListener) closeHandle() {
 
 // Activate sets a new active pcap handle on iface. This must be called once before Listen().
 func (l *IPRListener) Activate() error {
-	if err := l.setupHandle(); err != nil {
-		return err
-	}
-	l.logStartupModes()
-	return l.openCaptureFile()
+	return l.setupHandle()
 }
 
 // Run supervises capture on the interface: it activates a handle, captures until the
 // handle errors (e.g. the interface goes down/away) or ctx is cancelled, and on error
 // re-resolves the interface and re-activates with exponential backoff. It returns when
-// ctx is cancelled. The broadcast channel and any downstream consumers stay intact
+// ctx is cancelled. The packet channel and any downstream consumers stay intact
 // across reconnects. Run is the resilient alternative to Activate()+Listen().
 func (l *IPRListener) Run(ctx context.Context) error {
-	l.logStartupModes()
-	defer l.closeCaptureFile()
 	defer l.closeHandle()
 
 	backoff := reconnectMinBackoff
@@ -241,11 +183,6 @@ func (l *IPRListener) Run(ctx context.Context) error {
 			}
 			backoff = nextBackoff(backoff)
 			continue
-		}
-		// a bad capture-file path is a hard configuration error, not transient.
-		if err := l.openCaptureFile(); err != nil {
-			l.closeHandle()
-			return err
 		}
 		backoff = reconnectMinBackoff
 
@@ -275,11 +212,11 @@ func (l *IPRListener) activateForRun() error {
 	return l.setupHandle()
 }
 
-// Listen will start reading packets from the active handle and sends the marshalled IPReportPacket to Broadcast().
-// It blocks until the handle errors. For a resilient, self-reconnecting listener use Run().
+// Listen starts reading packets from the active handle and sends raw capture
+// events to Packets(). It blocks until the handle errors. For a resilient,
+// self-reconnecting listener use Run().
 func (l *IPRListener) Listen() {
 	defer l.closeHandle()
-	defer l.closeCaptureFile()
 	l.log.Info("start listen...")
 	if err := l.capture(context.Background()); err != nil {
 		l.log.Error(fmt.Errorf("capture stopped: %w", err))
@@ -306,60 +243,16 @@ func (l *IPRListener) capture(ctx context.Context) error {
 			return err
 		}
 
-		if l.captureW != nil {
-			if werr := l.captureW.WritePacket(ci, data); werr != nil {
-				l.log.Error(fmt.Errorf("failed to write packet to capture file: %w", werr))
-			} else {
-				l.captureBytes += pcapRecordHeader + int64(len(data))
-				if l.captureBytes >= maxCaptureFileSize {
-					if ferr := l.rollCaptureFile(); ferr != nil {
-						l.log.Error(fmt.Errorf("failed to roll capture file: %w", ferr))
-					}
-				}
-			}
-		}
-
-		packet := gopacket.NewPacket(data, linkType, gopacket.Default)
-		packet.Metadata().CaptureInfo = ci
-
-		// try and initialize as IPReportPacket.
-		r, _ := NewIPReportPacket(packet)
-		if r == nil {
-			// invalid layer or empty UDP paylaod.
-			continue
-		}
-		// parse IPReportPacket to validate that it is an IP Report packet.
-		if err := ParseIPReportPacket(r); err != nil {
-			// warn on duplicate packet.
-			if err.Error() == "duplicate packet" {
-				l.log.Warn(fmt.Sprintf("%s - %s", r.String(), err))
-			}
-			if l.cfg.Debug {
-				l.log.Error(fmt.Errorf("%s - not valid: %w", r.String(), err))
-				l.log.Debug("--- PACKET DUMP ---")
-				l.log.Debug(fmt.Sprintf("%s\n", packet.Dump()))
-			}
-			continue
-		}
-		if l.cfg.ForwardKnown {
-			if r.MinerHint == UnknownType {
-				l.log.Warn(fmt.Sprintf("received unknown IP Report %s", r.String()))
-				continue
-			}
-		}
-		l.log.Info(fmt.Sprintf("received IP Report %s", r.String()))
-		if l.cfg.Debug {
-			l.log.Debug(fmt.Sprintf("UDP Payload (%d) -> %s", r.CaptureLength, r.Payload))
-		}
-
-		// prepare new broadcast message.
-		msg, err := r.Marshal()
-		if err != nil {
-			l.log.Error(fmt.Errorf("failed to marshal packet: %w", err))
-			continue
+		eventCI := ci
+		eventCI.InterfaceIndex = l.iface.Index
+		captured := CapturedPacket{
+			Data:        data,
+			CaptureInfo: eventCI,
+			LinkType:    linkType,
+			Interface:   *l.iface,
 		}
 		select {
-		case l.ch <- msg:
+		case l.packets <- captured:
 		case <-ctx.Done():
 			return nil
 		}
@@ -385,102 +278,6 @@ func nextBackoff(cur time.Duration) time.Duration {
 		return reconnectMaxBackoff
 	}
 	return next
-}
-
-// rollCaptureFile either rotates capture history or resets the active file,
-// depending on the configured capture mode.
-func (l *IPRListener) rollCaptureFile() error {
-	if l.cfg.RotateCaptureFiles {
-		return l.rotateCaptureFile()
-	}
-	return l.flushCaptureFile()
-}
-
-// flushCaptureFile truncates the capture file and rewrites the pcap header,
-// keeping disk usage bounded by maxCaptureFileSize.
-func (l *IPRListener) flushCaptureFile() error {
-	if _, err := l.captureFile.Seek(0, 0); err != nil {
-		return fmt.Errorf("seek: %w", err)
-	}
-	if err := l.captureFile.Truncate(0); err != nil {
-		return fmt.Errorf("truncate: %w", err)
-	}
-	w := pcapgo.NewWriter(l.captureFile)
-	if err := w.WriteFileHeader(captureSnapLen, l.handle.LinkType()); err != nil {
-		return fmt.Errorf("write header: %w", err)
-	}
-	l.captureW = w
-	l.captureBytes = pcapFileHeaderSize
-	l.log.Info(fmt.Sprintf("capture file reached %d bytes, flushed", maxCaptureFileSize))
-	return nil
-}
-
-// rotateCaptureFile archives the active capture and starts a new one. The base
-// file is always current; numbered files are ordered from newest to oldest.
-func (l *IPRListener) rotateCaptureFile() error {
-	if err := l.captureFile.Close(); err != nil {
-		return fmt.Errorf("close active capture: %w", err)
-	}
-	l.captureFile = nil
-	l.captureW = nil
-
-	rotateErr := rotateCaptureFiles(l.cfg.CaptureFile, maxCaptureFiles)
-	openErr := l.createCaptureFile()
-	if rotateErr != nil || openErr != nil {
-		return errors.Join(rotateErr, openErr)
-	}
-	l.log.Info(fmt.Sprintf("capture file reached %d bytes, rotated (keeping %d files)", maxCaptureFileSize, maxCaptureFiles))
-	return nil
-}
-
-func (l *IPRListener) createCaptureFile() error {
-	f, err := os.Create(l.cfg.CaptureFile)
-	if err != nil {
-		return fmt.Errorf("failed to open capture file: %w", err)
-	}
-	w := pcapgo.NewWriter(f)
-	if err := w.WriteFileHeader(captureSnapLen, l.captureLinkType); err != nil {
-		f.Close()
-		return fmt.Errorf("failed to write pcap file header: %w", err)
-	}
-	l.captureFile = f
-	l.captureW = w
-	l.captureBytes = pcapFileHeaderSize
-	return nil
-}
-
-func normalizeCapturePath(path string) string {
-	ext := filepath.Ext(path)
-	if strings.EqualFold(ext, ".pcap") {
-		return path
-	}
-	if strings.TrimSuffix(path, ext) == "" {
-		return path + ".pcap"
-	}
-	return strings.TrimSuffix(path, ext) + ".pcap"
-}
-
-func rotatedCapturePath(path string, index int) string {
-	ext := filepath.Ext(path)
-	return fmt.Sprintf("%s.%d%s", strings.TrimSuffix(path, ext), index, ext)
-}
-
-func rotateCaptureFiles(path string, maxFiles int) error {
-	oldest := rotatedCapturePath(path, maxFiles-1)
-	if err := os.Remove(oldest); err != nil && !errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("remove oldest capture %q: %w", oldest, err)
-	}
-	for index := maxFiles - 1; index >= 1; index-- {
-		source := path
-		if index > 1 {
-			source = rotatedCapturePath(path, index-1)
-		}
-		destination := rotatedCapturePath(path, index)
-		if err := os.Rename(source, destination); err != nil && !errors.Is(err, os.ErrNotExist) {
-			return fmt.Errorf("rotate capture %q to %q: %w", source, destination, err)
-		}
-	}
-	return nil
 }
 
 // setInterface finds the specified interface from config and sets on listener.

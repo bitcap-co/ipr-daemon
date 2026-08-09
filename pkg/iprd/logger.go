@@ -12,6 +12,13 @@ const (
 	errorColor = "\033[1;31m%s\033[0m"
 )
 
+type Logger interface {
+	Debug(msg string)
+	Info(msg string)
+	Warn(msg string)
+	Error(err error)
+}
+
 type IPRLogger struct {
 	*log.Logger
 }

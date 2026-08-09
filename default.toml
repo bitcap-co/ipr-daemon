@@ -1,10 +1,10 @@
 # debug is a switch to enable packet debugging output.
 debug = false
 # auto is a switch to find and use the defined LAN interface (description matching 'lan/LAN') for listening.
-# overrides listen_inteface.
+# overrides listen_interfaces.
 auto = false
-# listen_inteface is the name or index of interface for listen/capture.
-listen_interface = "eth0"
+# listen_interfaces contains the names or indexes of interfaces for listen/capture.
+listen_interfaces = ["eth0"]
 # forward_bind is the local IP address to bind the TCP broadcast stream to.
 # empty binds all interfaces (default).
 forward_bind = ""
@@ -25,7 +25,16 @@ network_inclusions = [""]
 # network_exclusions is a list of networks to additionally exclude in BPF filter.
 # these get appended after network_inclusions.
 network_exclusions = [""]
-# capture_file is a path to write received packets to in PCAP format for replay/debugging.
+# capture_file is a path to write received packets to in PCAP-NG format for replay/debugging.
 capture_file = ""
 # rotate_capture_files keeps the active capture plus three numbered history files instead of flushing it.
 rotate_capture_files = false
+
+# Per-interface BPF options overlay the global options above. The selector
+# should also appear in listen_interfaces. Repeat [[interfaces]] for each interface.
+# [[interfaces]]
+# selector = "eth0"
+# no_root_network = true
+# ignored_devices = ["aa:bb:cc:dd:ee:ff"]
+# network_inclusions = ["192.168.1"]
+# network_exclusions = ["10"]
