@@ -52,6 +52,8 @@ func NewListenerManager(cfg *ListenerConfig, logger Logger) (*ListenerManager, e
 }
 
 // Reports returns the manager's combined stream of validated IP reports.
+// The stream is buffered; if the consumer falls behind and the buffer fills,
+// packet processing applies backpressure until reports are consumed.
 func (m *ListenerManager) Reports() <-chan *IPReportPacket {
 	return m.reports
 }
