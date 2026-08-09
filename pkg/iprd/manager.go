@@ -9,7 +9,10 @@ import (
 	"github.com/gopacket/gopacket"
 )
 
-var ErrListenerManagerAlreadyStarted = errors.New("listener manager may only be run once")
+var (
+	// ErrListenerManagerAlreadyStarted is returned when the listener manager is started more than once.
+	ErrListenerManagerAlreadyStarted = errors.New("listener manager may only be run once")
+)
 
 // ListenerManager coordinates interface listeners, capture writing, packet
 // processing, and a single combined IP report stream.

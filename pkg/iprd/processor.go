@@ -21,7 +21,8 @@ const (
 var (
 	// ErrDuplicatePacket indicates that the processor recently handled an IP
 	// report from the same source MAC address.
-	ErrDuplicatePacket = errors.New("duplicate packet")
+	ErrDuplicatePacket      = errors.New("duplicate packet")
+	errNoSourceIPInDatagram = errors.New("no source IP found in datagram")
 	// zlib payload offsets
 	zlibOffsets = []int{0, zlibSealMinerOffset}
 )
@@ -89,9 +90,18 @@ func (p *PacketProcessor) ParseIPReportPacket(packet *IPReportPacket) error {
 	packet.Payload = string(packet.Datagram)
 	// ignore packet if it doesn't contain source IP within UDP datagram.
 	if !bytes.Contains(packet.Datagram, []byte(packet.SrcIP)) {
-		// edge case: elphapex sends static message with no source IP
-		if !MsgPatterns[Elphapex].Match(packet.Datagram) {
-			return fmt.Errorf("no source IP found in datagram")
+		switch packet.MinerHint {
+		case Elphapex:
+			// ignore Elphapex packets that don't contain source IP within UDP datagram.
+			pattern, _ := GetMsgPatternFromHint(Elphapex)
+			if pattern != nil {
+				if !pattern.Match(packet.Datagram) {
+					return errNoSourceIPInDatagram
+				}
+			}
+			fallthrough
+		default:
+			return errNoSourceIPInDatagram
 		}
 	}
 	// update record with new packet data.
