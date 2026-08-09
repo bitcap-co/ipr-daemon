@@ -22,19 +22,8 @@ var (
 	// ErrDuplicatePacket indicates that the processor recently handled an IP
 	// report from the same source MAC address.
 	ErrDuplicatePacket = errors.New("duplicate packet")
-
+	// zlib payload offsets
 	zlibOffsets = []int{0, zlibSealMinerOffset}
-	minerPorts  = map[int]MinerTypeHint{
-		14235: Antminer, // Assume antminer but could be a multitude of miner types (i.e. Volcminer, Hammer)
-		11503: Iceriver,
-		8888:  Whatsminer,
-		1314:  Goldshell,
-		18650: Sealminer,
-		9999:  Elphapex,
-		12345: Auradine,
-		54321: IPollo,
-		42069: HiveGPU,
-	}
 )
 
 // PacketProcessor validates IP report packets and owns their duplicate record.
@@ -60,7 +49,7 @@ func (p *PacketProcessor) ParseIPReportPacket(packet *IPReportPacket) error {
 	}
 
 	// retrieve miner hint from DstPort.
-	minerHint, ok := minerPorts[packet.DstPort]
+	minerHint, ok := MinerPorts[packet.DstPort]
 	if ok {
 		packet.MinerHint = minerHint
 	}
@@ -100,8 +89,8 @@ func (p *PacketProcessor) ParseIPReportPacket(packet *IPReportPacket) error {
 	packet.Payload = string(packet.Datagram)
 	// ignore packet if it doesn't contain source IP within UDP datagram.
 	if !bytes.Contains(packet.Datagram, []byte(packet.SrcIP)) {
-		// edge case for Elphapex: it sends a static message that doesn't contain source IP.
-		if !MsgPatterns["elphapex"].Match(packet.Datagram) {
+		// edge case: elphapex sends static message with no source IP
+		if !MsgPatterns[Elphapex].Match(packet.Datagram) {
 			return fmt.Errorf("no source IP found in datagram")
 		}
 	}
