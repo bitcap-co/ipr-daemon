@@ -26,8 +26,10 @@ const (
 )
 
 var (
-	// MinerPorts is a map of UDP destination ports to MinerTypeHint.
-	MinerPorts = map[int]MinerTypeHint{
+	validIP  = regexp.MustCompile(`\b(?:(?:2(?:[0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9])\.){3}(?:(?:2([0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9]))\b`)
+	validMAC = regexp.MustCompile(`([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})`)
+	// minerPorts is a map of UDP destination ports to MinerTypeHint.
+	minerPorts = map[int]MinerTypeHint{
 		14235: Antminer, // This is a known common port for multiple miner types (i.e. Volcminer, Hammer)
 		11503: Iceriver,
 		8888:  Whatsminer,
@@ -38,16 +40,14 @@ var (
 		54321: IPollo,
 		42069: HiveGPU,
 	}
-	ValidIP  = regexp.MustCompile(`\b(?:(?:2(?:[0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9])\.){3}(?:(?:2([0-4][0-9]|5[0-5])|[0-1]?[0-9]?[0-9]))\b`)
-	ValidMAC = regexp.MustCompile(`([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})`)
-	// MsgPatterns is a map of regex UDP payload patterns for MinerTypeHint.
-	MsgPatterns = map[MinerTypeHint]*regexp.Regexp{
-		Antminer:   regexp.MustCompile(fmt.Sprintf(`^%s,%s`, ValidIP, ValidMAC)),
-		Iceriver:   regexp.MustCompile(fmt.Sprintf(`^addr:%s`, ValidIP)),
-		Whatsminer: regexp.MustCompile(fmt.Sprintf(`^IP:%sMAC:%s`, ValidIP, ValidMAC)),
+	// msgPatterns is a map of MinerTypeHint to regex UDP payload patterns.
+	msgPatterns = map[MinerTypeHint]*regexp.Regexp{
+		Antminer:   regexp.MustCompile(fmt.Sprintf(`^%s,%s`, validIP, validMAC)),
+		Iceriver:   regexp.MustCompile(fmt.Sprintf(`^addr:%s`, validIP)),
+		Whatsminer: regexp.MustCompile(fmt.Sprintf(`^IP:%sMAC:%s`, validIP, validMAC)),
 		Elphapex:   regexp.MustCompile(`^DG_IPREPORT_ONLY`),
-		IPollo:     regexp.MustCompile(fmt.Sprintf(`^IP Addr:\[%s\].*?MAC Addr:\[%s\]`, ValidIP, ValidMAC)),
-		HiveGPU:    regexp.MustCompile(fmt.Sprintf(`^HiveOS %s`, ValidIP)),
+		IPollo:     regexp.MustCompile(fmt.Sprintf(`^IP Addr:\[%s\].*?MAC Addr:\[%s\]`, validIP, validMAC)),
+		HiveGPU:    regexp.MustCompile(fmt.Sprintf(`^HiveOS %s`, validIP)),
 	}
 )
 
@@ -164,6 +164,18 @@ func (r *SealminerIPReport) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// GetMsgPatternFromHint returns the UDP payload regex pattern for the given MinerTypeHint, if known.
+func GetMsgPatternFromHint(hint MinerTypeHint) (*regexp.Regexp, bool) {
+	pattern, ok := msgPatterns[hint]
+	return pattern, ok
+}
+
+// GetMinerHintFromPort returns the MinerTypeHint for the given port, if known.
+func GetMinerHintFromPort(port int) (MinerTypeHint, bool) {
+	hint, ok := minerPorts[port]
+	return hint, ok
+}
+
 // ParseMACAddress parses address and returns a normalized MAC address.
 func ParseMACAddress(address string) string {
 	if address == "" {
@@ -187,7 +199,7 @@ func ParseMACAddress(address string) string {
 		return ""
 	}
 
-	if !ValidMAC.MatchString(address) {
+	if !validMAC.MatchString(address) {
 		return ""
 	}
 

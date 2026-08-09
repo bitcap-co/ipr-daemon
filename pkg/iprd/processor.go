@@ -49,7 +49,7 @@ func (p *PacketProcessor) ParseIPReportPacket(packet *IPReportPacket) error {
 	}
 
 	// retrieve miner hint from DstPort.
-	minerHint, ok := MinerPorts[packet.DstPort]
+	minerHint, ok := GetMinerHintFromPort(packet.DstPort)
 	if ok {
 		packet.MinerHint = minerHint
 	}
