@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+// Record is a fixed-size LRU cache of RecordEntry items.
+// Serves as a cache for IP report entries to avoid processing duplicates.
 type Record struct {
 	items    map[string]RecordEntry
 	elements map[string]*list.Element
@@ -13,7 +15,7 @@ type Record struct {
 	capacity int
 }
 
-// RecordEntry represents an entry in Record
+// RecordEntry represents an IP report entry in Record
 type RecordEntry struct {
 	SrcIP     string
 	SrcMAC    string
@@ -52,7 +54,7 @@ func (r *Record) Get(key string) (*RecordEntry, bool) {
 
 // Add creates or updates an RecordEntry in Record. Once capacity is reached, entries are removed in FIFO order.
 func (r *Record) Add(key string, entry RecordEntry) {
-	// if key already exists in Record, move to back and update when we saw it
+	// if key already exists, move to back and update when we saw it.
 	if element, ok := r.elements[key]; ok {
 		r.order.MoveToBack(element)
 		element.Value = key
@@ -60,7 +62,7 @@ func (r *Record) Add(key string, entry RecordEntry) {
 		r.items[key] = entry
 		return
 	}
-	// remove in FIFO order if we are at capacity
+	// remove entries in FIFO order if we are at capacity
 	if r.order.Len() >= r.capacity {
 		oldest := r.order.Front()
 		if oldest != nil {
@@ -69,13 +71,14 @@ func (r *Record) Add(key string, entry RecordEntry) {
 			r.order.Remove(oldest)
 		}
 	}
+	// Push new entry to back of order
 	el := r.order.PushBack(key)
 	r.elements[key] = el
 	entry.UpdatedAt = time.Now().UnixMilli()
 	r.items[key] = entry
 }
 
-// Remove deletes element matching key in Record. Returns error if key is not found.
+// Remove deletes entry matching key in Record, if it exists.
 func (r *Record) Remove(key string) error {
 	el, ok := r.elements[key]
 	if !ok {
@@ -87,14 +90,14 @@ func (r *Record) Remove(key string) error {
 	return nil
 }
 
-// Clear removes all elements in Record and resets order.
+// Clear removes all entries in Record and resets order.
 func (r *Record) Clear() {
 	r.items = make(map[string]RecordEntry)
 	r.elements = make(map[string]*list.Element)
 	r.order.Init()
 }
 
-// Display prints the current RecordEntries and Length of record to stdout. Useful for logging/debugging.
+// Display prints the current record entries and length of record to stdout. Useful for logging/debugging.
 func (r *Record) Display() {
 	fmt.Printf("Record len: %d\n", r.Length())
 	for e := r.order.Front(); e != nil; e = e.Next() {
