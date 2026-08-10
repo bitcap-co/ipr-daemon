@@ -46,7 +46,7 @@ func TestUpdateExistingEntry(t *testing.T) {
 
 	// update existing entry
 	key := "test 1"
-	ent := record.Get(key)
+	ent, _ := record.Get(key)
 	test_entry := iprd.RecordEntry{
 		SrcIP:     "192.168.1.111",
 		SrcMAC:    "aa:bb:cc:dd:ee:ff",
@@ -54,7 +54,7 @@ func TestUpdateExistingEntry(t *testing.T) {
 		CreatedAt: time.Now().UnixMilli(),
 	}
 	record.Add(key, test_entry)
-	updatedEnt := record.Get(key)
+	updatedEnt, _ := record.Get(key)
 	assertLength(t, record.Length(), len)
 	if reflect.DeepEqual(ent, updatedEnt) {
 		t.Errorf("got %+v, wanted %+v", updatedEnt, test_entry)

@@ -42,21 +42,15 @@ func (r *Record) Length() int {
 	return r.order.Len()
 }
 
-// Get returns RecordEntry matching key
-func (r *Record) Get(key string) *RecordEntry {
+// Get returns the RecordEntry for the given key, and a bool indicating if the key was found.
+func (r *Record) Get(key string) (*RecordEntry, bool) {
 	if ent, ok := r.items[key]; ok {
-		return &ent
+		return &ent, true
 	}
-	return nil
+	return nil, false
 }
 
-// Contains returns bool if key exists in Record
-func (r *Record) Contains(key string) bool {
-	_, ok := r.items[key]
-	return ok
-}
-
-// Add creates or updates an element in Record. If Record reaches capacity, elements are automatically removed in FIFO order.
+// Add creates or updates an RecordEntry in Record. Once capacity is reached, entries are removed in FIFO order.
 func (r *Record) Add(key string, entry RecordEntry) {
 	// if key already exists in Record, move to back and update when we saw it
 	if element, ok := r.elements[key]; ok {
