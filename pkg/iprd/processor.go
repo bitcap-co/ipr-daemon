@@ -14,16 +14,18 @@ import (
 
 const (
 	defaultRecordCapacity       = 10
-	zlibSealMinerOffset         = 8
 	recordMinAge          int64 = 10_000
+
+	zlibSealMinerOffset int = 8
 )
 
 var (
 	// ErrDuplicatePacket indicates that the processor recently handled an IP
 	// report from the same source MAC address.
-	ErrDuplicatePacket      = errors.New("duplicate packet")
-	errNoSourceIPInDatagram = errors.New("no source IP found in datagram")
-	// zlib payload offsets
+	ErrDuplicatePacket = errors.New("duplicate packet")
+	errNoSourceIP      = errors.New("no source IP found in datagram")
+
+	// known zlib paylaod offsets
 	zlibOffsets = []int{0, zlibSealMinerOffset}
 )
 
@@ -43,28 +45,53 @@ func NewPacketProcessor(record *Record) *PacketProcessor {
 	return &PacketProcessor{record: record}
 }
 
-// ParseIPReportPacket analyzes packet for a valid IP report packet.
+// ToIPRPacket decodes a captured packet into an IPReportPacket.
+func (p *PacketProcessor) ToIPRPacket(captured CapturedPacket) (*IPReportPacket, error) {
+	packet := gopacket.NewPacket(captured.Data, captured.LinkType, gopacket.Default)
+	packet.Metadata().CaptureInfo = captured.CaptureInfo
+
+	iprPacket, err := NewIPReportPacket(packet)
+	if err != nil {
+		return nil, err
+	}
+	return iprPacket, nil
+}
+
+// IsDuplicate returns true if the packet is a duplicate based on the processor's record.
+// A packet is considered a duplicate if it has the same source MAC as an existing record entry and is within the record's minimum age.
+// After the record's minimum age (10 seconds), the packet is no longer considered a duplicate and can be reported again.
+func (p *PacketProcessor) IsDuplicate(packet *IPReportPacket) bool {
+	if p.record.Length() == 0 {
+		return false
+	}
+	key := packet.SrcMAC
+	if ent, ok := p.record.Get(key); ok {
+		if time.Now().UnixMilli()-ent.UpdatedAt <= recordMinAge {
+			return true
+		}
+	}
+	return false
+}
+
+// ParseIPReportPacket analyzes packet for a valid IP report packet. Returns an error if the packet is invalid or a duplicate.
 func (p *PacketProcessor) ParseIPReportPacket(packet *IPReportPacket) error {
 	if packet == nil {
 		return fmt.Errorf("packet must not be nil")
 	}
 
-	// retrieve miner hint from DstPort.
-	minerHint, ok := GetMinerHintFromPort(packet.DstPort)
-	if ok {
+	// retrieve miner hint from destination port
+	if minerHint, ok := GetMinerHintFromPort(packet.DstPort); ok {
 		packet.MinerHint = minerHint
 	}
-	// check for existing record.
-	if p.record.Contains(packet.SrcMAC) {
-		ent := p.record.Get(packet.SrcMAC)
-		// if record exists and is not over minimum record age, mark as dup packet.
-		if time.Now().UnixMilli()-ent.UpdatedAt <= recordMinAge {
-			return ErrDuplicatePacket
-		}
+
+	// throw error if duplicate packet
+	if p.IsDuplicate(packet) {
+		return ErrDuplicatePacket
 	}
-	// if not valid UTF-8, it could be encoded/compressed.
+
+	// check UDP payload for encoding/compression
 	if !utf8.Valid(packet.Datagram) {
-		// check for start of zlib payload given a list of offsets.
+		// payload is not valid UTF-8, check for start of zlib payload given a list of known offsets
 		zlibStart := -1
 		for _, offset := range zlibOffsets {
 			if offset < len(packet.Datagram) && packet.Datagram[offset] == byte(0x78) {
@@ -83,20 +110,20 @@ func (p *PacketProcessor) ParseIPReportPacket(packet *IPReportPacket) error {
 		defer r.Close()
 		packet.Datagram, err = io.ReadAll(r)
 		if err != nil {
-			return fmt.Errorf("failed to read from zlib reader - %w", err)
+			return fmt.Errorf("zlib read - %w", err)
 		}
 	}
 
 	packet.Payload = string(packet.Datagram)
-	// Ignore packets that don't contain their source IP, except for the static
-	// Elphapex report payload.
+	// Ignore packets that don't contain their source IP
 	if !bytes.Contains(packet.Datagram, []byte(packet.SrcIP)) {
+		// edge case: Elphapex sends static IP report payload without source IP
 		pattern, ok := GetMsgPatternFromHint(Elphapex)
 		if packet.MinerHint != Elphapex || !ok || !pattern.Match(packet.Datagram) {
-			return errNoSourceIPInDatagram
+			return errNoSourceIP
 		}
 	}
-	// update record with new packet data.
+	// update record with new IP report entry
 	p.record.Add(packet.SrcMAC, RecordEntry{
 		SrcIP:     packet.SrcIP,
 		SrcMAC:    packet.SrcMAC,
@@ -104,15 +131,4 @@ func (p *PacketProcessor) ParseIPReportPacket(packet *IPReportPacket) error {
 		CreatedAt: packet.Timestamp.UnixMilli(),
 	})
 	return nil
-}
-
-// CaptureToIPRPacket decodes a captured packet into an IPReportPacket.
-func (p *PacketProcessor) CaptureToIPRPacket(captured CapturedPacket) (*IPReportPacket, error) {
-	packet := gopacket.NewPacket(captured.Data, captured.LinkType, gopacket.Default)
-	packet.Metadata().CaptureInfo = captured.CaptureInfo
-	ipr, err := NewIPReportPacket(packet)
-	if err != nil {
-		return nil, err
-	}
-	return ipr, nil
 }
