@@ -21,6 +21,7 @@ var (
 )
 
 func main() {
+	log.SetFlags(0)
 	log.SetPrefix("iprd-offline: ")
 	flag.Parse()
 
@@ -53,7 +54,7 @@ func dumpPcap(fd string, debug bool) error {
 	defer file.Close()
 
 	result, err := iprd.ProcessCapture(context.Background(), file, func(result iprd.OfflinePacketResult) error {
-		prefix := fmt.Sprintf("cnt:%d", result.Number)
+		prefix := fmt.Sprintf("%s cnt:%d", result.Report.Timestamp.Format("2006-01-02 15:04:05"), result.Number)
 		if debug {
 			log.Debug("--- Dumped Packet ---")
 			log.Debug(fmt.Sprintf("%s\n", result.Packet.Dump()))
