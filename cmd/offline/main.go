@@ -15,7 +15,7 @@ import (
 var (
 	// flags
 	flPcapFile = flag.String("f", "", "Path to a .pcap or .pcapng capture file.")
-	flDebug    = flag.Bool("d", false, "Switch to enable packet debugging output to stdout.")
+	flDebug    = flag.Bool("d", false, "Switch to enable packet dumping output to stdout.")
 
 	log = iprd.NewLogger()
 )
@@ -52,7 +52,7 @@ func dumpPcap(fd string, debug bool) error {
 	}
 	defer file.Close()
 
-	_, err = iprd.ProcessCapture(context.Background(), file, func(result iprd.OfflinePacketResult) error {
+	result, err := iprd.ProcessCapture(context.Background(), file, func(result iprd.OfflinePacketResult) error {
 		prefix := fmt.Sprintf("cnt:%d", result.Number)
 		if debug {
 			log.Debug("--- Dumped Packet ---")
@@ -75,5 +75,7 @@ func dumpPcap(fd string, debug bool) error {
 		log.Info(fmt.Sprintf("%s %s - Valid IP report", prefix, result.Report.String()))
 		return nil
 	})
+	log.Info(fmt.Sprintf("SUMMARY: processed:%d reports:%d invalid:%d duplicates:%d",
+		result.Processed, result.Reports, result.Invalid, result.Duplicates))
 	return err
 }
