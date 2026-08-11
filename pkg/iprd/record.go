@@ -54,11 +54,15 @@ func (r *Record) Get(key string) (*RecordEntry, bool) {
 
 // Add creates or updates an RecordEntry in Record. Once capacity is reached, entries are removed in FIFO order.
 func (r *Record) Add(key string, entry RecordEntry) {
+	r.addAt(key, entry, time.Now())
+}
+
+func (r *Record) addAt(key string, entry RecordEntry, observedAt time.Time) {
+	entry.UpdatedAt = observedAt.UnixMilli()
 	// if key already exists, move to back and update when we saw it.
 	if element, ok := r.elements[key]; ok {
 		r.order.MoveToBack(element)
 		element.Value = key
-		entry.UpdatedAt = time.Now().UnixMilli()
 		r.items[key] = entry
 		return
 	}
@@ -74,7 +78,6 @@ func (r *Record) Add(key string, entry RecordEntry) {
 	// Push new entry to back of order
 	el := r.order.PushBack(key)
 	r.elements[key] = el
-	entry.UpdatedAt = time.Now().UnixMilli()
 	r.items[key] = entry
 }
 

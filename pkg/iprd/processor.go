@@ -61,12 +61,16 @@ func (p *PacketProcessor) ToIPRPacket(captured CapturedPacket) (*IPReportPacket,
 // A packet is considered a duplicate if it has the same source MAC as an existing record entry and is within the record's minimum age.
 // After the record's minimum age (10 seconds), the packet is no longer considered a duplicate and can be reported again.
 func (p *PacketProcessor) IsDuplicate(packet *IPReportPacket) bool {
+	return p.isDuplicateAt(packet, time.Now())
+}
+
+func (p *PacketProcessor) isDuplicateAt(packet *IPReportPacket, observedAt time.Time) bool {
 	if p.record.Length() == 0 {
 		return false
 	}
 	key := packet.SrcMAC
 	if ent, ok := p.record.Get(key); ok {
-		if time.Now().UnixMilli()-ent.UpdatedAt <= recordMinAge {
+		if observedAt.UnixMilli()-ent.UpdatedAt <= recordMinAge {
 			return true
 		}
 	}
@@ -75,6 +79,10 @@ func (p *PacketProcessor) IsDuplicate(packet *IPReportPacket) bool {
 
 // ParseIPReportPacket analyzes packet for a valid IP report packet. Returns an error if the packet is invalid or a duplicate.
 func (p *PacketProcessor) ParseIPReportPacket(packet *IPReportPacket) error {
+	return p.parseIPReportPacketAt(packet, time.Now())
+}
+
+func (p *PacketProcessor) parseIPReportPacketAt(packet *IPReportPacket, observedAt time.Time) error {
 	if packet == nil {
 		return fmt.Errorf("packet must not be nil")
 	}
@@ -85,7 +93,7 @@ func (p *PacketProcessor) ParseIPReportPacket(packet *IPReportPacket) error {
 	}
 
 	// throw error if duplicate packet
-	if p.IsDuplicate(packet) {
+	if p.isDuplicateAt(packet, observedAt) {
 		return ErrDuplicatePacket
 	}
 
@@ -124,11 +132,11 @@ func (p *PacketProcessor) ParseIPReportPacket(packet *IPReportPacket) error {
 		}
 	}
 	// update record with new IP report entry
-	p.record.Add(packet.SrcMAC, RecordEntry{
+	p.record.addAt(packet.SrcMAC, RecordEntry{
 		SrcIP:     packet.SrcIP,
 		SrcMAC:    packet.SrcMAC,
 		MinerHint: packet.MinerHint,
 		CreatedAt: packet.Timestamp.UnixMilli(),
-	})
+	}, observedAt)
 	return nil
 }
