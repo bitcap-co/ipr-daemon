@@ -148,7 +148,7 @@ func processOfflineFrame(data []byte, ci gopacket.CaptureInfo, linkType layers.L
 	if err == nil {
 		report.InterfaceName = interfaceName
 		event.Report = report
-		err = processor.ParseIPReportPacket(report)
+		err = processor.parseIPReportPacketAt(report, report.Timestamp)
 	}
 	event.Err = err
 

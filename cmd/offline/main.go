@@ -56,7 +56,6 @@ func dumpPcap(fd string, debug bool) error {
 	result, err := iprd.ProcessCapture(context.Background(), file, func(result iprd.OfflinePacketResult) error {
 		prefix := fmt.Sprintf("%s cnt:%d", result.Timestamp.Format("2006-01-02 15:04:05"), result.Number)
 		if debug {
-			log.Debug("--- Dumped Packet ---")
 			log.Debug(fmt.Sprintf("%s\n", result.Packet.Dump()))
 		}
 		if result.Report == nil {

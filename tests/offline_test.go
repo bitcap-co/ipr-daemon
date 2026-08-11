@@ -79,6 +79,11 @@ func pcapNGOfflineCapture(t *testing.T) []byte {
 	if err := writer.WritePacket(ci, data); err != nil {
 		t.Fatal(err)
 	}
+	laterCI := ci
+	laterCI.Timestamp = laterCI.Timestamp.Add(11 * time.Second)
+	if err := writer.WritePacket(laterCI, data); err != nil {
+		t.Fatal(err)
+	}
 	invalid := []byte{0x00, 0x01, 0x02, 0x03}
 	invalidCI := ci
 	invalidCI.CaptureLength = len(invalid)
@@ -131,12 +136,12 @@ func TestProcessCapturePCAPNGClassifiesFrames(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ProcessCapture() error = %v", err)
 	}
-	want := iprd.OfflineResult{Processed: 3, Reports: 1, Invalid: 1, Duplicates: 1}
+	want := iprd.OfflineResult{Processed: 4, Reports: 2, Invalid: 1, Duplicates: 1}
 	if result != want {
 		t.Fatalf("ProcessCapture() result = %+v, want %+v", result, want)
 	}
-	if len(events) != 3 {
-		t.Fatalf("handler calls = %d, want 3", len(events))
+	if len(events) != 4 {
+		t.Fatalf("handler calls = %d, want 4", len(events))
 	}
 	if events[0].InterfaceName != "test0" || events[0].Report.InterfaceName != "test0" {
 		t.Fatalf("PCAP-NG interface was not preserved: %+v", events[0])
@@ -144,8 +149,11 @@ func TestProcessCapturePCAPNGClassifiesFrames(t *testing.T) {
 	if !errors.Is(events[1].Err, iprd.ErrDuplicatePacket) {
 		t.Fatalf("second packet error = %v, want duplicate", events[1].Err)
 	}
-	if events[2].Err == nil || events[2].Report != nil {
-		t.Fatalf("invalid packet outcome = %+v", events[2])
+	if events[2].Err != nil {
+		t.Fatalf("packet outside duplicate window error = %v", events[2].Err)
+	}
+	if events[3].Err == nil || events[3].Report != nil {
+		t.Fatalf("invalid packet outcome = %+v", events[3])
 	}
 }
 
