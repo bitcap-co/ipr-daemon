@@ -76,7 +76,6 @@ func dumpPcap(fd string, debug bool) error {
 		log.Info(fmt.Sprintf("%s %s - Valid IP report", prefix, result.Report.String()))
 		return nil
 	})
-	log.Info(fmt.Sprintf("SUMMARY: processed:%d reports:%d invalid:%d duplicates:%d",
-		result.Processed, result.Reports, result.Invalid, result.Duplicates))
+	log.Info(fmt.Sprintf("SUMMARY: %s", result.String()))
 	return err
 }

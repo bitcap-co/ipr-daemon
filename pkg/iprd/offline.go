@@ -23,6 +23,11 @@ type OfflineResult struct {
 	Duplicates int
 }
 
+// String returns a string representation of an offline capture result.
+func (r OfflineResult) String() string {
+	return fmt.Sprintf("processed:%d reports:%d invalid:%d duplicates:%d", r.Processed, r.Reports, r.Invalid, r.Duplicates)
+}
+
 // OfflinePacketResult describes the outcome of processing one captured frame.
 // Report is nil when the frame could not be decoded as an IP report packet.
 type OfflinePacketResult struct {
