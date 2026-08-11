@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"time"
 
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
@@ -31,6 +32,7 @@ func (r OfflineResult) String() string {
 // OfflinePacketResult describes the outcome of processing one captured frame.
 // Report is nil when the frame could not be decoded as an IP report packet.
 type OfflinePacketResult struct {
+	Timestamp     time.Time
 	Number        int64
 	InterfaceName string
 	Packet        gopacket.Packet
@@ -136,6 +138,7 @@ func processOfflineFrame(data []byte, ci gopacket.CaptureInfo, linkType layers.L
 	packet := gopacket.NewPacket(data, linkType, gopacket.Default)
 	packet.Metadata().CaptureInfo = ci
 	event := OfflinePacketResult{
+		Timestamp:     ci.Timestamp,
 		Number:        int64(result.Processed),
 		InterfaceName: interfaceName,
 		Packet:        packet,
