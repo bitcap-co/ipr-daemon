@@ -157,6 +157,9 @@ func (b *IPRBroadcast) Listen() {
 				if !errors.As(err, &netErr) || !netErr.Timeout() {
 					b.logger.Error(fmt.Errorf("scanner error from %s: %w", conn.RemoteAddr(), err))
 				}
+			} else if clientSubscribed {
+				// client disconnected cleanly
+				b.logger.Info(fmt.Sprintf("client gracefully disconnected: %s", conn.RemoteAddr()))
 			}
 		}()
 	}
