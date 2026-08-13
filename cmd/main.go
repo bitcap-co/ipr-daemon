@@ -15,7 +15,7 @@ import (
 )
 
 var (
-	// build info
+	// build variables set at build time via ldflags
 	VERSION   = "unknown"
 	BUILDINFO = "unknown"
 	TAG       = "NO-TAG"
@@ -25,16 +25,16 @@ var (
 	log = iprd.NewLogger()
 
 	// flags
-	flVersion            = flag.Bool("version", false, "Prints version info and exits")
+	flVersion            = flag.Bool("version", false, "Prints version information and exits.")
 	flList               = flag.Bool("list", false, "Lists all available network interfaces that can be listened on and exits.")
 	flDebug              = flag.Bool("d", false, "Switch to enable packet debugging output.")
 	flAuto               = flag.Bool("a", false, "Switch to use the defined LAN interface for listening (OPNSense/pfSense). Overrides -i flag.")
 	flInterfaces         = make(iprd.FlagInterface)
 	flForwardBind        = flag.String("b", "", "Bind address for the TCP broadcast stream. Empty binds all interfaces.")
 	flForwardPort        = flag.Int("p", 7788, "Forwarding port for the TCP broadcast stream. Defaults to 7788.")
-	flForwardKnown       = flag.Bool("known", false, "Switch to only forward IP reports from known miner types/ports over forward port.")
+	flForwardKnown       = flag.Bool("known", false, "Switch to only forward IP reports from known miner types/ports over TCP broadcast stream.\nUnknown IP reports are logged but not forwarded.")
 	flMDNS               = flag.Bool("mdns", false, "Switch to enable mDNS/DNS-SD advertising of the TCP forwarding endpoint.")
-	flNoRootNetwork      = flag.Bool("no-root-network", false, "Switch to ignore the interface's network in BPF filter. Must add additional network inclusion(s) with -add-network.\n(Global: applies to all interfaces.)")
+	flNoRootNetwork      = flag.Bool("no-root-network", false, "Switch to remove interface network from BPF filter. Must add additional network inclusion(s) via -add-network flag.\n(Global: applies to all interface selectors.)")
 	flNetworkInclusions  iprd.FlagSlice
 	flNetworkExclusions  iprd.FlagSlice
 	flIgnoredDevices     iprd.FlagSlice
@@ -45,13 +45,13 @@ var (
 )
 
 func main() {
-	flag.Var(&flInterfaces, "i", "Interface name/index, optionally followed by BPF options (for example: eth0:no-root-network,add-network=192.168.1).\nThis flag supports chaining; plain interface names may also be comma-separated.")
-	flag.Var(&flIgnoredDevices, "ignore", "List of source MAC addresses to exclude in BPF filter.\nThis flag supports chaining or comma-separated string.\n(Global: applies to all interfaces.)")
-	flag.Var(&flNetworkInclusions, "add-network", "List of networks to append to BPF filter. Networks are IPv4 network numbers that can be written as a dotted quad, triple, pair or a single number.\nThis flag supports chaining or comma-separated string.\n(Global: applies to all interfaces.)")
-	flag.Var(&flNetworkExclusions, "exclude", "List of networks to additionally exclude from BPF filter.\nThis flag supports chaining or comma-separated string.\n(Global: applies to all interfaces.)")
+	flag.Var(&flInterfaces, "i", "Interface selectors (name/index), optionally followed by BPF options (for example: eth0:no-root-network,add-network=192.168.1).\nThis flag supports chaining; plain interface names may also be comma-separated.")
+	flag.Var(&flIgnoredDevices, "ignore", "List of source MAC addresses to exclude in BPF filter.\nThis flag supports chaining or comma-separated string.\n(Global: applies to all interface selectors.)")
+	flag.Var(&flNetworkInclusions, "add-network", "List of networks to append to BPF filter. Networks are IPv4 network numbers that can be written as a dotted quad, triple, pair or a single number.\nThis flag supports chaining or comma-separated string.\n(Global: applies to all interface selectors.)")
+	flag.Var(&flNetworkExclusions, "exclude", "List of networks to additionally exclude from BPF filter.\nThis flag supports chaining or comma-separated string.\n(Global: applies to all interface selectors.)")
 	flag.Parse()
 
-	// print version info and exit
+	// print version information and exit.
 	if *flVersion {
 		delta := ""
 		if len(DELTA) > 0 {
@@ -135,26 +135,27 @@ func main() {
 			log.Fatal(err)
 		}
 	}
-	log.Info("start IPReporter Daemon...")
 
+	log.Info("start IPReporter Daemon...")
 	// cancel on SIGINT/SIGTERM for a clean shutdown of the reconnect loop.
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	// Initialize the capture and packet-processing manager.
+	// initialize the capture and packet-processing manager.
 	manager, err := iprd.NewListenerManager(&cfg.ListenerConfig, log)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	// open TCP broadcast.
+	// initialize TCP broadcast stream.
 	broadcaster, err := iprd.NewBroadcaster(log, cfg.Bind, cfg.Port)
 	if err != nil {
 		log.Fatal(err)
 	}
-	// start listening for incoming clients.
+	// start listening for incoming connections.
 	go broadcaster.Listen()
 
+	// start opted-in mDNS service advertisement (_iprd._tcp.local.)
 	var mdnsAdvertiser *iprd.MDNSAdvertiser
 	if cfg.MDNS {
 		mdnsAdvertiser, err = iprd.NewMDNSAdvertiser(cfg.Bind, cfg.Port, VERSION)
@@ -169,7 +170,8 @@ func main() {
 			log.Info(fmt.Sprintf("advertising mDNS service -> %s.local. port %d", iprd.MDNSServiceType, cfg.Port))
 		}
 	}
-	// handle channel messages.
+
+	// start message handler func.
 	go func() {
 		for {
 			select {
@@ -201,7 +203,7 @@ func main() {
 		}
 	}()
 	log.Info(fmt.Sprintf("set tcp forwarding -> %s", net.JoinHostPort(cfg.Bind, strconv.Itoa(cfg.Port))))
-	log.Info("successfully started iprd!")
+	log.Info("successfully initialized iprd!")
 
 	// Supervise capture and packet processing until the context is cancelled.
 	if err := manager.Run(ctx); err != nil {
@@ -212,5 +214,5 @@ func main() {
 		}
 		log.Fatal(err)
 	}
-	log.Info("shutting down iprd...")
+	log.Info("exiting...")
 }
