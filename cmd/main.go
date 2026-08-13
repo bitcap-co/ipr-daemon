@@ -31,7 +31,7 @@ var (
 	flAuto               = flag.Bool("a", false, "Switch to use the defined LAN interface for listening (OPNSense/pfSense). Overrides -i flag.")
 	flInterfaces         = make(iprd.FlagInterface)
 	flForwardBind        = flag.String("b", "", "Bind address for the TCP broadcast stream. Empty binds all interfaces.")
-	flForwardPort        = flag.Int("p", 7788, "Forwarding port for the TCP broadcast stream. Defaults to 7788.")
+	flForwardPort        = flag.Int("p", 7788, "Forwarding port for the TCP broadcast stream.")
 	flForwardKnown       = flag.Bool("known", false, "Switch to only forward IP reports from known miner types/ports over TCP broadcast stream.\nUnknown IP reports are logged but not forwarded.")
 	flMDNS               = flag.Bool("mdns", false, "Switch to enable mDNS/DNS-SD advertising of the TCP forwarding endpoint.")
 	flNoRootNetwork      = flag.Bool("no-root-network", false, "Switch to remove interface network from BPF filter. Must add additional network inclusion(s) via -add-network flag.\n(Global: applies to all interface selectors.)")
