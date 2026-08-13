@@ -40,8 +40,8 @@ var (
 	flIgnoredDevices     iprd.FlagSlice
 	flCaptureFile        = flag.String("capture-file", "", "Path to write received packets to in PCAP-NG format for replay/debugging.")
 	flRotateCaptureFiles = flag.Bool("rotate-capture", false, "Switch to rotate up to four capture files instead of flushing the active file at its size limit.")
-	flConfig             = flag.String("c", "", "Path to TOML config file. Overrides any other supplied flags.")
-	flWrite              = flag.String("w", "", "Path to new TOML config file. Writes the supplied arguments to new config path.")
+	flConfigFile         = flag.String("c", "", "Path to TOML configuration file. Overrides any other supplied flags.")
+	flWriteConfig        = flag.String("w", "", "Path to TOML configuration file. Writes the supplied arguments to new config file or updates an existing one.")
 )
 
 func main() {
@@ -75,7 +75,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	// build/read configuration.
+	// build/set configuration.
 	var err error
 	listenInterfaces := flInterfaces.Selectors()
 	if len(listenInterfaces) == 0 {
@@ -106,17 +106,31 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if *flWrite != "" {
-		*flWrite = strings.Split(*flWrite, ".")[0]
-		*flWrite = *flWrite + ".toml"
-		if err := iprd.WriteIPRDConfigToFile(cfg, *flWrite); err != nil {
-			log.Fatal(err)
+	if *flWriteConfig != "" {
+		// normalize the output file path to .toml extension
+		*flWriteConfig = strings.Split(*flWriteConfig, ".")[0]
+		*flWriteConfig = *flWriteConfig + ".toml"
+		if curr, err := iprd.NewIPRDConfigFromFile(*flWriteConfig); err == nil {
+			// config file exists, merge with current config.
+			newCfg := cfg.Merge(curr)
+			mergedCfg, err := iprd.ParseConfig(newCfg)
+			if err != nil {
+				log.Fatal(err)
+			}
+			if err := iprd.WriteIPRDConfigToFile(mergedCfg, *flWriteConfig); err != nil {
+				log.Fatal(err)
+			}
+		} else {
+			// write new config file.
+			if err := iprd.WriteIPRDConfigToFile(cfg, *flWriteConfig); err != nil {
+				log.Fatal(err)
+			}
 		}
-		log.Info(fmt.Sprintf("successfully wrote -> %s", *flWrite))
+		log.Info(fmt.Sprintf("successfully wrote -> %s", *flWriteConfig))
 		os.Exit(0)
 	}
-	if *flConfig != "" {
-		cfg, err = iprd.NewIPRDConfigFromFile(*flConfig)
+	if *flConfigFile != "" {
+		cfg, err = iprd.NewIPRDConfigFromFile(*flConfigFile)
 		if err != nil {
 			log.Fatal(err)
 		}
