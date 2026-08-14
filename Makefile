@@ -110,8 +110,8 @@ clean-build: vagrant-clean docker-clean clean
 $(DIST_DIR):
 	mkdir -p $(DIST_DIR)
 
-$(OUTPUT_NAME): ./cmd/main.go .prepare
-	go build -ldflags='$(LDFLAGS)' -o ${OUTPUT_NAME} ./cmd/main.go
+$(OUTPUT_NAME): $(wildcard ./cmd/*.go) .prepare
+	go build -ldflags='$(LDFLAGS)' -o ${OUTPUT_NAME} ./cmd
 
 .PHONY: offline
 offline: ./cmd/offline/main.go
@@ -141,7 +141,7 @@ linux-amd64-shell:
 $(LINUX_AMD64_S_NAME): .prepare
 	CGO_LDFLAGS="$$(pkg-config --libs libpcap)" CGO_ENABLED=1 \
 	    go build -ldflags "$(LDFLAGS) -linkmode 'external' -extldflags '-static'" \
-	        -o $(LINUX_AMD64_S_NAME) ./cmd/main.go
+	        -o $(LINUX_AMD64_S_NAME) ./cmd
 	@echo "Created: $(LINUX_AMD64_S_NAME)"
 
 # Linux musl (static, for Alpine/apk). One Alpine builder does a native build; the
@@ -170,14 +170,14 @@ linux-musl-arm64:
 $(MUSL_AMD64_S_NAME): .prepare
 	CGO_LDFLAGS="$$(pkg-config --libs --static libpcap)" CGO_ENABLED=1 \
 	    go build -ldflags "$(LDFLAGS) -linkmode 'external' -extldflags '-static'" \
-	        -o $(MUSL_AMD64_S_NAME) ./cmd/main.go
+	        -o $(MUSL_AMD64_S_NAME) ./cmd
 	@echo "Created: $(MUSL_AMD64_S_NAME)"
 
 .linux-musl-arm64: $(MUSL_ARM64_S_NAME)
 $(MUSL_ARM64_S_NAME): .prepare
 	CGO_LDFLAGS="$$(pkg-config --libs --static libpcap)" CGO_ENABLED=1 \
 	    go build -ldflags "$(LDFLAGS) -linkmode 'external' -extldflags '-static'" \
-	        -o $(MUSL_ARM64_S_NAME) ./cmd/main.go
+	        -o $(MUSL_ARM64_S_NAME) ./cmd
 	@echo "Created: $(MUSL_ARM64_S_NAME)"
 
 # Linux ARM (aarch64 / armv5 / armv6 / armv7)
@@ -244,7 +244,7 @@ $(LINUX_ARM64_S_NAME): .prepare
 	    CGO_CFLAGS="-I$(AARCH64_SYSROOT)/include" \
 	    CGO_LDFLAGS="-L$(AARCH64_SYSROOT)/lib -lpcap" \
 	    go build -ldflags "$(LDFLAGS) -linkmode 'external' -extldflags '-static'" \
-	        -o $(LINUX_ARM64_S_NAME) ./cmd/main.go
+	        -o $(LINUX_ARM64_S_NAME) ./cmd
 	@echo "Created: $(LINUX_ARM64_S_NAME)"
 	@file $(LINUX_ARM64_S_NAME)
 	@aarch64-linux-gnu-readelf -d $(LINUX_ARM64_S_NAME)
@@ -258,7 +258,7 @@ $(LINUX_ARMV5_S_NAME): .prepare
 	    CGO_CFLAGS="-I$(ARMV5_SYSROOT)/include" \
 	    CGO_LDFLAGS="-L$(ARMV5_SYSROOT)/lib -lpcap" \
 	    go build -ldflags "$(LDFLAGS) -linkmode 'external' -extldflags '-static'" \
-	        -o $(LINUX_ARMV5_S_NAME) ./cmd/main.go
+	        -o $(LINUX_ARMV5_S_NAME) ./cmd
 	@echo "Created: $(LINUX_ARMV5_S_NAME)"
 	@file $(LINUX_ARMV5_S_NAME)
 	@arm-linux-gnueabi-readelf -d $(LINUX_ARMV5_S_NAME)
@@ -269,7 +269,7 @@ $(LINUX_ARMV6_S_NAME): .prepare
 	    CGO_CFLAGS="-I$(ARMV6_SYSROOT)/include" \
 	    CGO_LDFLAGS="-L$(ARMV6_SYSROOT)/lib -lpcap" \
 	    go build -ldflags "$(LDFLAGS) -linkmode 'external' -extldflags '-static'" \
-	        -o $(LINUX_ARMV6_S_NAME) ./cmd/main.go
+	        -o $(LINUX_ARMV6_S_NAME) ./cmd
 	@echo "Created: $(LINUX_ARMV6_S_NAME)"
 	@file $(LINUX_ARMV6_S_NAME)
 	@arm-linux-gnueabi-readelf -d $(LINUX_ARMV6_S_NAME)
@@ -280,7 +280,7 @@ $(LINUX_ARMV7_S_NAME): .prepare
 	    CGO_CFLAGS="-I$(ARMV7_SYSROOT)/include" \
 	    CGO_LDFLAGS="-L$(ARMV7_SYSROOT)/lib -lpcap" \
 	    go build -ldflags "$(LDFLAGS) -linkmode 'external' -extldflags '-static'" \
-	        -o $(LINUX_ARMV7_S_NAME) ./cmd/main.go
+	        -o $(LINUX_ARMV7_S_NAME) ./cmd
 	@echo "Created: $(LINUX_ARMV7_S_NAME)"
 	@file $(LINUX_ARMV7_S_NAME)
 	@arm-linux-gnueabi-readelf -d $(LINUX_ARMV7_S_NAME)
@@ -329,7 +329,7 @@ $(FREEBSD_AMD64_S_NAME):
 	CGO_LDFLAGS="$$(pkg-config --libs libpcap) -libverbs" \
 	CGO_CFLAGS="$$(pkg-config --cflags libpcap)" \
 	go build -ldflags '$(LDFLAGS) -linkmode external -extldflags -static' \
-		-o $(FREEBSD_AMD64_S_NAME) ./cmd/main.go
+		-o $(FREEBSD_AMD64_S_NAME) ./cmd
 	@echo "Created: $(FREEBSD_AMD64_S_NAME)"
 
 # Cross-compile: --sysroot points the cross gcc at the aarch64 base tree for both
@@ -343,7 +343,7 @@ $(FREEBSD_ARM64_S_NAME):
 	CGO_CFLAGS="--sysroot=$(FREEBSD_ARM64_SYSROOT)" \
 	CGO_LDFLAGS="--sysroot=$(FREEBSD_ARM64_SYSROOT) -lpcap -libverbs" \
 	go build -ldflags '$(LDFLAGS) -linkmode external -extldflags -static' \
-		-o $(FREEBSD_ARM64_S_NAME) ./cmd/main.go
+		-o $(FREEBSD_ARM64_S_NAME) ./cmd
 	@echo "Created: $(FREEBSD_ARM64_S_NAME)"
 
 # FreeBSD .pkg packaging (must run on FreeBSD — needs the pkg(8) tool).
@@ -391,12 +391,12 @@ PCAP_LDFLAGS := -L$(HOMEBREW_PREFIX)/lib -lpcap
 endif
 
 CGO_LDFLAGS := -Wl,-rpath,$(HOMEBREW_PREFIX)/lib
-$(DARWIN_S_NAME): ./cmd/main.go .prepare
+$(DARWIN_S_NAME): $(wildcard ./cmd/*.go) .prepare
 	@echo "CFLAGS: $(PCAP_CFLAGS)"
 	CGO_ENABLED=1 CGO_CFLAGS="$(PCAP_CFLAGS)" \
 	CGO_LDFLAGS="$(CGO_LDFLAGS) $(PCAP_LDFLAGS)" \
 	go build -ldflags='$(LDFLAGS)' \
-		-o $(DARWIN_S_NAME) ./cmd/main.go
+		-o $(DARWIN_S_NAME) ./cmd
 	@echo "Created: $(DARWIN_S_NAME)"
 endif
 
@@ -494,7 +494,7 @@ docker:
 
 .docker:
 	CGO_ENABLED=1 \
-	go build -ldflags '$(LDFLAGS)' -o dist/iprd ./cmd/main.go
+	go build -ldflags '$(LDFLAGS)' -o dist/iprd ./cmd
 
 docker-shell:
 	docker run --rm -it --network=host \

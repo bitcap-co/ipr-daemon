@@ -232,7 +232,7 @@ jobs:
           $env:CGO_ENABLED = "1"
           $env:CGO_CFLAGS = "-I$sdk/Include"
           $env:CGO_LDFLAGS = "-L$sdk/Lib/x64"
-          go build -ldflags="-s -w" -o "dist/iprd-${{ github.ref_name }}-windows-amd64.exe" ./cmd/main.go
+          go build -ldflags="-s -w" -o "dist/iprd-${{ github.ref_name }}-windows-amd64.exe" ./cmd
         shell: pwsh
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
