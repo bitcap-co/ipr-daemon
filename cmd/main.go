@@ -27,10 +27,12 @@ var (
 	// flags
 	flVersion            = flag.Bool("version", false, "Prints version information and exits.")
 	flList               = flag.Bool("list", false, "Lists all available network interfaces that can be listened on and exits.")
+	flStatus             = flag.Bool("status", false, "Queries a running daemon for its current IP Report status and exits.")
+	flStatusJSON         = flag.Bool("status-json", false, "Queries a running daemon and prints its current IP Report status as JSON.")
 	flDebug              = flag.Bool("d", false, "Switch to enable packet debugging output.")
 	flAuto               = flag.Bool("a", false, "Switch to use the defined LAN interface for listening (OPNSense/pfSense). Overrides -i flag.")
 	flInterfaces         = make(iprd.FlagInterface)
-	flForwardBind        = flag.String("b", "", "Bind address for the TCP broadcast stream. Empty binds all interfaces.")
+	flForwardBind        = flag.String("b", "", "Bind address for the TCP broadcast stream; target host in status mode. Empty binds all interfaces.")
 	flForwardPort        = flag.Int("p", 7788, "Forwarding port for the TCP broadcast stream.")
 	flForwardKnown       = flag.Bool("known", false, "Switch to only forward IP reports from known miner types/ports over TCP broadcast stream.\nUnknown IP reports are logged but not forwarded.")
 	flMDNS               = flag.Bool("mdns", false, "Switch to enable mDNS/DNS-SD advertising of the TCP forwarding endpoint.")
@@ -135,6 +137,16 @@ func main() {
 			log.Fatal(err)
 		}
 	}
+	if *flStatus || *flStatusJSON {
+		response, err := requestStatus(cfg.Bind, cfg.Port)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := writeStatus(os.Stdout, response, *flStatusJSON); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 
 	log.Info("start IPReporter Daemon...")
 	// cancel on SIGINT/SIGTERM for a clean shutdown of the reconnect loop.
@@ -152,6 +164,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	broadcaster.SetStatusProvider(manager)
 	// start listening for incoming connections.
 	go broadcaster.Listen()
 
