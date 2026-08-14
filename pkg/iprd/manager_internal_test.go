@@ -64,6 +64,32 @@ func mustHardwareAddr(t *testing.T, value string) net.HardwareAddr {
 	return addr
 }
 
+func TestListenerManagerInitialStatus(t *testing.T) {
+	manager, err := NewListenerManager(DefaultListenerConfig(), NewLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	status := manager.Status()
+	if status.State != ManagerStateIdle {
+		t.Fatalf("state = %q, want %q", status.State, ManagerStateIdle)
+	}
+	if status.ListenersConfigured != len(manager.listeners) {
+		t.Fatalf("configured listeners = %d, want %d", status.ListenersConfigured, len(manager.listeners))
+	}
+	if status.ListenersActive != 0 {
+		t.Fatalf("active listeners = %d, want 0", status.ListenersActive)
+	}
+	if len(status.Listeners) != len(manager.listeners) {
+		t.Fatalf("listener statuses = %d, want %d", len(status.Listeners), len(manager.listeners))
+	}
+	for _, listener := range status.Listeners {
+		if listener.State != ListenerStateIdle {
+			t.Fatalf("listener state = %q, want %q", listener.State, ListenerStateIdle)
+		}
+	}
+}
+
 func TestListenerManagerRunIsOneShotAndClosesReports(t *testing.T) {
 	manager, err := NewListenerManager(DefaultListenerConfig(), NewLogger())
 	if err != nil {
@@ -74,11 +100,175 @@ func TestListenerManagerRunIsOneShotAndClosesReports(t *testing.T) {
 	if err := manager.Run(context.Background()); err == nil {
 		t.Fatal("Run() returned nil error with no configured listeners")
 	}
+	status := manager.Status()
+	if status.State != ManagerStateFailed {
+		t.Fatalf("state = %q, want %q", status.State, ManagerStateFailed)
+	}
+	if status.LastError == "" || status.LastErrorAt.IsZero() {
+		t.Fatalf("failure status did not retain error details: %+v", status)
+	}
 	if _, ok := <-manager.Reports(); ok {
 		t.Fatal("Reports() remained open after Run() returned")
 	}
 	if err := manager.Run(context.Background()); err == nil {
 		t.Fatal("second Run() returned nil error")
+	}
+}
+
+func TestListenerManagerStatusAggregatesListenerHealth(t *testing.T) {
+	cfg := DefaultListenerConfig()
+	cfg.ListenInterfaces = []string{"eth1", "eth2"}
+	manager, err := NewListenerManager(cfg, NewLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager.telemetry.setState(ManagerStateStarting, nil)
+
+	manager.listeners[0].telemetry.setState(ListenerStateActive, nil)
+	manager.listeners[1].telemetry.setState(ListenerStateActive, nil)
+	status := manager.Status()
+	if status.State != ManagerStateHealthy || status.ListenersActive != 2 {
+		t.Fatalf("healthy status = %+v", status)
+	}
+
+	manager.listeners[1].telemetry.activationFailures.Add(1)
+	manager.listeners[1].telemetry.setState(ListenerStateReconnecting, fmt.Errorf("interface unavailable"))
+	status = manager.Status()
+	if status.State != ManagerStateDegraded || status.ListenersActive != 1 {
+		t.Fatalf("degraded status = %+v", status)
+	}
+	if status.ActivationFailures != 1 {
+		t.Fatalf("activation failures = %d, want 1", status.ActivationFailures)
+	}
+	if status.Listeners[1].ActivationFailures != 1 || status.Listeners[1].LastError == "" || status.Listeners[1].LastErrorAt.IsZero() {
+		t.Fatalf("listener failure status = %+v", status.Listeners[1])
+	}
+}
+
+func TestListenerManagerStatusTracksActivationFailureAndShutdown(t *testing.T) {
+	cfg := DefaultListenerConfig()
+	cfg.ListenInterfaces = []string{"iprd-test-interface-that-does-not-exist"}
+	manager, err := NewListenerManager(cfg, NewLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	done := make(chan error, 1)
+	go func() {
+		done <- manager.Run(ctx)
+	}()
+
+	deadline := time.After(2 * time.Second)
+	for {
+		status := manager.Status()
+		if status.ActivationFailures > 0 {
+			if status.State != ManagerStateDegraded {
+				t.Fatalf("state after activation failure = %q, want %q", status.State, ManagerStateDegraded)
+			}
+			if status.ListenersActive != 0 || status.LastError == "" || status.LastErrorAt.IsZero() {
+				t.Fatalf("activation failure status = %+v", status)
+			}
+			break
+		}
+		select {
+		case <-deadline:
+			cancel()
+			t.Fatal("timed out waiting for activation failure")
+		case <-time.After(time.Millisecond):
+		}
+	}
+
+	cancel()
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("Run() after cancellation returned %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for manager shutdown")
+	}
+	if status := manager.Status(); status.State != ManagerStateStopped {
+		t.Fatalf("state after shutdown = %q, want %q", status.State, ManagerStateStopped)
+	}
+}
+
+func TestListenerManagerStatusConcurrent(t *testing.T) {
+	manager, err := NewListenerManager(DefaultListenerConfig(), NewLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
+	manager.telemetry.setState(ManagerStateStarting, nil)
+
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		for i := 0; i < 1_000; i++ {
+			manager.listeners[0].telemetry.setState(ListenerStateActive, nil)
+			manager.listeners[0].telemetry.reconnects.Add(1)
+			manager.listeners[0].telemetry.setState(ListenerStateReconnecting, fmt.Errorf("reconnect %d", i))
+		}
+	}()
+	for i := 0; i < 1_000; i++ {
+		_ = manager.Status()
+	}
+	<-done
+}
+
+func TestListenerManagerPacketStatus(t *testing.T) {
+	cfg := DefaultListenerConfig()
+	cfg.ForwardKnown = true
+	manager, err := NewListenerManager(cfg, NewLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	firstAt := time.Unix(1_700_000_000, 100)
+	valid := capturedIPReport(t, "aa:bb:cc:dd:ee:10", 14235, 1)
+	valid.CaptureInfo.Timestamp = firstAt
+	if report := manager.processCapturedPacket(valid); report == nil {
+		t.Fatal("valid capture returned no report")
+	}
+
+	duplicate := valid
+	duplicate.CaptureInfo.Timestamp = firstAt.Add(time.Second)
+	if report := manager.processCapturedPacket(duplicate); report != nil {
+		t.Fatal("duplicate capture returned a report")
+	}
+
+	unknown := capturedIPReport(t, "aa:bb:cc:dd:ee:11", 7777, 1)
+	unknown.CaptureInfo.Timestamp = firstAt.Add(2 * time.Second)
+	if report := manager.processCapturedPacket(unknown); report != nil {
+		t.Fatal("unknown capture returned a report")
+	}
+
+	invalidAt := firstAt.Add(3 * time.Second)
+	invalid := CapturedPacket{
+		Data:        []byte{0x01, 0x02, 0x03},
+		LinkType:    layers.LinkTypeEthernet,
+		CaptureInfo: gopacket.CaptureInfo{Timestamp: invalidAt},
+	}
+	if report := manager.processCapturedPacket(invalid); report != nil {
+		t.Fatal("invalid capture returned a report")
+	}
+
+	status := manager.Status()
+	want := PacketCounters{Processed: 4, Reports: 1, Invalid: 1, Duplicates: 1, UnknownFiltered: 1}
+	if status.Packets != want {
+		t.Fatalf("packet counters = %+v, want %+v", status.Packets, want)
+	}
+	if !status.LastPacketAt.Equal(invalidAt) {
+		t.Fatalf("last packet = %s, want %s", status.LastPacketAt, invalidAt)
+	}
+	if !status.LastReportAt.Equal(firstAt) {
+		t.Fatalf("last report = %s, want %s", status.LastReportAt, firstAt)
+	}
+
+	status.Packets.Processed = 0
+	status.Listeners = nil
+	fresh := manager.Status()
+	if fresh.Packets.Processed != 4 || len(fresh.Listeners) != len(manager.listeners) {
+		t.Fatalf("mutating snapshot changed manager status: %+v", fresh)
 	}
 }
 
