@@ -180,7 +180,8 @@ func newMDNSService(hostname string, port int, version string) (*zeroconf.Servic
 	service.Text = []string{
 		"txtvers=1",
 		"protocol=iprd",
-		"subscribe=iprd_subscribe",
+		"subscribe=" + TCPCommandSubscribe,
+		"status=" + TCPCommandStatus,
 	}
 	if version = strings.TrimSpace(version); version != "" && !strings.EqualFold(version, "unknown") {
 		service.Text = append(service.Text, "version="+version)

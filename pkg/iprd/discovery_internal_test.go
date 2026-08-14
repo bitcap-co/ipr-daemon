@@ -109,6 +109,7 @@ func TestNewMDNSService(t *testing.T) {
 		"txtvers=1",
 		"protocol=iprd",
 		"subscribe=iprd_subscribe",
+		"status=iprd_status",
 		"version=0.4.6",
 	}
 	if !reflect.DeepEqual(service.Text, wantText) {
@@ -121,7 +122,7 @@ func TestNewMDNSServiceOmitsUnknownVersion(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newMDNSService() error = %v", err)
 	}
-	want := []string{"txtvers=1", "protocol=iprd", "subscribe=iprd_subscribe"}
+	want := []string{"txtvers=1", "protocol=iprd", "subscribe=iprd_subscribe", "status=iprd_status"}
 	if !reflect.DeepEqual(service.Text, want) {
 		t.Errorf("service text = %#v, want %#v", service.Text, want)
 	}
