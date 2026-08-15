@@ -27,7 +27,7 @@ Pre-built binaries and packages are available in [Releases](https://github.com/b
 
 To build locally, simply run
 ```bash
-go build -o iprd cmd/main.go
+go build -o iprd ./cmd
 # or
 make
 ```
@@ -221,6 +221,31 @@ See `cmd/example/tcp_listener.go` for an example golang implementation or can us
 echo '{"command": "iprd_subscribe"}' | nc localhost 7788
 ```
 Replacing `localhost` with host IP address if required.
+
+## Querying daemon status
+
+The same TCP endpoint supports a one-shot status request. Send `iprd_status`
+on a new connection to receive the current listener state and cumulative diagnostics:
+
+```bash
+echo '{"command": "iprd_status"}' | nc localhost 7788
+```
+
+The `iprd` binary can query and format this response directly:
+
+```bash
+iprd -status
+iprd -status-json
+```
+
+Use `-b` and `-p`, or `-c` with the daemon's TOML configuration, to select a
+non-default endpoint. Status requests are separate from subscriptions and the
+server closes the request connection after sending one response.
+
+The TCP endpoint is unauthenticated. Both report subscriptions and status
+requests should only be exposed to a trusted LAN. Bind to localhost with
+`-b 127.0.0.1` or restrict the port with a firewall when remote access is not
+required; status responses include interface names and recent listener errors.
 
 ## Miner Support
 In theory, it should receive any ASIC miner IP Report message since it isn't bound to any specific UDP ports.

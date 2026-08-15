@@ -30,7 +30,7 @@ func main() {
 
 	log.Println("Sending subscribe command...")
 	var subCmd = iprd.TCPCommand{
-		Command: "iprd_subscribe",
+		Command: iprd.TCPCommandSubscribe,
 	}
 	subscribeMsg, err := json.Marshal(subCmd)
 	if err != nil {

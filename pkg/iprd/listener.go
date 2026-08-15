@@ -33,6 +33,7 @@ type IPRListener struct {
 	inactive     *pcap.InactiveHandle
 	handle       *pcap.Handle
 	packets      chan CapturedPacket
+	telemetry    listenerTelemetry
 }
 
 // NewListener returns a new IPRListener configured by ListenerConfig. If logger is nil, a new IPRLogger is created.
@@ -45,18 +46,30 @@ func NewListener(cfg *ListenerConfig, logger Logger, iface *IPRInterface) *IPRLi
 		logger = NewLogger()
 	}
 
+	interfaceName := cfg.ListenInterface
+	if iface != nil {
+		interfaceName = iface.Name
+		if interfaceName == "" {
+			interfaceName = iface.FriendlyName
+		}
+	}
 	return &IPRListener{
 		cfg:         cfg,
 		log:         logger,
 		iface:       iface,
 		ifacePinned: iface != nil,
 		packets:     make(chan CapturedPacket),
+		telemetry:   newListenerTelemetry(interfaceName),
 	}
 }
 
 // Packets returns the listener's stream of raw captured packets.
 func (l *IPRListener) Packets() <-chan CapturedPacket {
 	return l.packets
+}
+
+func (l *IPRListener) status() ListenerStatus {
+	return l.telemetry.snapshot()
 }
 
 func (l *IPRListener) setupBPF(root string) error {
@@ -147,6 +160,11 @@ func (l *IPRListener) setupHandle() error {
 		return fmt.Errorf("failed to activate handle: %w", err)
 	}
 	l.log.Info(fmt.Sprintf("activate handle on interface: %s (%s)", l.iface.FriendlyName, l.iface.MACAddr()))
+	interfaceName := l.iface.Name
+	if interfaceName == "" {
+		interfaceName = l.iface.FriendlyName
+	}
+	l.telemetry.setInterface(interfaceName)
 
 	if err = l.setupBPF(l.iface.NetworkPrefix()); err != nil {
 		return err
@@ -163,7 +181,14 @@ func (l *IPRListener) closeHandle() {
 
 // Activate sets a new active pcap handle on iface. This must be called once before Listen().
 func (l *IPRListener) Activate() error {
-	return l.setupHandle()
+	l.telemetry.setState(ListenerStateStarting, nil)
+	if err := l.setupHandle(); err != nil {
+		l.telemetry.activationFailures.Add(1)
+		l.telemetry.setState(ListenerStateStopped, err)
+		return err
+	}
+	l.telemetry.setState(ListenerStateActive, nil)
+	return nil
 }
 
 // Run supervises capture on the interface: it activates a handle, captures until the
@@ -173,17 +198,28 @@ func (l *IPRListener) Activate() error {
 // across reconnects. Run is the resilient alternative to Activate()+Listen().
 func (l *IPRListener) Run(ctx context.Context) error {
 	defer l.closeHandle()
+	defer l.telemetry.setState(ListenerStateStopped, nil)
 
 	backoff := reconnectMinBackoff
+	firstActivation := true
 	for {
+		if firstActivation {
+			l.telemetry.setState(ListenerStateStarting, nil)
+		} else {
+			l.telemetry.setState(ListenerStateReconnecting, nil)
+		}
 		if err := l.activateForRun(); err != nil {
+			l.telemetry.activationFailures.Add(1)
+			l.telemetry.setState(ListenerStateReconnecting, err)
 			l.log.Warn(fmt.Sprintf("failed to activate capture: %v; retrying in %s", err, backoff))
 			if !sleepCtx(ctx, backoff) {
 				return nil
 			}
 			backoff = nextBackoff(backoff)
+			firstActivation = false
 			continue
 		}
+		l.telemetry.setState(ListenerStateActive, nil)
 		backoff = reconnectMinBackoff
 
 		capErr := l.capture(ctx)
@@ -192,13 +228,18 @@ func (l *IPRListener) Run(ctx context.Context) error {
 			return nil
 		}
 		if capErr != nil {
+			l.telemetry.captureErrors.Add(1)
+			l.telemetry.setState(ListenerStateReconnecting, capErr)
 			l.log.Warn(fmt.Sprintf("capture stopped: %v; reconnecting in %s", capErr, backoff))
 		} else {
+			l.telemetry.setState(ListenerStateReconnecting, nil)
 			l.log.Warn(fmt.Sprintf("capture ended; reconnecting in %s", backoff))
 		}
+		l.telemetry.reconnects.Add(1)
 		if !sleepCtx(ctx, backoff) {
 			return nil
 		}
+		firstActivation = false
 		backoff = nextBackoff(backoff)
 	}
 }
@@ -217,8 +258,12 @@ func (l *IPRListener) activateForRun() error {
 // self-reconnecting listener use Run().
 func (l *IPRListener) Listen() {
 	defer l.closeHandle()
+	defer l.telemetry.setState(ListenerStateStopped, nil)
+	l.telemetry.setState(ListenerStateActive, nil)
 	l.log.Info("start listen...")
 	if err := l.capture(context.Background()); err != nil {
+		l.telemetry.captureErrors.Add(1)
+		l.telemetry.setState(ListenerStateStopped, err)
 		l.log.Error(fmt.Errorf("capture stopped: %w", err))
 	}
 }
