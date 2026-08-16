@@ -80,8 +80,13 @@ func main() {
 	// build/set configuration.
 	var err error
 	listenInterfaces := flInterfaces.Selectors()
-	if len(listenInterfaces) == 0 {
-		listenInterfaces = append([]string(nil), iprd.DefaultIPRDConfig().ListenInterfaces...)
+	listenInterface := ""
+	if len(listenInterfaces) > 0 {
+		listenInterface = listenInterfaces[0]
+	}
+	// no interface providers and not in config mode; exit.
+	if len(listenInterfaces) == 0 && *flConfigFile == "" && *flWriteConfig == "" {
+		log.Fatal(fmt.Errorf("no listen interface(s) specified.\nUSAGE: use -i/-c to specify at least one listen interface."))
 	}
 	cfg, err := iprd.ParseConfig(&iprd.IPRDConfig{
 		ListenerConfig: iprd.ListenerConfig{
@@ -89,7 +94,7 @@ func main() {
 			Auto:             *flAuto,
 			ListenInterfaces: listenInterfaces,
 			// Keep the first selector available through the legacy singular field.
-			ListenInterface:    listenInterfaces[0],
+			ListenInterface:    listenInterface,
 			Interfaces:         flInterfaces.Configs(),
 			ForwardKnown:       *flForwardKnown,
 			NoRootNetwork:      *flNoRootNetwork,
