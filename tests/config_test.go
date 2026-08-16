@@ -89,6 +89,45 @@ ignored_devices = ["aa:bb:cc:dd:ee:ff"]
 	}
 }
 
+func TestDefaultConfigHasNoListenInterfaces(t *testing.T) {
+	cfg, err := iprd.ParseConfig(nil)
+	if err != nil {
+		t.Fatalf("ParseConfig(nil): %v", err)
+	}
+	if len(cfg.ListenInterfaces) != 0 {
+		t.Fatalf("default interfaces = %v, want none", cfg.ListenInterfaces)
+	}
+	if cfg.ListenInterface != "" {
+		t.Fatalf("default compatibility interface = %q, want empty", cfg.ListenInterface)
+	}
+}
+
+func TestMergeWithoutListenInterfacesPreservesExistingInterfaces(t *testing.T) {
+	current, err := iprd.ParseConfig(&iprd.IPRDConfig{
+		ListenerConfig: iprd.ListenerConfig{ListenInterfaces: []string{"eth0"}},
+	})
+	if err != nil {
+		t.Fatalf("parse current config: %v", err)
+	}
+	overrides, err := iprd.ParseConfig(&iprd.IPRDConfig{
+		ListenerConfig: iprd.ListenerConfig{Debug: true},
+	})
+	if err != nil {
+		t.Fatalf("parse overrides without an interface: %v", err)
+	}
+
+	merged, err := iprd.ParseConfig(current.Merge(overrides))
+	if err != nil {
+		t.Fatalf("parse merged config: %v", err)
+	}
+	if want := []string{"eth0"}; !reflect.DeepEqual(merged.ListenInterfaces, want) {
+		t.Fatalf("merged interfaces = %v, want %v", merged.ListenInterfaces, want)
+	}
+	if !merged.Debug {
+		t.Fatal("merged Debug = false, want true")
+	}
+}
+
 func TestValidateRejectsInvalidInterfaceConfigSelectors(t *testing.T) {
 	tests := []struct {
 		name       string

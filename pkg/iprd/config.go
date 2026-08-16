@@ -193,10 +193,9 @@ type ListenerConfig struct {
 }
 
 // Validate returns an error if ListenerConfig contains invalid values.
+// An empty interface list is valid for partial configuration and config-file
+// updates; ListenerManager.Run requires at least one interface at runtime.
 func (cfg *ListenerConfig) Validate() error {
-	if len(cfg.effectiveListenInterfaces()) == 0 {
-		return fmt.Errorf("at least one listen interface must be present")
-	}
 	seen := make(map[string]struct{}, len(cfg.Interfaces))
 	for i, interfaceCfg := range cfg.Interfaces {
 		selector := strings.TrimSpace(interfaceCfg.Selector)
@@ -316,8 +315,8 @@ func DefaultListenerConfig() *ListenerConfig {
 	return &ListenerConfig{
 		Debug:              false,
 		Auto:               false,
-		ListenInterfaces:   []string{"eth0"},
-		ListenInterface:    "eth0",
+		ListenInterfaces:   []string{},
+		ListenInterface:    "",
 		Interfaces:         []InterfaceConfig{},
 		ForwardKnown:       false,
 		NoRootNetwork:      false,

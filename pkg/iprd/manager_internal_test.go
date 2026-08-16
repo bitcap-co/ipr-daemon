@@ -194,7 +194,9 @@ func TestListenerManagerStatusTracksActivationFailureAndShutdown(t *testing.T) {
 }
 
 func TestListenerManagerStatusConcurrent(t *testing.T) {
-	manager, err := NewListenerManager(DefaultListenerConfig(), NewLogger())
+	cfg := DefaultListenerConfig()
+	cfg.ListenInterfaces = []string{"test0"}
+	manager, err := NewListenerManager(cfg, NewLogger())
 	if err != nil {
 		t.Fatal(err)
 	}
