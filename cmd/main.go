@@ -119,7 +119,7 @@ func main() {
 		*flWriteConfig = *flWriteConfig + ".toml"
 		if curr, err := iprd.NewIPRDConfigFromFile(*flWriteConfig); err == nil {
 			// config file exists, merge with current config.
-			newCfg := cfg.Merge(curr)
+			newCfg := curr.Merge(cfg)
 			mergedCfg, err := iprd.ParseConfig(newCfg)
 			if err != nil {
 				log.Fatal(err)
