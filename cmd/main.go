@@ -150,7 +150,7 @@ func main() {
 	}
 	// no interface providers and not in config mode; exit.
 	if len(cfg.ListenInterfaces) == 0 {
-		log.Fatal(fmt.Errorf("no listen interface(s) specified.\nUSAGE: use -i/-c to specify at least one listen interface."))
+		log.Fatal(fmt.Errorf("no listen interface(s) specified.\nUSAGE: use -i/-c to specify at least one listen interface"))
 	}
 
 	log.Info("start IPReporter Daemon...")
