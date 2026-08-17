@@ -84,10 +84,6 @@ func main() {
 	if len(listenInterfaces) > 0 {
 		listenInterface = listenInterfaces[0]
 	}
-	// no interface providers and not in config mode; exit.
-	if len(listenInterfaces) == 0 && *flConfigFile == "" && *flWriteConfig == "" {
-		log.Fatal(fmt.Errorf("no listen interface(s) specified.\nUSAGE: use -i/-c to specify at least one listen interface."))
-	}
 	cfg, err := iprd.ParseConfig(&iprd.IPRDConfig{
 		ListenerConfig: iprd.ListenerConfig{
 			Debug:            *flDebug,
@@ -151,6 +147,10 @@ func main() {
 			log.Fatal(err)
 		}
 		return
+	}
+	// no interface providers and not in config mode; exit.
+	if len(cfg.ListenInterfaces) == 0 {
+		log.Fatal(fmt.Errorf("no listen interface(s) specified.\nUSAGE: use -i/-c to specify at least one listen interface."))
 	}
 
 	log.Info("start IPReporter Daemon...")
