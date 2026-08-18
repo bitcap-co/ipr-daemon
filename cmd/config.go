@@ -33,11 +33,11 @@ func updateExistingConfig(curr, target *iprd.IPRDConfig) *iprd.IPRDConfig {
 		newCfg.NetworkExclusions = mergeSortedUnique(curr.NetworkExclusions, target.NetworkExclusions)
 		log.Info(fmt.Sprintf("updated network_exclusions: %v -> %v", curr.NetworkExclusions, newCfg.NetworkExclusions))
 	}
-	if target.ForwardConfig.Bind != "" && target.ForwardConfig.Bind != curr.ForwardConfig.Bind {
-		log.Info(fmt.Sprintf("updated forward_bind: %s -> %s", curr.ForwardConfig.Bind, newCfg.ForwardConfig.Bind))
+	if target.Bind != "" && target.Bind != curr.Bind {
+		log.Info(fmt.Sprintf("updated forward_bind: %s -> %s", curr.Bind, newCfg.Bind))
 	}
-	if target.ForwardConfig.Port != 0 && target.ForwardConfig.Port != curr.ForwardConfig.Port {
-		log.Info(fmt.Sprintf("updated forward_port: %d -> %d", curr.ForwardConfig.Port, newCfg.ForwardConfig.Port))
+	if target.Port != 0 && target.Port != curr.Port {
+		log.Info(fmt.Sprintf("updated forward_port: %d -> %d", curr.Port, newCfg.Port))
 	}
 	if target.CaptureFile != "" && target.CaptureFile != curr.CaptureFile {
 		log.Info(fmt.Sprintf("updated capture_file: %s -> %s", curr.CaptureFile, newCfg.CaptureFile))

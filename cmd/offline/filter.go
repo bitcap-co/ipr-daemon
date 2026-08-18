@@ -38,31 +38,31 @@ func (fc *filterConfig) Validate() error {
 func (fc filterConfig) String() string {
 	var sb strings.Builder
 	if fc.InterfaceName != "" {
-		sb.WriteString(fmt.Sprintf("Interface=%s", fc.InterfaceName))
+		fmt.Fprintf(&sb, "Interface=%s", fc.InterfaceName)
 	}
 	if fc.IPAddress != "" {
 		if sb.Len() > 0 {
 			sb.WriteString(",")
 		}
-		sb.WriteString(fmt.Sprintf("IP=%s", fc.IPAddress))
+		fmt.Fprintf(&sb, "IP=%s", fc.IPAddress)
 	}
 	if fc.MACAddress != "" {
 		if sb.Len() > 0 {
 			sb.WriteString(",")
 		}
-		sb.WriteString(fmt.Sprintf("MAC=%s", fc.MACAddress))
+		fmt.Fprintf(&sb, "MAC=%s", fc.MACAddress)
 	}
 	if fc.UDPPort != 0 {
 		if sb.Len() > 0 {
 			sb.WriteString(",")
 		}
-		sb.WriteString(fmt.Sprintf("Port=%d", fc.UDPPort))
+		fmt.Fprintf(&sb, "Port=%d", fc.UDPPort)
 	}
 	if fc.Limit != 0 {
 		if sb.Len() > 0 {
 			sb.WriteString(",")
 		}
-		sb.WriteString(fmt.Sprintf("Limit=%d", fc.Limit))
+		fmt.Fprintf(&sb, "Limit=%d", fc.Limit)
 	}
 	if sb.Len() == 0 {
 		sb.WriteString("None")
