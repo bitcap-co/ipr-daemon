@@ -15,8 +15,11 @@ import (
 	"github.com/gopacket/gopacket/pcapgo"
 )
 
-func offlineTestPacket(t *testing.T) ([]byte, gopacket.CaptureInfo) {
+func offlineTestPacket(t *testing.T, ipAddress string) ([]byte, gopacket.CaptureInfo) {
 	t.Helper()
+	if ipAddress == "" {
+		ipAddress = "192.168.1.100"
+	}
 	eth := &layers.Ethernet{
 		SrcMAC:       net.HardwareAddr{0xaa, 0xbb, 0xcc, 0xdd, 0xee, 0x21},
 		DstMAC:       net.HardwareAddr{0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
@@ -26,7 +29,7 @@ func offlineTestPacket(t *testing.T) ([]byte, gopacket.CaptureInfo) {
 		Version:  4,
 		TTL:      64,
 		Protocol: layers.IPProtocolUDP,
-		SrcIP:    net.ParseIP("192.168.1.100").To4(),
+		SrcIP:    net.ParseIP(ipAddress).To4(),
 		DstIP:    net.ParseIP("255.255.255.255").To4(),
 	}
 	udp := &layers.UDP{SrcPort: 5000, DstPort: 14235}
@@ -50,7 +53,7 @@ func offlineTestPacket(t *testing.T) ([]byte, gopacket.CaptureInfo) {
 
 func TestDumpPcapNGIncludesInterfaceName(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "capture.pcapng")
-	data, ci := offlineTestPacket(t)
+	data, ci := offlineTestPacket(t, "")
 	writer := iprd.NewCaptureWriter(path, false, iprd.NewLogger())
 	if err := writer.Open(); err != nil {
 		t.Fatal(err)
@@ -70,8 +73,11 @@ func TestDumpPcapNGIncludesInterfaceName(t *testing.T) {
 	var output bytes.Buffer
 	log.SetOutput(&output)
 	defer log.SetOutput(os.Stdout)
-	if err := dumpPcap(path, false); err != nil {
+	if err := dumpPcap(path, false, filterConfig{}); err != nil {
 		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "Summary:") {
+		t.Fatalf("output does not contain summary:\n%s", output.String())
 	}
 	if !strings.Contains(output.String(), "iface: test0") {
 		t.Fatalf("output does not identify PCAP-NG interface:\n%s", output.String())
@@ -80,7 +86,7 @@ func TestDumpPcapNGIncludesInterfaceName(t *testing.T) {
 
 func TestDumpClassicPcapRemainsSupported(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "capture.pcap")
-	data, ci := offlineTestPacket(t)
+	data, ci := offlineTestPacket(t, "")
 	file, err := os.Create(path)
 	if err != nil {
 		t.Fatal(err)
@@ -99,10 +105,79 @@ func TestDumpClassicPcapRemainsSupported(t *testing.T) {
 	var output bytes.Buffer
 	log.SetOutput(&output)
 	defer log.SetOutput(os.Stdout)
-	if err := dumpPcap(path, false); err != nil {
+	if err := dumpPcap(path, false, filterConfig{}); err != nil {
 		t.Fatal(err)
+	}
+	if !strings.Contains(output.String(), "Summary:") {
+		t.Fatalf("output does not contain summary:\n%s", output.String())
 	}
 	if !strings.Contains(output.String(), "iface: classic") {
 		t.Fatalf("output does not identify classic PCAP input:\n%s", output.String())
+	}
+}
+
+func TestOfflineFilterOutput(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "capture.pcapng")
+	data, ci := offlineTestPacket(t, "")
+	writer := iprd.NewCaptureWriter(path, false, iprd.NewLogger())
+	if err := writer.Open(); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Write(iprd.CapturedPacket{
+		Data:        data,
+		CaptureInfo: ci,
+		LinkType:    layers.LinkTypeEthernet,
+		Interface:   iprd.IPRInterface{Index: 3, Name: "test0"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Write(iprd.CapturedPacket{
+		Data:        data,
+		CaptureInfo: ci,
+		LinkType:    layers.LinkTypeEthernet,
+		Interface:   iprd.IPRInterface{Index: 4, Name: "test1"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	data, ci2 := offlineTestPacket(t, "192.168.1.44")
+	if err := writer.Write(iprd.CapturedPacket{
+		Data:        data,
+		CaptureInfo: ci2,
+		LinkType:    layers.LinkTypeEthernet,
+		Interface:   iprd.IPRInterface{Index: 4, Name: "test1"},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	tests := []struct {
+		name          string
+		filter        filterConfig
+		expectedCount int
+	}{
+		{"filter by interface name (test0)", filterConfig{InterfaceName: "test0"}, 1},
+		{"filter by interface name (test1)", filterConfig{InterfaceName: "test1"}, 2},
+		{"filter by IP address (192.168.1.100)", filterConfig{IPAddress: "192.168.1.100"}, 2},
+		{"filter by MAC address (aa:bb:cc:dd:ee:21)", filterConfig{MACAddress: "aa:bb:cc:dd:ee:21"}, 3},
+		{"filter by non-existent interface name (test2)", filterConfig{InterfaceName: "test2"}, 0},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			var output bytes.Buffer
+			log.SetOutput(&output)
+			defer log.SetOutput(os.Stdout)
+			// enable debug here to output all messages including duplicates
+			if err := dumpPcap(path, true, test.filter); err != nil {
+				t.Fatal(err)
+			}
+			if strings.Contains(output.String(), "Summary:") {
+				t.Fatalf("output contains summary, expected no summary:\n%s", output.String())
+			}
+			gotCount := strings.Count(output.String(), " - ")
+			if gotCount != test.expectedCount {
+				t.Fatalf("expected %d packets, got %d:\n%s", test.expectedCount, gotCount, output.String())
+			}
+		})
 	}
 }

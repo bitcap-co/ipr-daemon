@@ -114,8 +114,8 @@ $(OUTPUT_NAME): $(wildcard ./cmd/*.go) .prepare
 	go build -ldflags='$(LDFLAGS)' -o ${OUTPUT_NAME} ./cmd
 
 .PHONY: offline
-offline: ./cmd/offline/main.go
-	go build -o ${OUTPUT_OFFLINE} ./cmd/offline/main.go
+offline: $(wildcard ./cmd/offline/*.go)
+	go build -o ${OUTPUT_OFFLINE} ./cmd/offline
 
 
 # Linux (amd64)
