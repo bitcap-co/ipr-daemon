@@ -18,6 +18,10 @@ mdns = false
 # no_root_network is a switch to remove the interface network from BPF filter.
 # must add additional network inclusions via network_inclusions.
 no_root_network = false
+# filter_known_ports is a switch to only allow packets from known miner ports.
+# This is similar to forward_known but applies at the BPF filter level instead.
+# Packets outside of these ports are dropped and not logged or captured.
+filter_known_ports = false
 # ignored_devices is a list of source MAC addresses to exclude in BPF filter.
 ignored_devices = [""]
 # network_inclusions is a list of networks to append in BPF filter.
@@ -37,6 +41,7 @@ rotate_capture_files = false
 # [[interfaces]]
 # selector = "eth0"
 # no_root_network = true
+# filter_known_ports = false
 # ignored_devices = ["aa:bb:cc:dd:ee:ff"]
 # network_inclusions = ["192.168.1"]
 # network_exclusions = ["10"]
