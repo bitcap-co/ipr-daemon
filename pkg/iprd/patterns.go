@@ -176,6 +176,15 @@ func GetMinerHintFromPort(port int) (MinerTypeHint, bool) {
 	return hint, ok
 }
 
+// GetKnownMinerPorts returns a list of known miner UDP destination ports.
+func GetKnownMinerPorts() []int {
+	var ports []int
+	for p := range minerPorts {
+		ports = append(ports, p)
+	}
+	return ports
+}
+
 // ParseMACAddress parses address and returns a normalized MAC address.
 func ParseMACAddress(address string) string {
 	if address == "" {
