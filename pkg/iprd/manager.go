@@ -196,6 +196,7 @@ func newManagedListeners(cfg *ListenerConfig, logger Logger) []*IPRListener {
 		listenerCfg.ListenInterface = selector
 		bpfCfg := cfg.interfaceConfig(selector)
 		listenerCfg.NoRootNetwork = bpfCfg.NoRootNetwork
+		listenerCfg.FilterKnownPorts = bpfCfg.FilterKnownPorts
 		listenerCfg.IgnoredDevices = bpfCfg.IgnoredDevices
 		listenerCfg.NetworkInclusions = bpfCfg.NetworkInclusions
 		listenerCfg.NetworkExclusions = bpfCfg.NetworkExclusions
