@@ -56,6 +56,10 @@ func updateExistingConfig(curr, target *iprd.IPRDConfig) *iprd.IPRDConfig {
 		newCfg.NoRootNetwork = !target.NoRootNetwork || !curr.NoRootNetwork
 		log.Info(fmt.Sprintf("toggled no_root_network: %v -> %v", curr.NoRootNetwork, newCfg.NoRootNetwork))
 	}
+	if target.FilterKnownPorts {
+		newCfg.FilterKnownPorts = !target.FilterKnownPorts || !curr.FilterKnownPorts
+		log.Info(fmt.Sprintf("toggled filter_known_ports: %v -> %v", curr.FilterKnownPorts, newCfg.FilterKnownPorts))
+	}
 	if target.RotateCaptureFiles {
 		newCfg.RotateCaptureFiles = !target.RotateCaptureFiles || !curr.RotateCaptureFiles
 		log.Info(fmt.Sprintf("toggled rotate_capture_files: %v -> %v", curr.RotateCaptureFiles, newCfg.RotateCaptureFiles))
@@ -89,8 +93,9 @@ func mergeInterfaceConfigs(curr, target []iprd.InterfaceConfig) []iprd.Interface
 
 func mergeInterfaceConfig(curr, target iprd.InterfaceConfig) iprd.InterfaceConfig {
 	merged := cloneInterfaceConfig(curr)
-	merged.NoRootNetwork = curr.NoRootNetwork || target.NoRootNetwork
-	merged.IgnoredDevices = mergeSortedUnique(curr.IgnoredDevices, target.IgnoredDevices)
+	if target.FilterKnownPorts {
+		merged.FilterKnownPorts = !curr.FilterKnownPorts || !target.FilterKnownPorts
+	}
 	merged.NetworkInclusions = mergeSortedUnique(curr.NetworkInclusions, target.NetworkInclusions)
 	merged.NetworkExclusions = mergeSortedUnique(curr.NetworkExclusions, target.NetworkExclusions)
 	return merged
@@ -98,7 +103,10 @@ func mergeInterfaceConfig(curr, target iprd.InterfaceConfig) iprd.InterfaceConfi
 
 func logInterfaceConfigChanges(selector string, curr, target iprd.InterfaceConfig) {
 	if curr.NoRootNetwork != target.NoRootNetwork {
-		log.Info(fmt.Sprintf("[%s] no_root_network: %v -> %v", selector, curr.NoRootNetwork, target.NoRootNetwork))
+		log.Info(fmt.Sprintf("[%s] toggled no_root_network: %v -> %v", selector, curr.NoRootNetwork, target.NoRootNetwork))
+	}
+	if curr.FilterKnownPorts != target.FilterKnownPorts {
+		log.Info(fmt.Sprintf("[%s] toggled filter_known_ports: %v -> %v", selector, curr.FilterKnownPorts, target.FilterKnownPorts))
 	}
 	if !slices.Equal(curr.IgnoredDevices, target.IgnoredDevices) {
 		log.Info(fmt.Sprintf("[%s] updated ignored_devices: %v -> %v", selector, curr.IgnoredDevices, target.IgnoredDevices))
