@@ -31,6 +31,7 @@ func (f *FlagSlice) Set(value string) error {
 type InterfaceConfig struct {
 	Selector          string   `toml:"selector" json:"selector"`
 	NoRootNetwork     bool     `toml:"no_root_network" json:"no_root_network"`
+	FilterKnownPorts  bool     `toml:"filter_known_ports" json:"filter_known_ports"`
 	IgnoredDevices    []string `toml:"ignored_devices" json:"ignored_devices"`
 	NetworkInclusions []string `toml:"network_inclusions" json:"network_inclusions"`
 	NetworkExclusions []string `toml:"network_exclusions" json:"network_exclusions"`
@@ -41,6 +42,7 @@ func DefaultInterfaceConfig() *InterfaceConfig {
 	return &InterfaceConfig{
 		Selector:          "",
 		NoRootNetwork:     false,
+		FilterKnownPorts:  false,
 		IgnoredDevices:    []string{},
 		NetworkInclusions: []string{},
 		NetworkExclusions: []string{},
@@ -125,6 +127,8 @@ func (f *FlagInterface) Set(value string) error {
 		switch {
 		case opt == "no-root-network":
 			cfg.NoRootNetwork = true
+		case opt == "known-ports":
+			cfg.FilterKnownPorts = true
 		case strings.HasPrefix(opt, "ignore="):
 			if value := strings.TrimSpace(strings.TrimPrefix(opt, "ignore=")); value != "" {
 				cfg.IgnoredDevices = append(cfg.IgnoredDevices, value)
@@ -185,6 +189,7 @@ type ListenerConfig struct {
 	Interfaces         []InterfaceConfig `toml:"interfaces,omitempty" json:"interfaces,omitempty"`
 	ForwardKnown       bool              `toml:"forward_known" json:"forward_known"`
 	NoRootNetwork      bool              `toml:"no_root_network" json:"no_root_network"`
+	FilterKnownPorts   bool              `toml:"filter_known_ports" json:"filter_known_ports"`
 	IgnoredDevices     []string          `toml:"ignored_devices" json:"ignored_devices"`
 	NetworkInclusions  []string          `toml:"network_inclusions" json:"network_inclusions"`
 	NetworkExclusions  []string          `toml:"network_exclusions" json:"network_exclusions"`
@@ -245,6 +250,9 @@ func (cfg *ListenerConfig) Merge(target *ListenerConfig) *ListenerConfig {
 	if len(target.Interfaces) > 0 {
 		result.Interfaces = cloneInterfaceConfigs(target.Interfaces)
 	}
+	if target.FilterKnownPorts {
+		result.FilterKnownPorts = true
+	}
 	if len(target.IgnoredDevices) > 0 {
 		result.IgnoredDevices = slices.Clone(target.IgnoredDevices)
 	}
@@ -293,6 +301,7 @@ func (cfg *ListenerConfig) normalizeListenInterfaces() {
 func (cfg *ListenerConfig) interfaceConfig(selector string) *InterfaceConfig {
 	combined := &InterfaceConfig{
 		NoRootNetwork:     cfg.NoRootNetwork,
+		FilterKnownPorts:  cfg.FilterKnownPorts,
 		IgnoredDevices:    slices.Clone(cfg.IgnoredDevices),
 		NetworkInclusions: slices.Clone(cfg.NetworkInclusions),
 		NetworkExclusions: slices.Clone(cfg.NetworkExclusions),
@@ -302,6 +311,7 @@ func (cfg *ListenerConfig) interfaceConfig(selector string) *InterfaceConfig {
 			continue
 		}
 		combined.NoRootNetwork = combined.NoRootNetwork || override.NoRootNetwork
+		combined.FilterKnownPorts = combined.FilterKnownPorts || override.FilterKnownPorts
 		combined.IgnoredDevices = append(combined.IgnoredDevices, override.IgnoredDevices...)
 		combined.NetworkInclusions = append(combined.NetworkInclusions, override.NetworkInclusions...)
 		combined.NetworkExclusions = append(combined.NetworkExclusions, override.NetworkExclusions...)
@@ -320,6 +330,7 @@ func DefaultListenerConfig() *ListenerConfig {
 		Interfaces:         []InterfaceConfig{},
 		ForwardKnown:       false,
 		NoRootNetwork:      false,
+		FilterKnownPorts:   false,
 		IgnoredDevices:     []string{},
 		NetworkInclusions:  []string{},
 		NetworkExclusions:  []string{},
