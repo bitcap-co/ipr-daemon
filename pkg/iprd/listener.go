@@ -21,7 +21,7 @@ const (
 )
 
 const (
-	bpfTemplate string = "(%s and (dst net 255 or %s) and udp src portrange 1024-65535 and udp dst portrange 1024-65535"
+	bpfTemplate string = "(%s and (dst net 255 or %s) and udp src portrange 1024-65535 and %s"
 )
 
 type IPRListener struct {
@@ -72,60 +72,80 @@ func (l *IPRListener) status() ListenerStatus {
 	return l.telemetry.snapshot()
 }
 
-func (l *IPRListener) setupBPF(root string) error {
-	// build networks into expression
+// setupBPF builds a new BPF filter expression based on the listener's configuration.
+// rootNetwork is the interface's IPv4 network address for inclusion in the filter.
+func (l *IPRListener) setupBPF(rootNetwork string) error {
+	var srcNetworks, dstNetworks, dstPorts strings.Builder
+	srcNetworks.WriteString("src host ")
+
+	// gather networks from configuration
 	var networks = []string{}
 	if !l.cfg.NoRootNetwork {
-		networks = append(networks, root)
+		networks = append(networks, rootNetwork)
 	}
-	for _, prefix := range l.cfg.NetworkInclusions {
-		if p := ParseBPFNetwork(prefix); p != "" {
+	for _, include := range l.cfg.NetworkInclusions {
+		if p := ParseBPFNetwork(include); p != "" {
 			networks = append(networks, p)
 		}
 	}
-
-	var src_prefix strings.Builder
-	src_prefix.WriteString("src host ")
-	var dst_prefix strings.Builder
+	// build networks as source/destination filters
 	for i, p := range networks {
 		sep := " or "
 		if i == len(networks)-1 {
 			sep = ""
 		}
-		fmt.Fprintf(&src_prefix, "%s%s", p, sep)
-		fmt.Fprintf(&dst_prefix, "%s%s", p, sep)
+		fmt.Fprintf(&srcNetworks, "%s%s", p, sep)
+		fmt.Fprintf(&dstNetworks, "%s%s", p, sep)
 	}
 
-	// build source network exclusions
-	for _, ex := range l.cfg.NetworkExclusions {
-		if p := ParseBPFNetwork(ex); p != "" {
-			fmt.Fprintf(&src_prefix, " and not %s", p)
+	// append source network exclusions
+	for _, exclude := range l.cfg.NetworkExclusions {
+		if p := ParseBPFNetwork(exclude); p != "" {
+			fmt.Fprintf(&srcNetworks, " and not %s", p)
 		}
 	}
-	fmt.Fprint(&src_prefix, ")")
+	fmt.Fprintf(&srcNetworks, ")")
 
-	// build source MAC addresses to exclude (ignored addresses)
+	// gather source MAC addresses to exclude
 	var ignored = []string{}
 	for _, mac := range l.cfg.IgnoredDevices {
 		if m := ParseMACAddress(mac); m != "" {
 			ignored = append(ignored, m)
 		}
 	}
+
+	// build ignored devices as BPF filter string
 	if len(ignored) > 0 {
-		var ignore_addrs strings.Builder
-		ignore_addrs.WriteString(" and not (ether src ")
+		var ignoredAddrs strings.Builder
+		ignoredAddrs.WriteString(" and not (ether src ")
 		for i, mac := range ignored {
 			sep := " or "
 			if i == len(ignored)-1 {
 				sep = ""
 			}
-			fmt.Fprintf(&ignore_addrs, "%s%s", mac, sep)
+			fmt.Fprintf(&ignoredAddrs, "%s%s", mac, sep)
 		}
-		fmt.Fprint(&ignore_addrs, ")")
-		fmt.Fprint(&src_prefix, ignore_addrs.String())
+		ignoredAddrs.WriteString(")")
+		srcNetworks.WriteString(ignoredAddrs.String())
 	}
 
-	bpfExpr := fmt.Sprintf(bpfTemplate, src_prefix.String(), dst_prefix.String())
+	// build UDP dst ports as BPF filter string
+	if l.cfg.FilterKnownPorts {
+		knownPorts := GetKnownMinerPorts()
+		dstPorts.WriteString("(udp port ")
+		for i, port := range knownPorts {
+			sep := " or "
+			if i == len(knownPorts)-1 {
+				sep = ""
+			}
+			fmt.Fprintf(&dstPorts, "%d%s", port, sep)
+		}
+		dstPorts.WriteString(")")
+	} else {
+		dstPorts.WriteString("udp dst portrange 1024-65535")
+	}
+
+	bpfExpr := fmt.Sprintf(bpfTemplate, srcNetworks.String(), dstNetworks.String(), dstPorts.String())
 	if err := l.handle.SetBPFFilter(bpfExpr); err != nil {
 		return fmt.Errorf("failed to set BPF expression: %w", err)
 	}
