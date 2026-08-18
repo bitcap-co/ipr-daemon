@@ -78,13 +78,12 @@ func main() {
 	}
 
 	// build/set configuration.
-	var err error
 	listenInterfaces := flInterfaces.Selectors()
 	listenInterface := ""
 	if len(listenInterfaces) > 0 {
 		listenInterface = listenInterfaces[0]
 	}
-	cfg, err := iprd.ParseConfig(&iprd.IPRDConfig{
+	rawCfg := iprd.IPRDConfig{
 		ListenerConfig: iprd.ListenerConfig{
 			Debug:            *flDebug,
 			Auto:             *flAuto,
@@ -105,17 +104,15 @@ func main() {
 			Port: *flForwardPort,
 			MDNS: *flMDNS,
 		},
-	})
-	if err != nil {
-		log.Fatal(err)
 	}
+	// config mode
 	if *flWriteConfig != "" {
 		// normalize the output file path to .toml extension
 		*flWriteConfig = strings.Split(*flWriteConfig, ".")[0]
 		*flWriteConfig = *flWriteConfig + ".toml"
 		if curr, err := iprd.NewIPRDConfigFromFile(*flWriteConfig); err == nil {
 			// config file exists, merge with current config.
-			newCfg := updateExistingConfig(curr, cfg)
+			newCfg := updateExistingConfig(curr, &rawCfg)
 			mergedCfg, err := iprd.ParseConfig(newCfg)
 			if err != nil {
 				log.Fatal(err)
@@ -125,19 +122,27 @@ func main() {
 			}
 		} else {
 			// write new config file.
-			if err := iprd.WriteIPRDConfigToFile(cfg, *flWriteConfig); err != nil {
+			if err := iprd.WriteIPRDConfigToFile(&rawCfg, *flWriteConfig); err != nil {
 				log.Fatal(err)
 			}
 		}
 		log.Info(fmt.Sprintf("successfully wrote -> %s", *flWriteConfig))
 		os.Exit(0)
 	}
+	var cfg *iprd.IPRDConfig
+	var err error
 	if *flConfigFile != "" {
 		cfg, err = iprd.NewIPRDConfigFromFile(*flConfigFile)
 		if err != nil {
 			log.Fatal(err)
 		}
+	} else {
+		cfg, err = iprd.ParseConfig(&rawCfg)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
+	// status mode
 	if *flStatus || *flStatusJSON {
 		response, err := requestStatus(cfg.Bind, cfg.Port)
 		if err != nil {
@@ -146,9 +151,11 @@ func main() {
 		if err := writeStatus(os.Stdout, response, *flStatusJSON); err != nil {
 			log.Fatal(err)
 		}
-		return
+		os.Exit(0)
 	}
-	// no interface providers and not in config mode; exit.
+
+	// enter run mode
+	// no interface providers; exit.
 	if len(cfg.ListenInterfaces) == 0 {
 		log.Fatal(fmt.Errorf("no listen interface(s) specified.\nUSAGE: use -i/-c to specify at least one listen interface"))
 	}
