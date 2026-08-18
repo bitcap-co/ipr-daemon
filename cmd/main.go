@@ -37,6 +37,7 @@ var (
 	flForwardKnown       = flag.Bool("known", false, "Switch to only forward IP reports from known miner types/ports over TCP broadcast stream.\nUnknown IP reports are logged but not forwarded.")
 	flMDNS               = flag.Bool("mdns", false, "Switch to enable mDNS/DNS-SD advertising of the TCP forwarding endpoint.")
 	flNoRootNetwork      = flag.Bool("no-root-network", false, "Switch to remove interface network from BPF filter. Must add additional network inclusion(s) via -add-network flag.\n(Global: applies to all interface selectors.)")
+	flFilterKnownPorts   = flag.Bool("known-ports", false, "Switch to only allow known miner ports/types through the BPF filter.\nThis has a similar effect to -known but unknown packets are dropped entirely and not logged/captured.\n(Global: applies to all interface selectors.)")
 	flNetworkInclusions  iprd.FlagSlice
 	flNetworkExclusions  iprd.FlagSlice
 	flIgnoredDevices     iprd.FlagSlice
@@ -93,6 +94,7 @@ func main() {
 			Interfaces:         flInterfaces.Configs(),
 			ForwardKnown:       *flForwardKnown,
 			NoRootNetwork:      *flNoRootNetwork,
+			FilterKnownPorts:   *flFilterKnownPorts,
 			IgnoredDevices:     []string(flIgnoredDevices),
 			NetworkInclusions:  []string(flNetworkInclusions),
 			NetworkExclusions:  []string(flNetworkExclusions),
