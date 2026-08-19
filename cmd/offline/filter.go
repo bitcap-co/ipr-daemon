@@ -16,12 +16,15 @@ type filterConfig struct {
 }
 
 func (fc *filterConfig) Validate() error {
-	if fc.IPAddress != "" && !iprd.ValidIP.MatchString(fc.IPAddress) {
-		return fmt.Errorf("invalid IP: %s", fc.IPAddress)
+	if fc.IPAddress != "" {
+		ip := iprd.ParseIPAddress(fc.IPAddress)
+		if ip == "" {
+			return fmt.Errorf("invalid IP: %s", fc.IPAddress)
+		}
+		fc.IPAddress = ip
 	}
-	var mac string
 	if fc.MACAddress != "" {
-		mac = iprd.ParseMACAddress(fc.MACAddress)
+		mac := iprd.ParseMACAddress(fc.MACAddress)
 		if mac == "" {
 			return fmt.Errorf("invalid MAC: %s", fc.MACAddress)
 		}
