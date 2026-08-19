@@ -17,18 +17,18 @@ type filterConfig struct {
 
 func (fc *filterConfig) Validate() error {
 	if fc.IPAddress != "" {
-		ip := iprd.ParseIPAddress(fc.IPAddress)
-		if ip == "" {
+		if ip := iprd.ParseIPAddress(fc.IPAddress); ip != "" {
+			fc.IPAddress = ip
+		} else {
 			return fmt.Errorf("invalid IP: %s", fc.IPAddress)
 		}
-		fc.IPAddress = ip
 	}
 	if fc.MACAddress != "" {
-		mac := iprd.ParseMACAddress(fc.MACAddress)
-		if mac == "" {
+		if mac := iprd.ParseMACAddress(fc.MACAddress); mac != "" {
+			fc.MACAddress = mac
+		} else {
 			return fmt.Errorf("invalid MAC: %s", fc.MACAddress)
 		}
-		fc.MACAddress = mac
 	}
 	if fc.UDPPort != 0 {
 		if fc.UDPPort < 1 || fc.UDPPort > 65535 {
