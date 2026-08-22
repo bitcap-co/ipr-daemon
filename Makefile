@@ -30,6 +30,7 @@ LDFLAGS            += -X "main.BUILDINFO=$(BUILDINFOS)" -X "main.TAG=$(PROJECT_T
 LDFLAGS            += -X "main.COMMIT=$(PROJECT_COMMIT)" -s -w
 OUTPUT_BINARY      := iprd
 OUTPUT_OFFLINE     := iprd-offline
+OUTPUT_TESTDATA    := gen-testdata
 OUTPUT_NAME        := $(DIST_DIR)$(OUTPUT_BINARY)-$(GOOS)-$(GOARCH)
 DOCKER_VERSION     := v$(PROJECT_VERSION)
 FREEBSD_VERSION    := 14.3
@@ -116,6 +117,10 @@ $(OUTPUT_NAME): $(wildcard ./cmd/*.go) .prepare
 .PHONY: offline
 offline: $(wildcard ./cmd/offline/*.go)
 	go build -o ${OUTPUT_OFFLINE} ./cmd/offline
+
+.PHONY: gen-testdata
+gen-testdata: $(wildcard ./cmd/testdata/*.go)
+	go build -o ${OUTPUT_TESTDATA} ./cmd/testdata
 
 
 # Linux (amd64)

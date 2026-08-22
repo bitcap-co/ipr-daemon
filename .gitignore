@@ -36,6 +36,7 @@ go.work.sum
 
 # binaries
 iprd-offline
+gen-testdata
 dist/
 .vagrant/
 .vagrant-ssh
