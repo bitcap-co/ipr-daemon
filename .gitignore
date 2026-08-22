@@ -33,6 +33,7 @@ go.work.sum
 
 .debug
 *.pcap*
+!tests/testdata/captures/*.pcap*
 
 # binaries
 iprd-offline
