@@ -22,13 +22,6 @@ func updateExistingConfig(curr, target *iprd.IPRDConfig) *iprd.IPRDConfig {
 		newCfg.NetworkInclusions = mergeSortedUnique(curr.NetworkInclusions, target.NetworkInclusions)
 		log.Info(fmt.Sprintf("updated network_inclusions: %v -> %v", curr.NetworkInclusions, newCfg.NetworkInclusions))
 	}
-	if target.NoRootNetwork && len(newCfg.NetworkInclusions) > 0 {
-		newCfg.NoRootNetwork = !curr.NoRootNetwork || !target.NoRootNetwork
-		log.Info(fmt.Sprintf("toggled no_root_network: %v -> %v", curr.NoRootNetwork, newCfg.NoRootNetwork))
-	} else if target.NoRootNetwork {
-		log.Error(fmt.Errorf("no_root_network set to true but network_inclusions is empty, ignored"))
-		newCfg.NoRootNetwork = false
-	}
 	if len(target.NetworkExclusions) > 0 && !slices.Equal(target.NetworkExclusions, curr.NetworkExclusions) {
 		newCfg.NetworkExclusions = mergeSortedUnique(curr.NetworkExclusions, target.NetworkExclusions)
 		log.Info(fmt.Sprintf("updated network_exclusions: %v -> %v", curr.NetworkExclusions, newCfg.NetworkExclusions))
@@ -59,9 +52,12 @@ func updateExistingConfig(curr, target *iprd.IPRDConfig) *iprd.IPRDConfig {
 		newCfg.MDNS = !target.MDNS || !curr.MDNS
 		log.Info(fmt.Sprintf("toggled mdns: %v -> %v", curr.MDNS, newCfg.MDNS))
 	}
-	if target.NoRootNetwork {
+	if target.NoRootNetwork && len(newCfg.NetworkInclusions) > 0 {
 		newCfg.NoRootNetwork = !target.NoRootNetwork || !curr.NoRootNetwork
 		log.Info(fmt.Sprintf("toggled no_root_network: %v -> %v", curr.NoRootNetwork, newCfg.NoRootNetwork))
+	} else if target.NoRootNetwork {
+		log.Error(fmt.Errorf("no_root_network set to true but network_inclusions is empty, ignored"))
+		newCfg.NoRootNetwork = false
 	}
 	if target.FilterKnownPorts {
 		newCfg.FilterKnownPorts = !target.FilterKnownPorts || !curr.FilterKnownPorts
