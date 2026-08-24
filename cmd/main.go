@@ -25,24 +25,24 @@ var (
 	log = iprd.NewLogger()
 
 	// flags
-	flVersion            = flag.Bool("version", false, "Prints version information and exits.")
-	flList               = flag.Bool("list", false, "Lists all available network interfaces that can be listened on and exits.")
-	flStatus             = flag.Bool("status", false, "Queries a running daemon for its current IP Report status and exits.")
-	flStatusJSON         = flag.Bool("status-json", false, "Queries a running daemon and prints its current IP Report status as JSON.")
+	flVersion            = flag.Bool("version", false, "Prints ipr-daemon version information and exits.")
+	flList               = flag.Bool("list", false, "Lists all available network interfaces for IP report listening and exits.")
+	flStatus             = flag.Bool("status", false, "Queries health/status of a running daemon and exits.\nDefaults to local daemon, use -b, -p, -c flags to specify a remote endpoint.")
+	flStatusJSON         = flag.Bool("status-json", false, "Queries health/status of a running daemon and prints as JSON.")
 	flDebug              = flag.Bool("d", false, "Switch to enable packet debugging output.")
 	flAuto               = flag.Bool("a", false, "Switch to use the defined LAN interface for listening (OPNSense/pfSense). Overrides -i flag.")
 	flInterfaces         = make(iprd.FlagInterface)
-	flForwardBind        = flag.String("b", "", "Bind address for the TCP broadcast stream; target host in status mode. Empty binds all interfaces.")
-	flForwardPort        = flag.Int("p", 0, "Forwarding port for the TCP broadcast stream.")
-	flForwardKnown       = flag.Bool("known", false, "Switch to only forward IP reports from known miner types/ports over TCP broadcast stream.\nUnknown IP reports are logged but not forwarded.")
-	flMDNS               = flag.Bool("mdns", false, "Switch to enable mDNS/DNS-SD advertising of the TCP forwarding endpoint.")
+	flForwardKnown       = flag.Bool("known", false, "Switch to only forward IP reports from known miner types over TCP broadcast stream.\nUnknown IP reports are logged but not forwarded.")
 	flNoRootNetwork      = flag.Bool("no-root-network", false, "Switch to remove interface network from BPF filter. Must add additional network inclusion(s) via -add-network flag.\n(Global: applies to all interface selectors.)")
-	flFilterKnownPorts   = flag.Bool("known-ports", false, "Switch to only allow known miner ports/types through the BPF filter.\nThis has a similar effect to -known but unknown packets are dropped entirely and not logged/captured.\n(Global: applies to all interface selectors.)")
+	flFilterKnownPorts   = flag.Bool("known-ports", false, "Switch to only allow packets from ports of known miner types through the BPF filter.\nThis has a similar effect to -known but unknown packets are dropped entirely and not logged/captured.\n(Global: applies to all interface selectors.)")
 	flNetworkInclusions  iprd.FlagSlice
 	flNetworkExclusions  iprd.FlagSlice
 	flIgnoredDevices     iprd.FlagSlice
-	flCaptureFile        = flag.String("capture-file", "", "Path to write received packets to in PCAP-NG format for replay/debugging.")
+	flCaptureFile        = flag.String("capture-file", "", "Path to write captured packets to in PCAP-NG format for replay/debugging.")
 	flRotateCaptureFiles = flag.Bool("rotate-capture", false, "Switch to rotate up to four capture files instead of flushing the active file at its size limit.")
+	flForwardBind        = flag.String("b", "", "Bind address for the TCP broadcast stream; target host in status mode. Empty binds all interfaces.")
+	flForwardPort        = flag.Int("p", 0, "Forwarding port for the TCP broadcast stream.")
+	flMDNS               = flag.Bool("mdns", false, "Switch to enable mDNS/DNS-SD advertising of the TCP forwarding endpoint.")
 	flConfigFile         = flag.String("c", "", "Path to TOML configuration file. Overrides any other supplied flags.")
 	flWriteConfig        = flag.String("w", "", "Path to TOML configuration file. Writes the supplied arguments to new config file or updates an existing one.")
 )
@@ -63,7 +63,7 @@ func main() {
 		}
 		fmt.Printf("ipr-daemon v%s\n", VERSION)
 		fmt.Printf("%s (%s)%s built at %s\n", COMMIT, TAG, delta, BUILDINFO)
-		os.Exit(0)
+		return
 	}
 
 	// list interfaces and exit.
@@ -75,7 +75,7 @@ func main() {
 		for _, iface := range ifaces {
 			fmt.Println(iface.String())
 		}
-		os.Exit(0)
+		return
 	}
 
 	// build/set configuration.
@@ -129,7 +129,7 @@ func main() {
 			}
 		}
 		log.Info(fmt.Sprintf("successfully wrote -> %s", *flWriteConfig))
-		os.Exit(0)
+		return
 	}
 	var cfg *iprd.IPRDConfig
 	var err error
@@ -153,16 +153,17 @@ func main() {
 		if err := writeStatus(os.Stdout, response, *flStatusJSON); err != nil {
 			log.Fatal(err)
 		}
-		os.Exit(0)
+		return
 	}
 
 	// enter run mode
 	// no interface providers; exit.
 	if len(cfg.ListenInterfaces) == 0 {
-		log.Fatal(fmt.Errorf("no listen interface(s) specified.\nUSAGE: use -i/-c to specify at least one listen interface"))
+		flag.Usage()
+		log.Fatal(fmt.Errorf("no listen interface(s) specified."))
 	}
 
-	log.Info("start IPReporter Daemon...")
+	log.Info("start IP Report Daemon...")
 	// cancel on SIGINT/SIGTERM for a clean shutdown of the reconnect loop.
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
