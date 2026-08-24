@@ -160,7 +160,7 @@ func main() {
 	// no interface providers; exit.
 	if len(cfg.ListenInterfaces) == 0 {
 		flag.Usage()
-		log.Fatal(fmt.Errorf("no listen interface(s) specified."))
+		log.Fatal(fmt.Errorf("no listen interface(s) specified"))
 	}
 
 	log.Info("start IP Report Daemon...")
