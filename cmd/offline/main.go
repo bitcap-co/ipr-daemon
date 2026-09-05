@@ -1,3 +1,5 @@
+// iprd-offline is a command-line tool that processes offline PCAP capture files.
+// Replays captured packets against iprd's packet processing pipeline, optionally filtering by interface, port, IP, or MAC address.
 package main
 
 import (

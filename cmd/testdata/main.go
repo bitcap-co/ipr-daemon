@@ -1,3 +1,6 @@
+// gen-testdata publishes a live capture file (.pcap or .pcapng) to the tests/testdata/captures directory as a replayable test fixture.
+// PCAP files are automatically anonymized before publishing: replaces interface names, IP addresses, MAC addresses in
+// frame data and payloads with incremented generic values instead.
 package main
 
 import (
