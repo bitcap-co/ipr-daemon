@@ -258,7 +258,7 @@ required; status responses include interface names and recent listener errors.
 ## Miner Support
 the daemon isn't bound to any specific UDP ports by default, so it can receive any IP report message from ANY source. Any packet containing its own source IP address in the payload is deemed as a valid IP report packet to be forwarded.
 
-The obvious downside of this approach is the possibility of false positives being forwarded as valid IP reports from other devices on the network. However, this can be mitigated as necessary via further configuration via the CLI (see `iprd -h`).
+The obvious downside of this approach is the possibility of false positives being forwarded as valid IP reports from other devices on the network. However, this can be refined as necessary with further configuration via the CLI (see [Modifying BPF filters](#modifying-bpf-filters) or available filtering options in `iprd -h`).
 
 Instead of explicitly handling each miner's specific packet format, the daemon uses the destination port of the packet to provide a type hint for the miner if known.
 
