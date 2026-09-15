@@ -1,4 +1,4 @@
-package iprd_test
+package config_test
 
 import (
 	"os"
@@ -7,18 +7,18 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
+	iprdconfig "github.com/bitcap-co/ipr-daemon/pkg/iprd/config"
 )
 
 func TestFlagSliceSupportsChainingAndCommaSeparatedValues(t *testing.T) {
-	var values iprd.FlagSlice
+	var values iprdconfig.FlagSlice
 	for _, value := range []string{"eth0", "eth1, wlan0", "  4  ", ""} {
 		if err := values.Set(value); err != nil {
 			t.Fatalf("Set(%q): %v", value, err)
 		}
 	}
 
-	want := iprd.FlagSlice{"eth0", "eth1", "wlan0", "4"}
+	want := iprdconfig.FlagSlice{"eth0", "eth1", "wlan0", "4"}
 	if !reflect.DeepEqual(values, want) {
 		t.Fatalf("got %v, want %v", values, want)
 	}
@@ -28,7 +28,7 @@ func TestFlagSliceSupportsChainingAndCommaSeparatedValues(t *testing.T) {
 }
 
 func TestFlagInterfaceSupportsPerInterfaceBPFOptions(t *testing.T) {
-	var interfaces iprd.FlagInterface
+	var interfaces iprdconfig.FlagInterface
 	for _, value := range []string{
 		"eth1,eth0",
 		"eth0:no-root-network,ignore=aa:bb:cc:dd:ee:ff,add-network=192.168.1,exclude=10",
@@ -63,7 +63,7 @@ func TestFlagInterfaceSupportsPerInterfaceBPFOptions(t *testing.T) {
 
 func TestFlagInterfaceRejectsInvalidOptions(t *testing.T) {
 	for _, value := range []string{"eth0:unknown", "eth0:add-network=", "eth0,eth1:no-root-network"} {
-		var interfaces iprd.FlagInterface
+		var interfaces iprdconfig.FlagInterface
 		if err := interfaces.Set(value); err == nil {
 			t.Fatalf("Set(%q) returned no error", value)
 		}
@@ -71,7 +71,7 @@ func TestFlagInterfaceRejectsInvalidOptions(t *testing.T) {
 }
 
 func TestInterfaceOptionsRoundTrip(t *testing.T) {
-	cfg, err := iprd.NewIPRDConfigFromBytes([]byte(`
+	cfg, err := iprdconfig.NewIPRDConfigFromBytes([]byte(`
 [[interfaces]]
 selector = "eth1"
 no_root_network = true
@@ -90,7 +90,7 @@ ignored_devices = ["aa:bb:cc:dd:ee:ff"]
 }
 
 func TestDefaultConfigHasNoListenInterfaces(t *testing.T) {
-	cfg, err := iprd.ParseConfig(nil)
+	cfg, err := iprdconfig.ParseConfig(nil)
 	if err != nil {
 		t.Fatalf("ParseConfig(nil): %v", err)
 	}
@@ -103,20 +103,20 @@ func TestDefaultConfigHasNoListenInterfaces(t *testing.T) {
 }
 
 func TestMergeWithoutListenInterfacesPreservesExistingInterfaces(t *testing.T) {
-	current, err := iprd.ParseConfig(&iprd.IPRDConfig{
-		ListenerConfig: iprd.ListenerConfig{ListenInterfaces: []string{"eth0"}},
+	current, err := iprdconfig.ParseConfig(&iprdconfig.IPRDConfig{
+		ListenerConfig: iprdconfig.ListenerConfig{ListenInterfaces: []string{"eth0"}},
 	})
 	if err != nil {
 		t.Fatalf("parse current config: %v", err)
 	}
-	overrides, err := iprd.ParseConfig(&iprd.IPRDConfig{
-		ListenerConfig: iprd.ListenerConfig{Debug: true},
+	overrides, err := iprdconfig.ParseConfig(&iprdconfig.IPRDConfig{
+		ListenerConfig: iprdconfig.ListenerConfig{Debug: true},
 	})
 	if err != nil {
 		t.Fatalf("parse overrides without an interface: %v", err)
 	}
 
-	merged, err := iprd.ParseConfig(current.Merge(overrides))
+	merged, err := iprdconfig.ParseConfig(current.Merge(overrides))
 	if err != nil {
 		t.Fatalf("parse merged config: %v", err)
 	}
@@ -131,15 +131,15 @@ func TestMergeWithoutListenInterfacesPreservesExistingInterfaces(t *testing.T) {
 func TestValidateRejectsInvalidInterfaceConfigSelectors(t *testing.T) {
 	tests := []struct {
 		name       string
-		interfaces []iprd.InterfaceConfig
+		interfaces []iprdconfig.InterfaceConfig
 	}{
 		{
 			name:       "empty selector",
-			interfaces: []iprd.InterfaceConfig{{}},
+			interfaces: []iprdconfig.InterfaceConfig{{}},
 		},
 		{
 			name: "duplicate selector",
-			interfaces: []iprd.InterfaceConfig{
+			interfaces: []iprdconfig.InterfaceConfig{
 				{Selector: "eth0"},
 				{Selector: " eth0 "},
 			},
@@ -147,7 +147,7 @@ func TestValidateRejectsInvalidInterfaceConfigSelectors(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := iprd.DefaultListenerConfig()
+			cfg := iprdconfig.DefaultListenerConfig()
 			cfg.Interfaces = tt.interfaces
 			if err := cfg.Validate(); err == nil {
 				t.Fatal("Validate() returned no error")
@@ -157,8 +157,8 @@ func TestValidateRejectsInvalidInterfaceConfigSelectors(t *testing.T) {
 }
 
 func TestValidateRejectsInterfaceWithoutAnyIncludedNetwork(t *testing.T) {
-	cfg := iprd.DefaultIPRDConfig()
-	cfg.Interfaces = []iprd.InterfaceConfig{{Selector: "eth0", NoRootNetwork: true}}
+	cfg := iprdconfig.DefaultIPRDConfig()
+	cfg.Interfaces = []iprdconfig.InterfaceConfig{{Selector: "eth0", NoRootNetwork: true}}
 	if err := cfg.Validate(); err == nil {
 		t.Fatal("Validate() returned no error")
 	}
@@ -179,7 +179,7 @@ func TestValidateForwardBind(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := iprd.DefaultIPRDConfig()
+			cfg := iprdconfig.DefaultIPRDConfig()
 			cfg.Bind = tt.bind
 			err := cfg.Validate()
 			if (err != nil) != tt.wantErr {
@@ -190,7 +190,7 @@ func TestValidateForwardBind(t *testing.T) {
 }
 
 func TestListenInterfacesRoundTrip(t *testing.T) {
-	cfg, err := iprd.NewIPRDConfigFromBytes([]byte(`listen_interfaces = ["eth0", "eth1, wlan0", "eth0"]`))
+	cfg, err := iprdconfig.NewIPRDConfigFromBytes([]byte(`listen_interfaces = ["eth0", "eth1, wlan0", "eth0"]`))
 	if err != nil {
 		t.Fatalf("got error %v, want no error", err)
 	}
@@ -204,7 +204,7 @@ func TestListenInterfacesRoundTrip(t *testing.T) {
 }
 
 func TestLegacyListenInterface(t *testing.T) {
-	cfg, err := iprd.NewIPRDConfigFromBytes([]byte(`listen_interface = "eth1"`))
+	cfg, err := iprdconfig.NewIPRDConfigFromBytes([]byte(`listen_interface = "eth1"`))
 	if err != nil {
 		t.Fatalf("got error %v, want no error", err)
 	}
@@ -218,7 +218,7 @@ func TestLegacyListenInterface(t *testing.T) {
 }
 
 func TestPluralListenInterfacesTakePrecedence(t *testing.T) {
-	cfg, err := iprd.NewIPRDConfigFromBytes([]byte(`
+	cfg, err := iprdconfig.NewIPRDConfigFromBytes([]byte(`
 listen_interface = "legacy0"
 listen_interfaces = ["eth0", "eth1"]
 `))
@@ -232,10 +232,10 @@ listen_interfaces = ["eth0", "eth1"]
 }
 
 func TestWriteConfigUsesPluralListenInterfaces(t *testing.T) {
-	path := filepath.Join(t.TempDir(), "iprd.toml")
-	cfg := iprd.DefaultIPRDConfig()
+	path := filepath.Join(t.TempDir(), "iprdconfig.toml")
+	cfg := iprdconfig.DefaultIPRDConfig()
 	cfg.ListenInterfaces = []string{"eth0", "eth1"}
-	if err := iprd.WriteIPRDConfigToFile(cfg, path); err != nil {
+	if err := iprdconfig.WriteIPRDConfigToFile(cfg, path); err != nil {
 		t.Fatal(err)
 	}
 	data, err := os.ReadFile(path)
@@ -252,7 +252,7 @@ func TestWriteConfigUsesPluralListenInterfaces(t *testing.T) {
 }
 
 func TestMDNSRoundTrip(t *testing.T) {
-	cfg, err := iprd.NewIPRDConfigFromBytes([]byte(`mdns = true`))
+	cfg, err := iprdconfig.NewIPRDConfigFromBytes([]byte(`mdns = true`))
 	if err != nil {
 		t.Fatalf("got error %v, want no error", err)
 	}
@@ -262,7 +262,7 @@ func TestMDNSRoundTrip(t *testing.T) {
 }
 
 func TestRotateCaptureFilesRoundTrip(t *testing.T) {
-	cfg, err := iprd.NewIPRDConfigFromBytes([]byte(`rotate_capture_files = true`))
+	cfg, err := iprdconfig.NewIPRDConfigFromBytes([]byte(`rotate_capture_files = true`))
 	if err != nil {
 		t.Fatalf("got error %v, want no error", err)
 	}
@@ -272,11 +272,30 @@ func TestRotateCaptureFilesRoundTrip(t *testing.T) {
 }
 
 func TestForwardBindRoundTrip(t *testing.T) {
-	cfg, err := iprd.NewIPRDConfigFromBytes([]byte(`forward_bind = "127.0.0.1"`))
+	cfg, err := iprdconfig.NewIPRDConfigFromBytes([]byte(`forward_bind = "127.0.0.1"`))
 	if err != nil {
 		t.Fatalf("got error %v, want no error", err)
 	}
 	if cfg.Bind != "127.0.0.1" {
 		t.Fatalf("got ForwardBind %q, want %q", cfg.Bind, "127.0.0.1")
+	}
+}
+
+func TestInterfaceConfigForReturnsIndependentSlices(t *testing.T) {
+	cfg := iprdconfig.DefaultListenerConfig()
+	cfg.IgnoredDevices = []string{"global"}
+	cfg.Interfaces = []iprdconfig.InterfaceConfig{{
+		Selector:       "eth0",
+		IgnoredDevices: []string{"interface"},
+	}}
+
+	resolved := cfg.InterfaceConfigFor("eth0")
+	resolved.IgnoredDevices[0] = "changed"
+
+	if got := cfg.IgnoredDevices[0]; got != "global" {
+		t.Fatalf("global ignored device changed to %q", got)
+	}
+	if got := cfg.Interfaces[0].IgnoredDevices[0]; got != "interface" {
+		t.Fatalf("interface ignored device changed to %q", got)
 	}
 }
