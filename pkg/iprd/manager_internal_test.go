@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	iprdconfig "github.com/bitcap-co/ipr-daemon/pkg/iprd/config"
 	"github.com/gopacket/gopacket"
 	"github.com/gopacket/gopacket/layers"
 )
@@ -65,7 +66,7 @@ func mustHardwareAddr(t *testing.T, value string) net.HardwareAddr {
 }
 
 func TestListenerManagerInitialStatus(t *testing.T) {
-	manager, err := NewListenerManager(DefaultListenerConfig(), NewLogger())
+	manager, err := NewListenerManager(iprdconfig.DefaultListenerConfig(), NewLogger())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -91,7 +92,7 @@ func TestListenerManagerInitialStatus(t *testing.T) {
 }
 
 func TestListenerManagerRunIsOneShotAndClosesReports(t *testing.T) {
-	manager, err := NewListenerManager(DefaultListenerConfig(), NewLogger())
+	manager, err := NewListenerManager(iprdconfig.DefaultListenerConfig(), NewLogger())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +117,7 @@ func TestListenerManagerRunIsOneShotAndClosesReports(t *testing.T) {
 }
 
 func TestListenerManagerStatusAggregatesListenerHealth(t *testing.T) {
-	cfg := DefaultListenerConfig()
+	cfg := iprdconfig.DefaultListenerConfig()
 	cfg.ListenInterfaces = []string{"eth1", "eth2"}
 	manager, err := NewListenerManager(cfg, NewLogger())
 	if err != nil {
@@ -146,7 +147,7 @@ func TestListenerManagerStatusAggregatesListenerHealth(t *testing.T) {
 }
 
 func TestListenerManagerStatusTracksActivationFailureAndShutdown(t *testing.T) {
-	cfg := DefaultListenerConfig()
+	cfg := iprdconfig.DefaultListenerConfig()
 	cfg.ListenInterfaces = []string{"iprd-test-interface-that-does-not-exist"}
 	manager, err := NewListenerManager(cfg, NewLogger())
 	if err != nil {
@@ -194,7 +195,7 @@ func TestListenerManagerStatusTracksActivationFailureAndShutdown(t *testing.T) {
 }
 
 func TestListenerManagerStatusConcurrent(t *testing.T) {
-	cfg := DefaultListenerConfig()
+	cfg := iprdconfig.DefaultListenerConfig()
 	cfg.ListenInterfaces = []string{"test0"}
 	manager, err := NewListenerManager(cfg, NewLogger())
 	if err != nil {
@@ -218,7 +219,7 @@ func TestListenerManagerStatusConcurrent(t *testing.T) {
 }
 
 func TestListenerManagerPacketStatus(t *testing.T) {
-	cfg := DefaultListenerConfig()
+	cfg := iprdconfig.DefaultListenerConfig()
 	cfg.ForwardKnown = true
 	manager, err := NewListenerManager(cfg, NewLogger())
 	if err != nil {
@@ -275,7 +276,7 @@ func TestListenerManagerPacketStatus(t *testing.T) {
 }
 
 func TestListenerManagerProcessesCapturedPacket(t *testing.T) {
-	manager, err := NewListenerManager(DefaultListenerConfig(), NewLogger())
+	manager, err := NewListenerManager(iprdconfig.DefaultListenerConfig(), NewLogger())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -294,7 +295,7 @@ func TestListenerManagerProcessesCapturedPacket(t *testing.T) {
 }
 
 func TestListenerManagerDeduplicatesAcrossCapturedInterfaces(t *testing.T) {
-	manager, err := NewListenerManager(DefaultListenerConfig(), NewLogger())
+	manager, err := NewListenerManager(iprdconfig.DefaultListenerConfig(), NewLogger())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -308,7 +309,7 @@ func TestListenerManagerDeduplicatesAcrossCapturedInterfaces(t *testing.T) {
 }
 
 func TestListenerManagerFiltersUnknownMiners(t *testing.T) {
-	cfg := DefaultListenerConfig()
+	cfg := iprdconfig.DefaultListenerConfig()
 	cfg.ForwardKnown = true
 	manager, err := NewListenerManager(cfg, NewLogger())
 	if err != nil {
@@ -321,7 +322,7 @@ func TestListenerManagerFiltersUnknownMiners(t *testing.T) {
 }
 
 func TestNewListenerManagerCreatesListenerPerInterface(t *testing.T) {
-	cfg := DefaultListenerConfig()
+	cfg := iprdconfig.DefaultListenerConfig()
 	cfg.ListenInterfaces = []string{"eth1", "eth2"}
 	cfg.ListenInterface = ""
 	cfg.CaptureFile = "capture.pcap"
@@ -357,12 +358,12 @@ func TestNewListenerManagerCreatesListenerPerInterface(t *testing.T) {
 }
 
 func TestNewListenerManagerAppliesInterfaceBPFOptions(t *testing.T) {
-	cfg := DefaultListenerConfig()
+	cfg := iprdconfig.DefaultListenerConfig()
 	cfg.ListenInterfaces = []string{"eth1", "eth2"}
 	cfg.IgnoredDevices = []string{"global-mac"}
 	cfg.NetworkInclusions = []string{"10"}
 	cfg.NetworkExclusions = []string{"172.16"}
-	cfg.Interfaces = []InterfaceConfig{
+	cfg.Interfaces = []iprdconfig.InterfaceConfig{
 		{
 			Selector:          "eth2",
 			NoRootNetwork:     true,
@@ -399,7 +400,7 @@ func TestNewListenerManagerAppliesInterfaceBPFOptions(t *testing.T) {
 }
 
 func TestNewListenerManagerAutoModeCreatesOneListener(t *testing.T) {
-	cfg := DefaultListenerConfig()
+	cfg := iprdconfig.DefaultListenerConfig()
 	cfg.Auto = true
 	cfg.ListenInterfaces = []string{"eth1", "eth2"}
 	manager, err := NewListenerManager(cfg, NewLogger())
@@ -416,7 +417,7 @@ func TestNewListenerManagerAutoModeCreatesOneListener(t *testing.T) {
 }
 
 func TestForwardCapturedPacketsFansInListeners(t *testing.T) {
-	cfg := DefaultListenerConfig()
+	cfg := iprdconfig.DefaultListenerConfig()
 	cfg.ListenInterfaces = []string{"eth1", "eth2"}
 	manager, err := NewListenerManager(cfg, NewLogger())
 	if err != nil {

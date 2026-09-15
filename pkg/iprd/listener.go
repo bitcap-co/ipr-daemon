@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	iprdconfig "github.com/bitcap-co/ipr-daemon/pkg/iprd/config"
 	"github.com/gopacket/gopacket/pcap"
 )
 
@@ -25,7 +26,7 @@ const (
 )
 
 type IPRListener struct {
-	cfg          *ListenerConfig
+	cfg          *iprdconfig.ListenerConfig
 	log          Logger
 	iface        *IPRInterface
 	ifacePinned  bool
@@ -38,9 +39,9 @@ type IPRListener struct {
 
 // NewListener returns a new IPRListener configured by ListenerConfig. If logger is nil, a new IPRLogger is created.
 // If iface is supplied it is pinned and reused; otherwise the interface is resolved from cfg (and re-resolved on each reconnect).
-func NewListener(cfg *ListenerConfig, logger Logger, iface *IPRInterface) *IPRListener {
+func NewListener(cfg *iprdconfig.ListenerConfig, logger Logger, iface *IPRInterface) *IPRListener {
 	if cfg == nil {
-		cfg = DefaultListenerConfig()
+		cfg = iprdconfig.DefaultListenerConfig()
 	}
 	if logger == nil {
 		logger = NewLogger()

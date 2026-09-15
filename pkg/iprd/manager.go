@@ -7,6 +7,7 @@ import (
 	"sync"
 	"time"
 
+	iprdconfig "github.com/bitcap-co/ipr-daemon/pkg/iprd/config"
 	"github.com/gopacket/gopacket"
 )
 
@@ -18,7 +19,7 @@ var (
 // ListenerManager coordinates interface listeners, capture writing, packet
 // processing, and a single combined IP report stream.
 type ListenerManager struct {
-	cfg       *ListenerConfig
+	cfg       *iprdconfig.ListenerConfig
 	log       Logger
 	listeners []*IPRListener
 	processor *PacketProcessor
@@ -30,22 +31,17 @@ type ListenerManager struct {
 
 // NewListenerManager returns a manager with one listener per configured
 // interface. Auto mode creates one listener and ignores explicit selectors.
-func NewListenerManager(cfg *ListenerConfig, logger Logger) (*ListenerManager, error) {
-	if cfg == nil {
-		cfg = DefaultListenerConfig()
+func NewListenerManager(cfg *iprdconfig.ListenerConfig, logger Logger) (*ListenerManager, error) {
+	managerCfg, err := iprdconfig.ParseListenerConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("listener config: %w", err)
 	}
 	if logger == nil {
 		logger = NewLogger()
 	}
-	managerCfg := *cfg
-	managerCfg.normalizeListenInterfaces()
-
-	if err := managerCfg.Validate(); err != nil {
-		return nil, fmt.Errorf("listener config: %w", err)
-	}
 	capture := NewCaptureWriter(managerCfg.CaptureFile, managerCfg.RotateCaptureFiles, logger)
 	managerCfg.CaptureFile = capture.Path()
-	cfg = &managerCfg
+	cfg = managerCfg
 	return &ListenerManager{
 		cfg:       cfg,
 		log:       logger,
@@ -184,7 +180,7 @@ func (m *ListenerManager) Run(ctx context.Context) error {
 	return finalErr
 }
 
-func newManagedListeners(cfg *ListenerConfig, logger Logger) []*IPRListener {
+func newManagedListeners(cfg *iprdconfig.ListenerConfig, logger Logger) []*IPRListener {
 	selectors := cfg.ListenInterfaces
 	if cfg.Auto && len(selectors) > 1 {
 		selectors = selectors[:1]
@@ -194,7 +190,7 @@ func newManagedListeners(cfg *ListenerConfig, logger Logger) []*IPRListener {
 		listenerCfg := *cfg
 		listenerCfg.ListenInterfaces = []string{selector}
 		listenerCfg.ListenInterface = selector
-		bpfCfg := cfg.interfaceConfig(selector)
+		bpfCfg := cfg.InterfaceConfigFor(selector)
 		listenerCfg.NoRootNetwork = bpfCfg.NoRootNetwork
 		listenerCfg.FilterKnownPorts = bpfCfg.FilterKnownPorts
 		listenerCfg.IgnoredDevices = bpfCfg.IgnoredDevices
