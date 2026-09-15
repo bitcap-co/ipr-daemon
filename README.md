@@ -29,23 +29,17 @@ Currently, IPR Daemon is available for UNIX-based distros (FreeBSD/pfSense/OPNse
 
 Prebuilt Linux amd64/arm64 container images are published to Docker Hub at [`mattwert/ipr-daemon`](https://hub.docker.com/r/mattwert/ipr-daemon).
 
-Binaries are built statically wherever possible, meaning that all the needed libraries/dependencies (e.g. `libpcap`) are already included in the binary itself. However, particularly Windows and MacOS/darwin, dependencies may need to be installed manually.
+Binaries are built statically wherever possible, meaning that all the needed libraries/dependencies (e.g. `libpcap`) are already included in the binary itself. Windows requires Npcap to be installed separately; macOS uses its native system libpcap.
 
 Below shows necessary steps for each operating system:
 
 ### Windows Prerequisites
 For best support for Windows, install [Npcap for Windows](https://npcap.com/#download)
 
-### MacOS/darwin Prerequisites
-For best support for MacOS, install `libpcap` via Brew:
-```bash
-brew install libpcap
-```
-
 ## Building/Installation
 ### Build prerequisites
   - Go (>=1.25.0)
-  - libpcap
+  - libpcap (provided by macOS/npcap for Windows; install the development package on other platforms)
   - make
 
 To build locally, simply run
