@@ -1,38 +1,34 @@
 ## ipr-daemon
-IPR Daemon (later referred to as IPRD) is an ASIC miner listener, sniffing IP report messages live on the wire from a LAN.
+IPR Daemon is an ASIC miner listening backend targetting the IP report packets sent by miners within a LAN.
 
 ## Overview
-iprd serves as a LAN-wide listening backend for ASIC miners by sniffing IP report packets sent by the miners. It captures the received IP & MAC addresses along with the miner type over an TCP stream for easy reading and integration with front-ends/applications like its sister project [bitcap-ipr](https://github.com/bitcap-co/bitcap-ipr).
+IPR Daemon serves as a LAN-wide listening backend for ASIC miners by sniffing IP report packets sent via IP report button. It processes UDP packets live on the wire and sends back the identifying information (i.e. IP, MAC and miner type) over a TCP JSON broadcast for easy reading/integration with front-ends/applications. 
+Check out it's sister project [bitcap-ipr](https://github.com/bitcap-co/bitcap-ipr) as an example.
 
 ## How it works
-IPRD is designed to run on a local server/container with direct access to the LAN. Instead of running UDP listeners on specific ports, it looks at ALL local UDP packets in real-time and processes each one to determine if its a valid IP report packet.
+IPR Daemon is designed to run on a local node with direct access to the LAN. It listens on one or more interfaces for local UDP packets and processes each one in real-time for valid IP report packets. 
 
-Effectively, works exactly like [WireShark](https://www.wireshark.org/) but specificly for IP Report packets.
+When a valid IP report packet is received, It will send over the relevant data over a TCP-JSON broadcast that is accessible over a configurable port (default: port 7788).
 
-As it receives IP Report messages, it will send the data over a TCP broadcast/stream that is accessible over an configurable port (default: port 7788).
-
-## Highlights of IPRD
- - IP Report listening/sniffing across LAN (even miners within VLANS!)
- - TCP Broadcasting for easy front-end/app integration
+## Features/Support
+ - IP report listening/sniffing across LAN (even miners within VLANs)
  - Duplicate packet handling
- - Wide OS support
-
-## Building
-Currently, IPRD is available for UNIX-based distros (FreeBSD/pfSense/OPNsense, Ubuntu, MacOS) and Windows!
-Pre-built binaries and packages are available in [Releases](https://github.com/bitcap-co/ipr-daemon/releases)!
-
-### Build dependencies
-  - Go (>=1.24.0)
-  - make (Optional)
-
-To build locally, simply run
-```bash
-go build -o iprd ./cmd
-# or
-make
-```
+ - Listen on one or more interfaces with configurable BPF filters
+ - TCP-JSON broadcasting/forwarding over configurable address/port
+ - Capture live packets to .pcagng files
+ - Opt-in MDNS advertising for service discovery
+ - Wide device support 
+    - FreeBSD (amd64/arm64) - pfSense/OPNsense
+    - Linux (amd64/arm64/armv5/armv6/armv7)
+    - MacOS (amd64/arm64)
+    - Windows (amd64)
+    - Docker (amd64/arm64) - Linux container image
 
 ## Getting started
+Currently, IPR Daemon is available for UNIX-based distros (FreeBSD/pfSense/OPNsense, Ubuntu, MacOS) and Windows! Pre-built binaries and packages are available in [Releases](https://github.com/bitcap-co/ipr-daemon/releases)!
+
+Prebuilt Linux amd64/arm64 container images are published to Docker Hub at [`mattwert/ipr-daemon`](https://hub.docker.com/r/mattwert/ipr-daemon).
+
 Binaries are built statically wherever possible, meaning that all the needed libraries/dependencies (e.g. `libpcap`) are already included in the binary itself. However, particularly Windows and MacOS/darwin, dependencies may need to be installed manually.
 
 Below shows necessary steps for each operating system:
@@ -44,6 +40,19 @@ For best support for Windows, install [Npcap for Windows](https://npcap.com/#dow
 For best support for MacOS, install `libpcap` via Brew:
 ```bash
 brew install libpcap
+```
+
+## Building/Installation
+### Build prerequisites
+  - Go (>=1.25.0)
+  - libpcap
+  - make
+
+To build locally, simply run
+```bash
+go build -o iprd ./cmd
+# or
+make
 ```
 
 ### Linux (Debian/RedHat) Setup
@@ -95,7 +104,7 @@ This installs `/usr/local/sbin/iprd`, registers the rc service at
 Prebuilt Linux amd64/arm64 images are published to Docker Hub at
 [`mattwert/ipr-daemon`](https://hub.docker.com/r/mattwert/ipr-daemon).
 
-Because iprd sniffs packets across the LAN, the container must run on the **host
+Because IPR Daemon sniffs packets across the LAN, the container must run on the **host
 network**. The simplest run uses auto interface detection (`-a`):
 ```bash
 docker run -d --name ipr-daemon --network host -e ARGS="-a" mattwert/ipr-daemon:latest
@@ -122,7 +131,6 @@ CONFIG_PATH=./default.toml docker compose up -d
 > (`--cap-add=NET_ADMIN`) to put the interface into promiscuous mode.
 
 ## IPR Daemon CLI
-
 ### Finding interfaces
 To see all available network interfaces that the daemon can listen on, run with the `-list` argument:
 ```
@@ -145,7 +153,7 @@ processed through one duplicate record, capture file, and TCP broadcast stream.
 It also worth noting that `iprd` requires running under the `root` user to run.
 
 ### Modifying BPF filters
-IPRD CLI allows direct modification of BPF filters for interfaces to add/exclude networks and ignoring specific devices on the network.
+the CLI allows direct modification of BPF filters for interfaces to add/exclude networks and ignoring specific devices on the network.
 
 Available global BPF interface (applies to all interfaces):
  - `-add-network <NETWORK>` - Append a IPv4 network number to BPF filter. (i.e. -add-network 172.16,192.168.1,10). Can be used multple times or comma-separated values.
@@ -248,16 +256,16 @@ requests should only be exposed to a trusted LAN. Bind to localhost with
 required; status responses include interface names and recent listener errors.
 
 ## Miner Support
-In theory, it should receive any ASIC miner IP Report message since it isn't bound to any specific UDP ports.
+the daemon isn't bound to any specific UDP ports by default, so it can receive any IP report message from ANY source. Any packet containing its own source IP address in the payload is deemed as a valid IP report packet to be forwarded.
 
-The only thing that iprd looks at is the destination port of the packet for a known ASIC miner "hint" (not all miner types have unique port destinations) and the data payload for if it contains its own source IP address.
+The obvious downside of this approach is the possibility of false positives being forwarded as valid IP reports from other devices on the network. However, this can be mitigated as necessary via further configuration via the CLI (see `iprd -h`).
 
-This is designed to be as open-ended as possible to accept any IP Report message/output from ASIC miners. One caveat is the possibility of false positives from other devices on the network.
+Instead of explicitly handling each miner's specific packet format, the daemon uses the destination port of the packet to provide a type hint for the miner if known.
 
-### Current list of known miner ports:
+### Known Miners:
 ```go
-minerPorts  = map[int]MinerTypeHint{
-	14235: Antminer, // Assume antminer but could be a multitude of miner types (i.e. Volcminer, Hammer)
+minerPorts = map[int]MinerTypeHint{
+	14235: Antminer,
 	11503: Iceriver,
 	8888:  Whatsminer,
 	1314:  Goldshell,
