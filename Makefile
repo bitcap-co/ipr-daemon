@@ -95,16 +95,22 @@ lint:
 ## precheck : run all checks
 precheck: test test-fmt test-tidy lint
 
-## clean : clear dist/
+## clean : clean build artifacts from dist/
 clean:
 	rm -f dist/*
+
+## clean-build : clean all build artifacts
+clean-build:
+	rm -f dist/*
+	rm -f iprd-offline
+	rm -f gen-testdata
 
 ## clean-go : clear go cache
 clean-go:
 	go clean -i -r -cache -modcache
 
-## clean-build : clear build environment
-clean-build: vagrant-clean docker-clean clean
+## clean-all : fully clean build environment (all build artifacts and build containers)
+clean-all: vagrant-clean docker-clean clean-build
 
 .prepare: $(DIST_DIR)
 
