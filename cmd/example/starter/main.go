@@ -7,6 +7,7 @@ import (
 	"syscall"
 
 	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
+	iprdconfig "github.com/bitcap-co/ipr-daemon/pkg/iprd/config"
 )
 
 var (
@@ -15,10 +16,10 @@ var (
 
 func main() {
 	// Listener config
-	cfg := iprd.DefaultListenerConfig()
+	cfg := iprdconfig.DefaultListenerConfig()
 	cfg.ListenInterfaces = []string{"eth0"} // set list of interface names/indexes to listen on
 	// configure interface BPF filters
-	cfg.Interfaces = []iprd.InterfaceConfig{
+	cfg.Interfaces = []iprdconfig.InterfaceConfig{
 		{
 			Selector:          "eth0",     // set to the name/index of the interface to apply configuration
 			NoRootNetwork:     false,      // set to true to exclude the root IPv4 network of interface (If true, must set at least one NetworkInclusions)

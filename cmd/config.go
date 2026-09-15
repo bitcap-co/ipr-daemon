@@ -5,10 +5,10 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
+	iprdconfig "github.com/bitcap-co/ipr-daemon/pkg/iprd/config"
 )
 
-func updateExistingConfig(curr, target *iprd.IPRDConfig) *iprd.IPRDConfig {
+func updateExistingConfig(curr, target *iprdconfig.IPRDConfig) *iprdconfig.IPRDConfig {
 	newCfg := curr.Merge(target)
 	if len(target.ListenInterfaces) > 0 {
 		newCfg.ListenInterfaces = mergeUnique(curr.ListenInterfaces, target.ListenInterfaces)
@@ -70,8 +70,8 @@ func updateExistingConfig(curr, target *iprd.IPRDConfig) *iprd.IPRDConfig {
 	return newCfg
 }
 
-func mergeInterfaceConfigs(curr, target []iprd.InterfaceConfig) []iprd.InterfaceConfig {
-	merged := make([]iprd.InterfaceConfig, len(curr))
+func mergeInterfaceConfigs(curr, target []iprdconfig.InterfaceConfig) []iprdconfig.InterfaceConfig {
+	merged := make([]iprdconfig.InterfaceConfig, len(curr))
 	indexes := make(map[string]int, len(curr)+len(target))
 	for i, interfaceCfg := range curr {
 		merged[i] = cloneInterfaceConfig(interfaceCfg)
@@ -94,7 +94,7 @@ func mergeInterfaceConfigs(curr, target []iprd.InterfaceConfig) []iprd.Interface
 	return merged
 }
 
-func mergeInterfaceConfig(curr, target iprd.InterfaceConfig) iprd.InterfaceConfig {
+func mergeInterfaceConfig(curr, target iprdconfig.InterfaceConfig) iprdconfig.InterfaceConfig {
 	merged := cloneInterfaceConfig(curr)
 	if target.FilterKnownPorts {
 		merged.FilterKnownPorts = !curr.FilterKnownPorts || !target.FilterKnownPorts
@@ -111,7 +111,7 @@ func mergeInterfaceConfig(curr, target iprd.InterfaceConfig) iprd.InterfaceConfi
 	return merged
 }
 
-func logInterfaceConfigChanges(selector string, curr, target iprd.InterfaceConfig) {
+func logInterfaceConfigChanges(selector string, curr, target iprdconfig.InterfaceConfig) {
 	if curr.NoRootNetwork != target.NoRootNetwork {
 		log.Info(fmt.Sprintf("[%s] toggled no_root_network: %v -> %v", selector, curr.NoRootNetwork, target.NoRootNetwork))
 	}
@@ -129,7 +129,7 @@ func logInterfaceConfigChanges(selector string, curr, target iprd.InterfaceConfi
 	}
 }
 
-func cloneInterfaceConfig(cfg iprd.InterfaceConfig) iprd.InterfaceConfig {
+func cloneInterfaceConfig(cfg iprdconfig.InterfaceConfig) iprdconfig.InterfaceConfig {
 	cfg.IgnoredDevices = slices.Clone(cfg.IgnoredDevices)
 	cfg.NetworkInclusions = slices.Clone(cfg.NetworkInclusions)
 	cfg.NetworkExclusions = slices.Clone(cfg.NetworkExclusions)

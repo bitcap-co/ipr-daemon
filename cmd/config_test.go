@@ -4,13 +4,13 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
+	iprdconfig "github.com/bitcap-co/ipr-daemon/pkg/iprd/config"
 )
 
 func TestUpdateExistingConfigUpdatesOnlyMatchingInterface(t *testing.T) {
-	curr := &iprd.IPRDConfig{ListenerConfig: iprd.ListenerConfig{
+	curr := &iprdconfig.IPRDConfig{ListenerConfig: iprdconfig.ListenerConfig{
 		ListenInterfaces: []string{"eth0", "eth1"},
-		Interfaces: []iprd.InterfaceConfig{
+		Interfaces: []iprdconfig.InterfaceConfig{
 			{
 				Selector:          "eth0",
 				IgnoredDevices:    []string{"00:00:00:00:00:01"},
@@ -22,9 +22,9 @@ func TestUpdateExistingConfigUpdatesOnlyMatchingInterface(t *testing.T) {
 			},
 		},
 	}}
-	target := &iprd.IPRDConfig{ListenerConfig: iprd.ListenerConfig{
+	target := &iprdconfig.IPRDConfig{ListenerConfig: iprdconfig.ListenerConfig{
 		ListenInterfaces: []string{"eth1"},
-		Interfaces: []iprd.InterfaceConfig{
+		Interfaces: []iprdconfig.InterfaceConfig{
 			{
 				Selector:          "eth1",
 				NoRootNetwork:     true,
@@ -42,7 +42,7 @@ func TestUpdateExistingConfigUpdatesOnlyMatchingInterface(t *testing.T) {
 	if !reflect.DeepEqual(got.Interfaces[0], curr.Interfaces[0]) {
 		t.Fatalf("untargeted eth0 config changed: got %#v, want %#v", got.Interfaces[0], curr.Interfaces[0])
 	}
-	wantEth1 := iprd.InterfaceConfig{
+	wantEth1 := iprdconfig.InterfaceConfig{
 		Selector:          "eth1",
 		NoRootNetwork:     true,
 		IgnoredDevices:    []string{"00:00:00:00:00:02"},
@@ -54,15 +54,15 @@ func TestUpdateExistingConfigUpdatesOnlyMatchingInterface(t *testing.T) {
 }
 
 func TestUpdateExistingConfigAddsMultipleTargetInterfaces(t *testing.T) {
-	curr := &iprd.IPRDConfig{ListenerConfig: iprd.ListenerConfig{
+	curr := &iprdconfig.IPRDConfig{ListenerConfig: iprdconfig.ListenerConfig{
 		ListenInterfaces: []string{"eth0"},
-		Interfaces: []iprd.InterfaceConfig{
+		Interfaces: []iprdconfig.InterfaceConfig{
 			{Selector: "eth0", NetworkInclusions: []string{"10"}},
 		},
 	}}
-	target := &iprd.IPRDConfig{ListenerConfig: iprd.ListenerConfig{
+	target := &iprdconfig.IPRDConfig{ListenerConfig: iprdconfig.ListenerConfig{
 		ListenInterfaces: []string{"eth0", "eth1", "eth2"},
-		Interfaces: []iprd.InterfaceConfig{
+		Interfaces: []iprdconfig.InterfaceConfig{
 			{Selector: "eth2", NetworkExclusions: []string{"172.16"}},
 			{Selector: "eth1", IgnoredDevices: []string{"00:00:00:00:00:01"}},
 			{Selector: "eth0", NetworkInclusions: []string{"192.168"}},

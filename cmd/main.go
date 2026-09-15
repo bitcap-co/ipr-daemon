@@ -12,6 +12,7 @@ import (
 	"syscall"
 
 	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
+	iprdconfig "github.com/bitcap-co/ipr-daemon/pkg/iprd/config"
 )
 
 var (
@@ -31,13 +32,13 @@ var (
 	flStatusJSON         = flag.Bool("status-json", false, "Queries health/status of a running daemon and prints as JSON.")
 	flDebug              = flag.Bool("d", false, "Switch to enable packet debugging output.")
 	flAuto               = flag.Bool("a", false, "Switch to use the defined LAN interface for listening (OPNSense/pfSense). Overrides -i flag.")
-	flInterfaces         = make(iprd.FlagInterface)
+	flInterfaces         = make(iprdconfig.FlagInterface)
 	flForwardKnown       = flag.Bool("known", false, "Switch to only forward IP reports from known miner types over TCP broadcast stream.\nUnknown IP reports are logged but not forwarded.")
 	flNoRootNetwork      = flag.Bool("no-root-network", false, "Switch to remove interface network from BPF filter. Must add additional network inclusion(s) via -add-network flag.\n(Global: applies to all interface selectors.)")
 	flFilterKnownPorts   = flag.Bool("known-ports", false, "Switch to only allow packets from ports of known miner types through the BPF filter.\nThis has a similar effect to -known but unknown packets are dropped entirely and not logged/captured.\n(Global: applies to all interface selectors.)")
-	flNetworkInclusions  iprd.FlagSlice
-	flNetworkExclusions  iprd.FlagSlice
-	flIgnoredDevices     iprd.FlagSlice
+	flNetworkInclusions  iprdconfig.FlagSlice
+	flNetworkExclusions  iprdconfig.FlagSlice
+	flIgnoredDevices     iprdconfig.FlagSlice
 	flCaptureFile        = flag.String("capture-file", "", "Path to write captured packets to in PCAP-NG format for replay/debugging.")
 	flRotateCaptureFiles = flag.Bool("rotate-capture", false, "Switch to rotate up to four capture files instead of flushing the active file at its size limit.")
 	flForwardBind        = flag.String("b", "", "Bind address for the TCP broadcast stream; target host in status mode. Empty binds all interfaces.")
@@ -84,8 +85,8 @@ func main() {
 	if len(listenInterfaces) > 0 {
 		listenInterface = listenInterfaces[0]
 	}
-	rawCfg := iprd.IPRDConfig{
-		ListenerConfig: iprd.ListenerConfig{
+	rawCfg := iprdconfig.IPRDConfig{
+		ListenerConfig: iprdconfig.ListenerConfig{
 			Debug:            *flDebug,
 			Auto:             *flAuto,
 			ListenInterfaces: listenInterfaces,
@@ -101,7 +102,7 @@ func main() {
 			CaptureFile:        *flCaptureFile,
 			RotateCaptureFiles: *flRotateCaptureFiles,
 		},
-		ForwardConfig: iprd.ForwardConfig{
+		ForwardConfig: iprdconfig.ForwardConfig{
 			Bind: *flForwardBind,
 			Port: *flForwardPort,
 			MDNS: *flMDNS,
@@ -112,34 +113,34 @@ func main() {
 		// normalize the output file path to .toml extension
 		*flWriteConfig = strings.Split(*flWriteConfig, ".")[0]
 		*flWriteConfig = *flWriteConfig + ".toml"
-		if curr, err := iprd.NewIPRDConfigFromFile(*flWriteConfig); err == nil {
+		if curr, err := iprdconfig.NewIPRDConfigFromFile(*flWriteConfig); err == nil {
 			// config file exists, merge with current config.
 			newCfg := updateExistingConfig(curr, &rawCfg)
-			mergedCfg, err := iprd.ParseConfig(newCfg)
+			mergedCfg, err := iprdconfig.ParseConfig(newCfg)
 			if err != nil {
 				log.Fatal(err)
 			}
-			if err := iprd.WriteIPRDConfigToFile(mergedCfg, *flWriteConfig); err != nil {
+			if err := iprdconfig.WriteIPRDConfigToFile(mergedCfg, *flWriteConfig); err != nil {
 				log.Fatal(err)
 			}
 		} else {
 			// write new config file.
-			if err := iprd.WriteIPRDConfigToFile(&rawCfg, *flWriteConfig); err != nil {
+			if err := iprdconfig.WriteIPRDConfigToFile(&rawCfg, *flWriteConfig); err != nil {
 				log.Fatal(err)
 			}
 		}
 		log.Info(fmt.Sprintf("successfully wrote -> %s", *flWriteConfig))
 		return
 	}
-	var cfg *iprd.IPRDConfig
+	var cfg *iprdconfig.IPRDConfig
 	var err error
 	if *flConfigFile != "" {
-		cfg, err = iprd.NewIPRDConfigFromFile(*flConfigFile)
+		cfg, err = iprdconfig.NewIPRDConfigFromFile(*flConfigFile)
 		if err != nil {
 			log.Fatal(err)
 		}
 	} else {
-		cfg, err = iprd.ParseConfig(&rawCfg)
+		cfg, err = iprdconfig.ParseConfig(&rawCfg)
 		if err != nil {
 			log.Fatal(err)
 		}
