@@ -21,6 +21,8 @@ Vagrant.configure("2") do |config|
       virtualbox-ose-additions-nox11 aarch64-gcc13 \
       aarch64-binutils arm-gnueabi-binutils amd64-binutils \
       armv7-freebsd-sysroot aarch64-freebsd-sysroot
+    install -d -o vagrant -g vagrant /home/vagrant/ipr-daemon/dist
+    chown -R vagrant:vagrant /home/vagrant/ipr-daemon/dist
   SHELL
 
 
@@ -73,6 +75,9 @@ Vagrant.configure("2") do |config|
     trigger.info = "building FreeBSD binaries..."
     trigger.name = "build-binary"
     trigger.run = {inline: "vagrant rsync"}
-    trigger.run_remote = {inline: "sh -c 'PATH=/usr/local/bin:${PATH} cd ipr-daemon && gmake freebsd-binaries'"}
+    trigger.run_remote = {
+      inline: "sh -c 'PATH=/usr/local/bin:${PATH} cd ipr-daemon && gmake freebsd-binaries'",
+      privileged: false
+    }
   end
 end
