@@ -10,7 +10,7 @@ env:
 
 jobs:
   linux-amd64:
-    name: Linux amd64
+    name: Linux (amd64) - Static + nfpm
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -55,7 +55,7 @@ jobs:
           retention-days: 1
 
   linux-aarch64:
-    name: Linux ARM64
+    name: Linux (arm64) - Static + nfpm
     runs-on: ubuntu-24.04-arm
     steps:
       - uses: actions/checkout@v6
@@ -102,7 +102,7 @@ jobs:
           retention-days: 1
 
   linux-arm32:
-    name: Linux ARM32 (armv5/v6/v7)
+    name: Linux ARM32 (armv5/v6/v7) - Static cross-compile
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -143,7 +143,7 @@ jobs:
           retention-days: 1
 
   macos:
-    name: MacOS x86/arm64
+    name: MacOS (intel x86_64/arm64) - dynamic (shared libpcap)
     strategy:
       matrix:
         include:
@@ -174,7 +174,7 @@ jobs:
           retention-days: 1
 
   freebsd:
-    name: FreeBSD amd64/arm64
+    name: FreeBSD (amd64/arm64) - Static cross compile + .pkg
     runs-on: ubuntu-latest
 
     steps:
@@ -203,7 +203,7 @@ jobs:
           retention-days: 1
 
   windows:
-    name: Windows amd64
+    name: Windows (amd64) - dynamic (npcap)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
