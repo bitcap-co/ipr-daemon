@@ -365,6 +365,7 @@ FREEBSD_PKG_STAGE  := $(DIST_DIR)iprd-pkg-stage
 # Arch of the .pkg to build. Defaults to amd64; .freebsd-package-arm64 overrides these.
 PKG_ARCH ?= amd64
 PKG_BIN  ?= $(FREEBSD_AMD64_S_NAME)
+FREEBSD_PKG_NAME   := $(DIST_DIR)iprd-$(VERSION_PKG)-freebsd-$(PKG_ARCH).pkg
 
 ## .freebsd-package : (run on FreeBSD) stage tree and build .pkg with pkg create
 .PHONY: .freebsd-package .freebsd-package-arm64
@@ -377,9 +378,9 @@ PKG_BIN  ?= $(FREEBSD_AMD64_S_NAME)
 	     -e 's/%%ARCH%%/FreeBSD:$(FREEBSD_MAJOR):$(PKG_ARCH)/' \
 	     resources/freebsd/+MANIFEST.in > $(DIST_DIR)+MANIFEST
 	pkg create -M $(DIST_DIR)+MANIFEST -p resources/freebsd/pkg-plist -r $(FREEBSD_PKG_STAGE) -o $(DIST_DIR)
-	@mv $(DIST_DIR)iprd-$(VERSION_PKG).pkg $(DIST_DIR)iprd-$(VERSION_PKG)-$(PKG_ARCH).pkg
+	@mv $(DIST_DIR)iprd-$(VERSION_PKG).pkg $(FREEBSD_PKG_NAME)
 	@rm -rf $(FREEBSD_PKG_STAGE) $(DIST_DIR)+MANIFEST
-	@echo "Created: $(DIST_DIR)iprd-$(VERSION_PKG)-$(PKG_ARCH).pkg"
+	@echo "Created: $(FREEBSD_PKG_NAME)"
 
 ## .freebsd-package-arm64 : (run on FreeBSD) build the arm64 .pkg
 .freebsd-package-arm64:
@@ -402,6 +403,8 @@ endif
 # nfpm reads nfpm.yaml; the packaged binary/arch/version are passed via env.
 # deb/rpm use the glibc-static binary; apk uses the musl-static binary.
 NFPM ?= nfpm
+APK_AMD64_NAME := $(DIST_DIR)iprd-$(VERSION_PKG)-linux-musl-amd64.apk
+APK_ARM64_NAME := $(DIST_DIR)iprd-$(VERSION_PKG)-linux-musl-arm64.apk
 
 ## deb-package : build static linux-amd64 binary (Docker) and package as .deb
 .PHONY: deb-package
@@ -465,7 +468,7 @@ apk-package: linux-musl-amd64
 .apk-package:
 	@test -f $(MUSL_AMD64_S_NAME) || { echo "ERROR: $(MUSL_AMD64_S_NAME) not found — build it first (make linux-musl-amd64)" >&2; exit 1; }
 	@cp $(MUSL_AMD64_S_NAME) $(DIST_DIR).nfpm-bin
-	IPRD_ARCH=amd64 IPRD_VERSION=$(VERSION_PKG) $(NFPM) package -f nfpm.yaml -p apk -t $(DIST_DIR)
+	IPRD_ARCH=amd64 IPRD_VERSION=$(VERSION_PKG) $(NFPM) package -f nfpm.yaml -p apk -t $(APK_AMD64_NAME)
 	@rm -f $(DIST_DIR).nfpm-bin
 
 ## apk-package-arm64 : build static musl arm64 binary (Docker) and package as arm64 .apk
@@ -478,7 +481,7 @@ apk-package-arm64: linux-musl-arm64
 .apk-package-arm64:
 	@test -f $(MUSL_ARM64_S_NAME) || { echo "ERROR: $(MUSL_ARM64_S_NAME) not found — build it first (make linux-musl-arm64)" >&2; exit 1; }
 	@cp $(MUSL_ARM64_S_NAME) $(DIST_DIR).nfpm-bin
-	IPRD_ARCH=arm64 IPRD_VERSION=$(VERSION_PKG) $(NFPM) package -f nfpm.yaml -p apk -t $(DIST_DIR)
+	IPRD_ARCH=arm64 IPRD_VERSION=$(VERSION_PKG) $(NFPM) package -f nfpm.yaml -p apk -t $(APK_ARM64_NAME)
 	@rm -f $(DIST_DIR).nfpm-bin
 
 DOCKER_IMAGE := $(DOCKER_REPO)/$(PROJECT_NAME):$(DOCKER_VERSION)
