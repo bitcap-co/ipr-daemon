@@ -399,10 +399,9 @@ func TestNewListenerManagerAppliesInterfaceBPFOptions(t *testing.T) {
 	}
 }
 
-func TestNewListenerManagerAutoModeCreatesOneListener(t *testing.T) {
+func TestNewListenerManagerAutoModeCreatesOneListenerWithoutSelector(t *testing.T) {
 	cfg := iprdconfig.DefaultListenerConfig()
 	cfg.Auto = true
-	cfg.ListenInterfaces = []string{"eth1", "eth2"}
 	manager, err := NewListenerManager(cfg, NewLogger())
 	if err != nil {
 		t.Fatal(err)
@@ -413,6 +412,32 @@ func TestNewListenerManagerAutoModeCreatesOneListener(t *testing.T) {
 	}
 	if !manager.listeners[0].cfg.Auto {
 		t.Fatal("auto listener does not have auto mode enabled")
+	}
+}
+
+func TestNewListenerManagerAutoModeIgnoresExplicitSelectors(t *testing.T) {
+	cfg := iprdconfig.DefaultListenerConfig()
+	cfg.Auto = true
+	cfg.ListenInterfaces = []string{"eth1", "eth2"}
+	cfg.IgnoredDevices = []string{"global-mac"}
+	cfg.Interfaces = []iprdconfig.InterfaceConfig{{
+		Selector:       "eth1",
+		IgnoredDevices: []string{"interface-mac"},
+	}}
+	manager, err := NewListenerManager(cfg, NewLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if len(manager.listeners) != 1 {
+		t.Fatalf("listener count = %d, want 1", len(manager.listeners))
+	}
+	listenerCfg := manager.listeners[0].cfg
+	if listenerCfg.ListenInterface != "" || len(listenerCfg.ListenInterfaces) != 0 {
+		t.Fatalf("auto listener retained explicit selectors: %#v", listenerCfg.ListenInterfaces)
+	}
+	if want := []string{"global-mac"}; !reflect.DeepEqual(listenerCfg.IgnoredDevices, want) {
+		t.Fatalf("auto listener ignored devices = %v, want global options %v", listenerCfg.IgnoredDevices, want)
 	}
 }
 

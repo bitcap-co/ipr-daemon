@@ -181,10 +181,15 @@ func (m *ListenerManager) Run(ctx context.Context) error {
 }
 
 func newManagedListeners(cfg *iprdconfig.ListenerConfig, logger Logger) []*IPRListener {
-	selectors := cfg.ListenInterfaces
-	if cfg.Auto && len(selectors) > 1 {
-		selectors = selectors[:1]
+	if cfg.Auto {
+		listenerCfg := *cfg
+		listenerCfg.ListenInterfaces = nil
+		listenerCfg.ListenInterface = ""
+		listenerCfg.Interfaces = nil
+		return []*IPRListener{NewListener(&listenerCfg, logger, nil)}
 	}
+
+	selectors := cfg.ListenInterfaces
 	listeners := make([]*IPRListener, 0, len(selectors))
 	for _, selector := range selectors {
 		listenerCfg := *cfg

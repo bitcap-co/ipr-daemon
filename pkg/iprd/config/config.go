@@ -84,6 +84,12 @@ func (cfg *ListenerConfig) Validate() error {
 		}
 		seen[selector] = struct{}{}
 	}
+	if cfg.Auto {
+		if cfg.NoRootNetwork && len(cfg.NetworkInclusions) == 0 {
+			return fmt.Errorf("auto mode requires network inclusions when no_root_network is enabled")
+		}
+		return nil
+	}
 	for _, selector := range cfg.effectiveListenInterfaces() {
 		interfaceCfg := cfg.interfaceConfig(selector)
 		if interfaceCfg.NoRootNetwork && len(interfaceCfg.NetworkInclusions) == 0 {

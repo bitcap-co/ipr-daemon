@@ -102,6 +102,37 @@ func TestDefaultConfigHasNoListenInterfaces(t *testing.T) {
 	}
 }
 
+func TestAutoConfigDoesNotRequireListenInterface(t *testing.T) {
+	cfg, err := iprdconfig.ParseConfig(&iprdconfig.IPRDConfig{
+		ListenerConfig: iprdconfig.ListenerConfig{Auto: true},
+	})
+	if err != nil {
+		t.Fatalf("ParseConfig(auto): %v", err)
+	}
+	if !cfg.Auto {
+		t.Fatal("auto config disabled auto mode")
+	}
+	if len(cfg.ListenInterfaces) != 0 {
+		t.Fatalf("auto mode interfaces = %v, want none", cfg.ListenInterfaces)
+	}
+}
+
+func TestAutoConfigIgnoresExplicitInterfaceBPFValidation(t *testing.T) {
+	_, err := iprdconfig.ParseConfig(&iprdconfig.IPRDConfig{
+		ListenerConfig: iprdconfig.ListenerConfig{
+			Auto:             true,
+			ListenInterfaces: []string{"eth0"},
+			Interfaces: []iprdconfig.InterfaceConfig{{
+				Selector:      "eth0",
+				NoRootNetwork: true,
+			}},
+		},
+	})
+	if err != nil {
+		t.Fatalf("ParseConfig(auto with ignored interface options): %v", err)
+	}
+}
+
 func TestMergeWithoutListenInterfacesPreservesExistingInterfaces(t *testing.T) {
 	current, err := iprdconfig.ParseConfig(&iprdconfig.IPRDConfig{
 		ListenerConfig: iprdconfig.ListenerConfig{ListenInterfaces: []string{"eth0"}},
