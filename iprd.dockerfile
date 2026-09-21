@@ -22,7 +22,7 @@ debug = false
 # overrides listen_interfaces.
 auto = false
 # listen_interfaces contains the names or indexes of interfaces for listen/capture.
-# At least one interface must be configured before starting the daemon.
+# At least one interface must be configured unless auto is enabled.
 listen_interfaces = []
 # forward_bind is the local IP address to bind the TCP broadcast stream to.
 # empty binds all interfaces (default).
