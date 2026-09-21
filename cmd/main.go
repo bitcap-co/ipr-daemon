@@ -158,8 +158,8 @@ func main() {
 	}
 
 	// enter run mode
-	// no interface providers; exit.
-	if len(cfg.ListenInterfaces) == 0 {
+	// no interface providers; exit. Auto mode discovers its interface at runtime.
+	if !cfg.Auto && len(cfg.ListenInterfaces) == 0 {
 		flag.Usage()
 		log.Fatal(fmt.Errorf("no listen interface(s) specified"))
 	}
