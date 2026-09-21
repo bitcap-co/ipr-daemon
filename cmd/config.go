@@ -8,7 +8,7 @@ import (
 	iprdconfig "github.com/bitcap-co/ipr-daemon/pkg/iprd/config"
 )
 
-func updateExistingConfig(curr, target *iprdconfig.IPRDConfig) *iprdconfig.IPRDConfig {
+func updateExistingConfig(curr, target *iprdconfig.IPRDConfig) (*iprdconfig.IPRDConfig, error) {
 	newCfg := curr.Merge(target)
 	if len(target.ListenInterfaces) > 0 {
 		newCfg.ListenInterfaces = mergeUnique(curr.ListenInterfaces, target.ListenInterfaces)
@@ -52,12 +52,9 @@ func updateExistingConfig(curr, target *iprdconfig.IPRDConfig) *iprdconfig.IPRDC
 		newCfg.MDNS = !target.MDNS || !curr.MDNS
 		log.Info(fmt.Sprintf("toggled mdns: %v -> %v", curr.MDNS, newCfg.MDNS))
 	}
-	if target.NoRootNetwork && len(newCfg.NetworkInclusions) > 0 {
-		newCfg.NoRootNetwork = !target.NoRootNetwork || !curr.NoRootNetwork
+	if target.NoRootNetwork {
+		newCfg.NoRootNetwork = !curr.NoRootNetwork
 		log.Info(fmt.Sprintf("toggled no_root_network: %v -> %v", curr.NoRootNetwork, newCfg.NoRootNetwork))
-	} else if target.NoRootNetwork {
-		log.Error(fmt.Errorf("no_root_network set to true but network_inclusions is empty, ignored"))
-		newCfg.NoRootNetwork = false
 	}
 	if target.FilterKnownPorts {
 		newCfg.FilterKnownPorts = !target.FilterKnownPorts || !curr.FilterKnownPorts
@@ -67,7 +64,7 @@ func updateExistingConfig(curr, target *iprdconfig.IPRDConfig) *iprdconfig.IPRDC
 		newCfg.RotateCaptureFiles = !target.RotateCaptureFiles || !curr.RotateCaptureFiles
 		log.Info(fmt.Sprintf("toggled rotate_capture_files: %v -> %v", curr.RotateCaptureFiles, newCfg.RotateCaptureFiles))
 	}
-	return newCfg
+	return iprdconfig.ParseConfig(newCfg)
 }
 
 func mergeInterfaceConfigs(curr, target []iprdconfig.InterfaceConfig) []iprdconfig.InterfaceConfig {

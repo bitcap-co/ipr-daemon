@@ -34,7 +34,10 @@ func TestUpdateExistingConfigUpdatesOnlyMatchingInterface(t *testing.T) {
 		},
 	}}
 
-	got := updateExistingConfig(curr, target)
+	got, err := updateExistingConfig(curr, target)
+	if err != nil {
+		t.Fatalf("updateExistingConfig: %v", err)
+	}
 
 	if want := []string{"eth0", "eth1"}; !reflect.DeepEqual(got.ListenInterfaces, want) {
 		t.Fatalf("listen interfaces = %v, want %v", got.ListenInterfaces, want)
@@ -50,6 +53,64 @@ func TestUpdateExistingConfigUpdatesOnlyMatchingInterface(t *testing.T) {
 	}
 	if !reflect.DeepEqual(got.Interfaces[1], wantEth1) {
 		t.Fatalf("eth1 config = %#v, want %#v", got.Interfaces[1], wantEth1)
+	}
+}
+
+func TestUpdateExistingConfigAutoModeDoesNotRequireInterface(t *testing.T) {
+	curr := iprdconfig.DefaultIPRDConfig()
+	target := &iprdconfig.IPRDConfig{ListenerConfig: iprdconfig.ListenerConfig{Auto: true}}
+
+	got, err := updateExistingConfig(curr, target)
+	if err != nil {
+		t.Fatalf("updateExistingConfig: %v", err)
+	}
+	if !got.Auto {
+		t.Fatal("update config did not enable auto mode")
+	}
+	if len(got.ListenInterfaces) != 0 {
+		t.Fatalf("auto config interfaces = %v, want none", got.ListenInterfaces)
+	}
+}
+
+func TestUpdateExistingConfigValidatesGlobalListenerConfig(t *testing.T) {
+	curr := iprdconfig.DefaultIPRDConfig()
+	curr.ListenInterfaces = []string{"eth0"}
+	target := &iprdconfig.IPRDConfig{ListenerConfig: iprdconfig.ListenerConfig{NoRootNetwork: true}}
+
+	if _, err := updateExistingConfig(curr, target); err == nil {
+		t.Fatal("updateExistingConfig accepted no_root_network without network inclusions")
+	}
+}
+
+func TestUpdateExistingConfigAutoModeIgnoresExplicitInterfaceValidation(t *testing.T) {
+	curr := iprdconfig.DefaultIPRDConfig()
+	target := &iprdconfig.IPRDConfig{ListenerConfig: iprdconfig.ListenerConfig{
+		Auto:             true,
+		ListenInterfaces: []string{"eth0"},
+		Interfaces: []iprdconfig.InterfaceConfig{{
+			Selector:      "eth0",
+			NoRootNetwork: true,
+		}},
+	}}
+
+	got, err := updateExistingConfig(curr, target)
+	if err != nil {
+		t.Fatalf("updateExistingConfig: %v", err)
+	}
+	if !got.Auto {
+		t.Fatalf("updated config did not enable auto mode")
+	}
+}
+
+func TestUpdateExistingConfigDisablingAutoValidatesExplicitInterfaces(t *testing.T) {
+	curr := iprdconfig.DefaultIPRDConfig()
+	curr.Auto = true
+	curr.ListenInterfaces = []string{"eth0"}
+	curr.Interfaces = []iprdconfig.InterfaceConfig{{Selector: "eth0", NoRootNetwork: true}}
+	target := &iprdconfig.IPRDConfig{ListenerConfig: iprdconfig.ListenerConfig{Auto: true}}
+
+	if _, err := updateExistingConfig(curr, target); err == nil {
+		t.Fatalf("updateExistingConfig accepted invalid explicit interface after disabling auto")
 	}
 }
 
@@ -69,7 +130,10 @@ func TestUpdateExistingConfigAddsMultipleTargetInterfaces(t *testing.T) {
 		},
 	}}
 
-	got := updateExistingConfig(curr, target)
+	got, err := updateExistingConfig(curr, target)
+	if err != nil {
+		t.Fatalf("updateExistingConfig: %v", err)
+	}
 
 	if want := []string{"eth0", "eth1", "eth2"}; !reflect.DeepEqual(got.ListenInterfaces, want) {
 		t.Fatalf("listen interfaces = %v, want %v", got.ListenInterfaces, want)
