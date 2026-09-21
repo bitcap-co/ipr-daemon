@@ -7,14 +7,14 @@
 
 name=iprd
 desc="IP Report Daemon"
-rcvar=iprd_enable
+rcvar="${name}_enable"
 command="/usr/local/sbin/${name}"
+iprd_flags="-a"  # iprd args; see iprd -h
 
 start_precmd="${name}_prestart"
-
 iprd_prestart()
 {
-    rc_flags="-a ${rc_flags} > /var/log/iprd.log &"
+    rc_flags="${iprd_flags} > /var/log/iprd.log &"
 }
 
 load_rc_config $name
