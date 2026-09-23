@@ -136,11 +136,14 @@ To see all available network interfaces that the daemon can listen on, run with 
    IPv4:192.168.1.xx
 ```
 Using an interface index or name, specify one or more interfaces with `-i`.
-The flag supports chaining and comma-separated values:
+The flag supports chaining, comma-separated values, and inclusive interface index ranges:
 ```bash
 sudo ./iprd -i "eth0" -i "eth1"
 sudo ./iprd -i "eth0,eth1"
+sudo ./iprd -i "8-21,23"
 ```
+Index ranges can also use per-interface BPF options, which are applied to every
+index in the range (for example, `-i "8-21:known-ports"`).
 Each interface has an independent capture and reconnect loop. Packets are
 processed through one duplicate record, capture file, and TCP broadcast stream.
 

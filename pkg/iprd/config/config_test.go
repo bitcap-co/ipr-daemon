@@ -61,8 +61,46 @@ func TestFlagInterfaceSupportsPerInterfaceBPFOptions(t *testing.T) {
 	}
 }
 
-func TestFlagInterfaceRejectsInvalidOptions(t *testing.T) {
-	for _, value := range []string{"eth0:unknown", "eth0:add-network=", "eth0,eth1:no-root-network"} {
+func TestFlagInterfaceSupportsInterfaceIndexRanges(t *testing.T) {
+	var interfaces iprdconfig.FlagInterface
+	for _, value := range []string{"8-10,12", "9-11:known-ports"} {
+		if err := interfaces.Set(value); err != nil {
+			t.Fatalf("Set(%q): %v", value, err)
+		}
+	}
+
+	want := []string{"10", "11", "12", "8", "9"}
+	if !reflect.DeepEqual(interfaces.Selectors(), want) {
+		t.Fatalf("selectors = %v, want %v", interfaces.Selectors(), want)
+	}
+	for _, selector := range []string{"9", "10", "11"} {
+		if !interfaces[selector].FilterKnownPorts {
+			t.Fatalf("interface %s known ports = false, want true", selector)
+		}
+	}
+	if interfaces["8"].FilterKnownPorts || interfaces["12"].FilterKnownPorts {
+		t.Fatal("range options applied to interfaces outside the configured range")
+	}
+}
+
+func TestFlagInterfacePreservesHyphenatedNames(t *testing.T) {
+	var interfaces iprdconfig.FlagInterface
+	if err := interfaces.Set("vlan-8,8-vlan"); err != nil {
+		t.Fatal(err)
+	}
+	if want := []string{"8-vlan", "vlan-8"}; !reflect.DeepEqual(interfaces.Selectors(), want) {
+		t.Fatalf("selectors = %v, want %v", interfaces.Selectors(), want)
+	}
+}
+
+func TestFlagInterfaceRejectsInvalidOptionsAndRanges(t *testing.T) {
+	for _, value := range []string{
+		"eth0:unknown",
+		"eth0:add-network=",
+		"eth0,eth1:no-root-network",
+		"8-0",
+		"12-8",
+	} {
 		var interfaces iprdconfig.FlagInterface
 		if err := interfaces.Set(value); err == nil {
 			t.Fatalf("Set(%q) returned no error", value)

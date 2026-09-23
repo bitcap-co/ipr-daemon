@@ -49,7 +49,7 @@ var (
 )
 
 func main() {
-	flag.Var(&flInterfaces, "i", "Interface selectors (name/index), optionally followed by BPF options (for example: eth0:no-root-network,add-network=192.168.1).\nThis flag supports chaining; plain interface names may also be comma-separated.")
+	flag.Var(&flInterfaces, "i", "Interface selectors (name/index), optionally followed by BPF options (for example: eth0:no-root-network,add-network=192.168.1).\nThis flag supports chaining, comma-separated selectors, and index ranges (for example: 8-21,23).")
 	flag.Var(&flIgnoredDevices, "ignore", "List of source MAC addresses to exclude in BPF filter.\nThis flag supports chaining or comma-separated string.\n(Global: applies to all interface selectors.)")
 	flag.Var(&flNetworkInclusions, "add-network", "List of networks to append to BPF filter. Networks are IPv4 network numbers that can be written as a dotted quad, triple, pair or a single number.\nThis flag supports chaining or comma-separated string.\n(Global: applies to all interface selectors.)")
 	flag.Var(&flNetworkExclusions, "exclude", "List of networks to additionally exclude from BPF filter.\nThis flag supports chaining or comma-separated string.\n(Global: applies to all interface selectors.)")

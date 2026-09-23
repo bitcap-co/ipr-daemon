@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -46,7 +47,11 @@ func (f *FlagInterface) Set(value string) error {
 		ifaceID = strings.TrimSpace(parts[0])
 		options = parts[1]
 	} else {
-		for _, selector := range normalizeInterfaceSelectors([]string{value}) {
+		selectors, err := expandInterfaceSelectors(value)
+		if err != nil {
+			return err
+		}
+		for _, selector := range selectors {
 			if (*f)[selector] == nil {
 				(*f)[selector] = DefaultInterfaceConfig()
 			}
@@ -60,16 +65,54 @@ func (f *FlagInterface) Set(value string) error {
 		return fmt.Errorf("interface options must be specified separately for each interface")
 	}
 
-	if (*f)[ifaceID] == nil {
-		(*f)[ifaceID] = DefaultInterfaceConfig()
+	selectors, err := expandInterfaceSelectors(ifaceID)
+	if err != nil {
+		return err
 	}
-	cfg := (*f)[ifaceID]
+	for _, selector := range selectors {
+		if (*f)[selector] == nil {
+			(*f)[selector] = DefaultInterfaceConfig()
+		}
+		if err := applyInterfaceOptions((*f)[selector], options); err != nil {
+			return err
+		}
+	}
+	return nil
+}
 
-	if options == "" {
-		return nil
+func expandInterfaceSelectors(value string) ([]string, error) {
+	selectors := make([]string, 0)
+	for _, selector := range normalizeInterfaceSelectors([]string{value}) {
+		startText, endText, hasHyphen := strings.Cut(selector, "-")
+		if !hasHyphen || strings.Contains(endText, "-") {
+			selectors = append(selectors, selector)
+			continue
+		}
+
+		start, startErr := strconv.Atoi(startText)
+		end, endErr := strconv.Atoi(endText)
+		if startErr != nil || endErr != nil {
+			selectors = append(selectors, selector)
+			continue
+		}
+		if start <= 0 || end <= 0 {
+			return nil, fmt.Errorf("interface index range %q must contain positive indexes", selector)
+		}
+		if start > end {
+			return nil, fmt.Errorf("interface index range %q is descending", selector)
+		}
+		for index := start; ; index++ {
+			selectors = append(selectors, strconv.Itoa(index))
+			if index == end {
+				break
+			}
+		}
 	}
-	opts := strings.SplitSeq(options, ",")
-	for opt := range opts {
+	return normalizeInterfaceSelectors(selectors), nil
+}
+
+func applyInterfaceOptions(cfg *InterfaceConfig, options string) error {
+	for opt := range strings.SplitSeq(options, ",") {
 		opt = strings.TrimSpace(opt)
 		if opt == "" {
 			continue
