@@ -222,6 +222,26 @@ jobs:
           path: dist/iprd*
           retention-days: 1
 
+  windows-arm64:
+    name: Windows (arm64) - dynamic (npcap)
+    runs-on: windows-11-arm
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "${{ env.GO_VERSION }}"
+      - name: Build Windows arm64 binary
+        run: |
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          .\scripts\build_win.ps1 -VersionTag $version
+        shell: pwsh
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: iprd-build-${{ runner.os }}-${{ runner.arch }}
+          path: dist/iprd*
+          retention-days: 1
+
   docker:
     name: Docker image (amd64/arm64)
     needs: [linux-amd64, linux-aarch64]
@@ -244,7 +264,7 @@ jobs:
     name: Create release
     permissions:
       contents: write
-    needs: [linux-amd64, linux-aarch64, linux-arm32, macos, freebsd, windows]
+    needs: [linux-amd64, linux-aarch64, linux-arm32, macos, freebsd, windows, windows-arm64]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
