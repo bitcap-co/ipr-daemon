@@ -203,42 +203,25 @@ jobs:
           retention-days: 1
 
   windows:
-    name: Windows (amd64) - dynamic (npcap)
+    name: Windows (amd64/arm64) - dynamic cross compile (npcap)
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-go@v6
         with:
           go-version: "${{ env.GO_VERSION }}"
-      - name: Build Windows amd64 binary
+      - name: Build Windows amd64/arm64 binaries
         run: |
           $version = "${{ github.ref_name }}" -replace '^v', ''
+          .\scripts\build_win.ps1 -VersionTag $version
+          $env:GOOS = 'windows'
+          $env:GOARCH = 'arm64'
           .\scripts\build_win.ps1 -VersionTag $version
         shell: pwsh
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
         with:
-          name: iprd-build-${{ runner.os }}-${{ runner.arch }}
-          path: dist/iprd*
-          retention-days: 1
-
-  windows-arm64:
-    name: Windows (arm64) - dynamic (npcap)
-    runs-on: windows-11-arm
-    steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-go@v6
-        with:
-          go-version: "${{ env.GO_VERSION }}"
-      - name: Build Windows arm64 binary
-        run: |
-          $version = "${{ github.ref_name }}" -replace '^v', ''
-          .\scripts\build_win.ps1 -VersionTag $version
-        shell: pwsh
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v7
-        with:
-          name: iprd-build-${{ runner.os }}-${{ runner.arch }}
+          name: iprd-build-windows-all
           path: dist/iprd*
           retention-days: 1
 
@@ -264,7 +247,7 @@ jobs:
     name: Create release
     permissions:
       contents: write
-    needs: [linux-amd64, linux-aarch64, linux-arm32, macos, freebsd, windows, windows-arm64]
+    needs: [linux-amd64, linux-aarch64, linux-arm32, macos, freebsd, windows]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
