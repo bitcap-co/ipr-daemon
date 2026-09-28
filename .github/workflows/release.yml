@@ -210,19 +210,10 @@ jobs:
       - uses: actions/setup-go@v6
         with:
           go-version: "${{ env.GO_VERSION }}"
-      - name: Setup Npcap SDK
-        run: |
-          Invoke-WebRequest -Uri "https://npcap.com/dist/npcap-sdk-1.13.zip" -OutFile npcap-sdk.zip
-          Expand-Archive -Path npcap-sdk.zip -DestinationPath npcap-sdk
-        shell: pwsh
       - name: Build Windows amd64 binary
         run: |
-          New-Item -ItemType Directory -Force -Path dist | Out-Null
-          $sdk = "$env:GITHUB_WORKSPACE/npcap-sdk"
-          $env:CGO_ENABLED = "1"
-          $env:CGO_CFLAGS = "-I$sdk/Include"
-          $env:CGO_LDFLAGS = "-L$sdk/Lib/x64"
-          go build -ldflags="-s -w" -o "dist/iprd-${{ github.ref_name }}-windows-amd64.exe" ./cmd
+          $version = "${{ github.ref_name }}" -replace '^v', ''
+          .\scripts\build_win.ps1 -VersionTag $version
         shell: pwsh
       - name: Upload artifacts
         uses: actions/upload-artifact@v7
