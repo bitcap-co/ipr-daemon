@@ -90,10 +90,6 @@ pkg add ./iprd-<version>-<arch>.pkg
 This installs `/usr/local/sbin/iprd`, registers the rc service at
 `/usr/local/etc/rc.d/iprd`, and enables + starts it. Remove with `pkg delete iprd`.
 
-> [!NOTE]
-> `pkg add` refuses on an ABI mismatch (e.g. a different FreeBSD major, or some
-> pfSense builds). Use `pkg add -f ./iprd-<version>.pkg` to force the install.
-
 ### Docker container
 Prebuilt Linux amd64/arm64 images are published to Docker Hub at
 [`mattwert/ipr-daemon`](https://hub.docker.com/r/mattwert/ipr-daemon).
