@@ -17,7 +17,7 @@ Vagrant.configure("2") do |config|
   config.vm.guest = :freebsd
   config.ssh.shell = "sh"
   config.vm.provision "shell", inline: <<-SHELL
-    pkg install -y binutils git gmake go libpcap pkgconf virtualbox-ose-kmod \
+    pkg install -y binutils git gmake go libpcap pkgconf virtualbox-ose-kmod zip \
       virtualbox-ose-additions-nox11 aarch64-gcc13 \
       aarch64-binutils arm-gnueabi-binutils amd64-binutils \
       armv7-freebsd-sysroot aarch64-freebsd-sysroot

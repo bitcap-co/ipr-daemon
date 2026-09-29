@@ -314,6 +314,13 @@ freebsd-package: .vagrant-check
 		ssh -F .vagrant-ssh default 'sh -c "PATH=/usr/local/bin:$$PATH; cd $(PROJECT_NAME) && gmake .freebsd-package .freebsd-package-arm64"' && \
 		scp -F .vagrant-ssh default:$(PROJECT_NAME)/dist/*.pkg dist/
 
+## firewall-bundle : build private pfSense/OPNsense installer ZIPs for amd64/arm64
+.PHONY: firewall-bundle
+firewall-bundle: .vagrant-check
+	vagrant provision && vagrant up && vagrant ssh-config >.vagrant-ssh && \
+		ssh -F .vagrant-ssh default 'sh -c "PATH=/usr/local/bin:$$PATH; cd $(PROJECT_NAME) && gmake .firewall-bundle .firewall-bundle-arm64"' && \
+		scp -F .vagrant-ssh default:$(PROJECT_NAME)/dist/*-firewall.zip dist/
+
 ## freebsd-shell : get shell in FreeBSD Vagrant VM
 freebsd-shell:
 	vagrant ssh
@@ -385,6 +392,29 @@ FREEBSD_PKG_NAME   := $(DIST_DIR)iprd-$(VERSION_PKG)-freebsd-$(PKG_ARCH).pkg
 ## .freebsd-package-arm64 : (run on FreeBSD) build the arm64 .pkg
 .freebsd-package-arm64:
 	$(MAKE) .freebsd-package PKG_ARCH=arm64 PKG_BIN=$(FREEBSD_ARM64_S_NAME)
+
+# Private pfSense/OPNsense ZIP bundles (must run on FreeBSD).
+FIREWALL_ARCH ?= amd64
+FIREWALL_BIN  ?= $(FREEBSD_AMD64_S_NAME)
+FIREWALL_BUNDLE_BASE  = iprd-$(VERSION_PKG)-freebsd-$(FIREWALL_ARCH)-firewall
+FIREWALL_BUNDLE_STAGE = $(DIST_DIR)$(FIREWALL_BUNDLE_BASE)
+FIREWALL_BUNDLE_NAME  = $(DIST_DIR)$(FIREWALL_BUNDLE_BASE).zip
+
+.PHONY: .firewall-bundle .firewall-bundle-arm64
+.firewall-bundle: $(FIREWALL_BIN)
+	@rm -rf $(FIREWALL_BUNDLE_STAGE) $(FIREWALL_BUNDLE_NAME)
+	@mkdir -p $(FIREWALL_BUNDLE_STAGE)
+	@install -m 0755 $(FIREWALL_BIN) $(FIREWALL_BUNDLE_STAGE)/iprd
+	@install -m 0755 resources/firewall/bootstrap.sh $(FIREWALL_BUNDLE_STAGE)/bootstrap.sh
+	@install -m 0755 resources/firewall/install-firewall.sh $(FIREWALL_BUNDLE_STAGE)/install-firewall.sh
+	@install -m 0755 resources/firewall/remove-firewall.sh $(FIREWALL_BUNDLE_STAGE)/remove-firewall.sh
+	@install -m 0644 resources/firewall/README.md $(FIREWALL_BUNDLE_STAGE)/README.md
+	@cd $(DIST_DIR) && zip -qr $(notdir $(FIREWALL_BUNDLE_NAME)) $(notdir $(FIREWALL_BUNDLE_STAGE))
+	@rm -rf $(FIREWALL_BUNDLE_STAGE)
+	@echo "Created: $(FIREWALL_BUNDLE_NAME)"
+
+.firewall-bundle-arm64:
+	$(MAKE) .firewall-bundle FIREWALL_ARCH=arm64 FIREWALL_BIN=$(FREEBSD_ARM64_S_NAME)
 endif
 
 # macOS/darwin
