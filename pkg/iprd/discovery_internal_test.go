@@ -47,6 +47,61 @@ func TestFilterOperationalMulticastInterfaces(t *testing.T) {
 	}
 }
 
+func TestResolveMDNSInterfaces(t *testing.T) {
+	required := net.FlagUp | net.FlagRunning | net.FlagMulticast
+	ifaces := []net.Interface{
+		{Index: 2, Name: "lan0", Flags: required},
+		{Index: 7, Name: "vlan20", Flags: required},
+		{Index: 9, Name: "down0", Flags: net.FlagUp | net.FlagMulticast},
+	}
+
+	got, err := resolveMDNSInterfaces(ifaces, []string{"lan0", "7", "2"})
+	if err != nil {
+		t.Fatalf("resolveMDNSInterfaces() error = %v", err)
+	}
+	want := []net.Interface{ifaces[0], ifaces[1]}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("resolveMDNSInterfaces() = %#v, want %#v", got, want)
+	}
+}
+
+func TestResolveMDNSInterfacesRejectsInvalidSelectors(t *testing.T) {
+	required := net.FlagUp | net.FlagRunning | net.FlagMulticast
+	ifaces := []net.Interface{
+		{Index: 2, Name: "lan0", Flags: required},
+		{Index: 9, Name: "down0", Flags: net.FlagUp | net.FlagMulticast},
+	}
+	tests := []struct {
+		name     string
+		selector string
+	}{
+		{name: "empty", selector: ""},
+		{name: "non-positive index", selector: "0"},
+		{name: "missing name", selector: "vlan20"},
+		{name: "missing index", selector: "7"},
+		{name: "not operational", selector: "down0"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := resolveMDNSInterfaces(ifaces, []string{tt.selector}); err == nil {
+				t.Fatalf("resolveMDNSInterfaces(%q) returned nil error", tt.selector)
+			}
+		})
+	}
+}
+
+func TestAppendUniqueMDNSInterfaceDeduplicatesBindOwner(t *testing.T) {
+	required := net.FlagUp | net.FlagRunning | net.FlagMulticast
+	lan := net.Interface{Index: 2, Name: "lan0", Flags: required}
+	vlan := net.Interface{Index: 7, Name: "vlan20", Flags: required}
+
+	got := appendUniqueMDNSInterface([]net.Interface{lan, vlan}, lan)
+	want := []net.Interface{lan, vlan}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("appendUniqueMDNSInterface() = %#v, want %#v", got, want)
+	}
+}
+
 func TestReloadOnMDNSInterfaceChange(t *testing.T) {
 	previous := []mdnsInterfaceState{{
 		Index:     2,

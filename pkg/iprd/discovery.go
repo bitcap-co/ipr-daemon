@@ -8,6 +8,7 @@ import (
 	"os"
 	"reflect"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -69,10 +70,11 @@ type MDNSAdvertiser struct {
 	closeErr  error
 }
 
-// NewMDNSAdvertiser advertises the iprd TCP endpoint. A wildcard bind is
-// published on all operational multicast-capable interfaces; an explicit bind
-// is limited to the local interface that owns that address.
-func NewMDNSAdvertiser(bind string, port int, version string) (*MDNSAdvertiser, error) {
+// NewMDNSAdvertiser advertises the iprd TCP endpoint. Without selectors, a
+// wildcard bind publishes on every operational multicast interface and an
+// explicit bind publishes on its owning interface. Selectors restrict wildcard
+// advertisement; an explicit bind's owning interface is always added.
+func NewMDNSAdvertiser(bind string, port int, version string, selectors []string) (*MDNSAdvertiser, error) {
 	hostname, err := os.Hostname()
 	if err != nil {
 		return nil, fmt.Errorf("determine hostname: %w", err)
@@ -82,21 +84,21 @@ func NewMDNSAdvertiser(bind string, port int, version string) (*MDNSAdvertiser, 
 		return nil, err
 	}
 
-	client := zeroconf.New().
-		Publish(service).
-		Interfaces(operationalMulticastInterfaces)
 	addr, explicit, err := parseMDNSBind(bind)
 	if err != nil {
 		return nil, err
 	}
-	if explicit {
-		if _, err := interfaceForAddress(addr); err != nil {
-			return nil, err
-		}
-		service.Addrs = []netip.Addr{addr}
-		client.Interfaces(func() ([]net.Interface, error) {
-			return operationalInterfaceForAddress(addr)
+	if _, err := mdnsAdvertisementInterfaces(addr, explicit, selectors); err != nil {
+		return nil, err
+	}
+
+	client := zeroconf.New().
+		Publish(service).
+		Interfaces(func() ([]net.Interface, error) {
+			return mdnsAdvertisementInterfaces(addr, explicit, selectors)
 		})
+	if explicit {
+		service.Addrs = []netip.Addr{addr}
 	}
 
 	opened, err := client.Open()
@@ -240,6 +242,80 @@ func filterOperationalMulticastInterfaces(ifaces []net.Interface) []net.Interfac
 	return filtered
 }
 
+func mdnsAdvertisementInterfaces(bind netip.Addr, explicit bool, selectors []string) ([]net.Interface, error) {
+	if len(selectors) == 0 && !explicit {
+		return operationalMulticastInterfaces()
+	}
+
+	ifaces, err := net.Interfaces()
+	if err != nil {
+		return nil, fmt.Errorf("list interfaces for mDNS advertisement: %w", err)
+	}
+
+	selected := make([]net.Interface, 0, len(selectors)+1)
+	if len(selectors) > 0 {
+		selected, err = resolveMDNSInterfaces(ifaces, selectors)
+		if err != nil {
+			return nil, err
+		}
+	}
+	if explicit {
+		owner, err := interfaceForAddressFrom(bind, ifaces)
+		if err != nil {
+			return nil, err
+		}
+		selected = appendUniqueMDNSInterface(selected, *owner)
+	}
+	return selected, nil
+}
+
+func resolveMDNSInterfaces(ifaces []net.Interface, selectors []string) ([]net.Interface, error) {
+	selected := make([]net.Interface, 0, len(selectors))
+	for _, rawSelector := range selectors {
+		selector := strings.TrimSpace(rawSelector)
+		if selector == "" {
+			return nil, fmt.Errorf("mDNS interface selector cannot be empty")
+		}
+
+		var matched *net.Interface
+		if index, err := strconv.Atoi(selector); err == nil {
+			if index <= 0 {
+				return nil, fmt.Errorf("mDNS interface index %q must be positive", selector)
+			}
+			for i := range ifaces {
+				if ifaces[i].Index == index {
+					matched = &ifaces[i]
+					break
+				}
+			}
+		} else {
+			for i := range ifaces {
+				if ifaces[i].Name == selector {
+					matched = &ifaces[i]
+					break
+				}
+			}
+		}
+		if matched == nil {
+			return nil, fmt.Errorf("mDNS interface %q not found", selector)
+		}
+		if !isOperationalMulticast(*matched) {
+			return nil, fmt.Errorf("mDNS interface %q is not operational and multicast-capable", selector)
+		}
+		selected = appendUniqueMDNSInterface(selected, *matched)
+	}
+	return selected, nil
+}
+
+func appendUniqueMDNSInterface(ifaces []net.Interface, iface net.Interface) []net.Interface {
+	for i := range ifaces {
+		if ifaces[i].Index == iface.Index {
+			return ifaces
+		}
+	}
+	return append(ifaces, iface)
+}
+
 func parseMDNSBind(bind string) (netip.Addr, bool, error) {
 	bind = strings.TrimSpace(bind)
 	if bind == "" {
@@ -259,11 +335,7 @@ func parseMDNSBind(bind string) (netip.Addr, bool, error) {
 	return addr, true, nil
 }
 
-func interfaceForAddress(target netip.Addr) (*net.Interface, error) {
-	ifaces, err := net.Interfaces()
-	if err != nil {
-		return nil, fmt.Errorf("list interfaces for bind address %s: %w", target, err)
-	}
+func interfaceForAddressFrom(target netip.Addr, ifaces []net.Interface) (*net.Interface, error) {
 	for i := range ifaces {
 		addrs, err := ifaces[i].Addrs()
 		if err != nil {
@@ -285,34 +357,6 @@ func interfaceForAddress(target netip.Addr) (*net.Interface, error) {
 		}
 	}
 	return nil, fmt.Errorf("bind address %s is not assigned to a local multicast interface", target)
-}
-
-func operationalInterfaceForAddress(target netip.Addr) ([]net.Interface, error) {
-	ifaces, err := net.Interfaces()
-	if err != nil {
-		return nil, fmt.Errorf(
-			"list interfaces for bind address %s: %w",
-			target,
-			err,
-		)
-	}
-	for i := range ifaces {
-		addrs, err := ifaces[i].Addrs()
-		if err != nil {
-			continue
-		}
-		for _, addr := range addrs {
-			local, ok := netAddressIP(addr)
-			if !ok || local.Unmap() != target {
-				continue
-			}
-			if !isOperationalMulticast(ifaces[i]) {
-				return []net.Interface{}, nil
-			}
-			return []net.Interface{ifaces[i]}, nil
-		}
-	}
-	return []net.Interface{}, nil
 }
 
 func netAddressIP(addr net.Addr) (netip.Addr, bool) {
