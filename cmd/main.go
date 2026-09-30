@@ -54,7 +54,7 @@ func main() {
 	flag.Var(&flIgnoredDevices, "ignore", "List of source MAC addresses to exclude in BPF filter.\nThis flag supports chaining or comma-separated string.\n(Global: applies to all interface selectors.)")
 	flag.Var(&flNetworkInclusions, "add-network", "List of networks to append to BPF filter. Networks are IPv4 network numbers that can be written as a dotted quad, triple, pair or a single number.\nThis flag supports chaining or comma-separated string.\n(Global: applies to all interface selectors.)")
 	flag.Var(&flNetworkExclusions, "exclude", "List of networks to additionally exclude from BPF filter.\nThis flag supports chaining or comma-separated string.\n(Global: applies to all interface selectors.)")
-	flag.Var(&flMDNSInterfaces, "mdns-interface", "Interface names or indexes on which to advertise mDNS.\nThis flag supports chaining or comma-separated values. The interface owning forward_bind is always included.")
+	flag.Var(&flMDNSInterfaces, "advertise", "Interface names or indexes on which to advertise mDNS.\nThis flag supports chaining or comma-separated values. The interface owning forward_bind is always included.")
 	flag.Parse()
 
 	// print version information and exit.
