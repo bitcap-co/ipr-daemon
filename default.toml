@@ -15,6 +15,10 @@ forward_port = 7788
 forward_known = false
 # mdns advertises the TCP forwarding endpoint as _iprd._tcp.local. for LAN discovery.
 mdns = false
+# mdns_interfaces optionally restricts advertisement to interface names or indexes.
+# Empty advertises on all operational multicast interfaces when forward_bind is empty.
+# The interface owning an explicit forward_bind is always included.
+mdns_interfaces = []
 # no_root_network is a switch to remove the interface network from BPF filter.
 # must add additional network inclusions via network_inclusions.
 no_root_network = false
