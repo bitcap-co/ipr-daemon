@@ -232,9 +232,10 @@ func ParseListenerConfig(supplied *ListenerConfig) (*ListenerConfig, error) {
 
 // ForwardConfig describes the daemon's TCP forwarding endpoint and service advertisement.
 type ForwardConfig struct {
-	Bind string `toml:"forward_bind" json:"forward_bind"`
-	Port int    `toml:"forward_port" json:"forward_port"`
-	MDNS bool   `toml:"mdns" json:"mdns"`
+	Bind           string   `toml:"forward_bind" json:"forward_bind"`
+	Port           int      `toml:"forward_port" json:"forward_port"`
+	MDNS           bool     `toml:"mdns" json:"mdns"`
+	MDNSInterfaces []string `toml:"mdns_interfaces,omitempty" json:"mdns_interfaces,omitempty"`
 }
 
 // Validate returns an error if ForwardConfig contains invalid endpoint values.
@@ -263,15 +264,21 @@ func (cfg *ForwardConfig) Merge(target *ForwardConfig) *ForwardConfig {
 	if target.MDNS {
 		result.MDNS = target.MDNS
 	}
+	if len(target.MDNSInterfaces) > 0 {
+		result.MDNSInterfaces = slices.Clone(target.MDNSInterfaces)
+	} else {
+		result.MDNSInterfaces = slices.Clone(result.MDNSInterfaces)
+	}
 	return &result
 }
 
 // DefaultForwardConfig returns the default daemon forwarding configuration.
 func DefaultForwardConfig() *ForwardConfig {
 	return &ForwardConfig{
-		Bind: "",
-		Port: 7788,
-		MDNS: false,
+		Bind:           "",
+		Port:           7788,
+		MDNS:           false,
+		MDNSInterfaces: []string{},
 	}
 }
 
@@ -317,6 +324,7 @@ func DefaultIPRDConfig() *IPRDConfig {
 func ParseConfig(supplied *IPRDConfig) (*IPRDConfig, error) {
 	cfg := DefaultIPRDConfig().Merge(supplied)
 	cfg.normalizeListenInterfaces()
+	cfg.MDNSInterfaces = normalizeInterfaceSelectors(cfg.MDNSInterfaces)
 	return cfg, cfg.Validate()
 }
 

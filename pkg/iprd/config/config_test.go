@@ -321,12 +321,19 @@ func TestWriteConfigUsesPluralListenInterfaces(t *testing.T) {
 }
 
 func TestMDNSRoundTrip(t *testing.T) {
-	cfg, err := iprdconfig.NewIPRDConfigFromBytes([]byte(`mdns = true`))
+	cfg, err := iprdconfig.NewIPRDConfigFromBytes([]byte(`
+mdns = true
+mdns_interfaces = ["lan0", "7", " lan0 ", "vlan20,7"]
+`))
 	if err != nil {
 		t.Fatalf("got error %v, want no error", err)
 	}
 	if !cfg.MDNS {
 		t.Fatal("got MDNS false, want true")
+	}
+	want := []string{"lan0", "7", "vlan20"}
+	if !reflect.DeepEqual(cfg.MDNSInterfaces, want) {
+		t.Fatalf("got mDNS interfaces %v, want %v", cfg.MDNSInterfaces, want)
 	}
 }
 
