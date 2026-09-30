@@ -10,6 +10,12 @@ import (
 
 func updateExistingConfig(curr, target *iprdconfig.IPRDConfig) (*iprdconfig.IPRDConfig, error) {
 	newCfg := curr.Merge(target)
+	if len(target.MDNSInterfaces) > 0 {
+		newCfg.MDNSInterfaces = mergeUnique(curr.MDNSInterfaces, target.MDNSInterfaces)
+		if !slices.Equal(newCfg.MDNSInterfaces, curr.MDNSInterfaces) {
+			log.Info(fmt.Sprintf("updated mdns_interfaces: %v -> %v", curr.MDNSInterfaces, newCfg.MDNSInterfaces))
+		}
+	}
 	if len(target.ListenInterfaces) > 0 {
 		newCfg.ListenInterfaces = mergeUnique(curr.ListenInterfaces, target.ListenInterfaces)
 	}

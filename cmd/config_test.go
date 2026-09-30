@@ -56,6 +56,23 @@ func TestUpdateExistingConfigUpdatesOnlyMatchingInterface(t *testing.T) {
 	}
 }
 
+func TestUpdateExistingConfigMergesMDNSInterfaces(t *testing.T) {
+	curr := iprdconfig.DefaultIPRDConfig()
+	curr.MDNSInterfaces = []string{"lan0", "7"}
+	target := &iprdconfig.IPRDConfig{ForwardConfig: iprdconfig.ForwardConfig{
+		MDNSInterfaces: []string{"7", "vlan20"},
+	}}
+
+	got, err := updateExistingConfig(curr, target)
+	if err != nil {
+		t.Fatalf("updateExistingConfig: %v", err)
+	}
+	want := []string{"lan0", "7", "vlan20"}
+	if !reflect.DeepEqual(got.MDNSInterfaces, want) {
+		t.Fatalf("mDNS interfaces = %v, want %v", got.MDNSInterfaces, want)
+	}
+}
+
 func TestUpdateExistingConfigAutoModeDoesNotRequireInterface(t *testing.T) {
 	curr := iprdconfig.DefaultIPRDConfig()
 	target := &iprdconfig.IPRDConfig{ListenerConfig: iprdconfig.ListenerConfig{Auto: true}}

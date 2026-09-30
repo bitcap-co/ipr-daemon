@@ -44,6 +44,7 @@ var (
 	flForwardBind        = flag.String("b", "", "Bind address for the TCP broadcast stream; target host in status mode. Empty binds all interfaces.")
 	flForwardPort        = flag.Int("p", 0, "Forwarding port for the TCP broadcast stream.")
 	flMDNS               = flag.Bool("mdns", false, "Switch to enable mDNS/DNS-SD advertising of the TCP forwarding endpoint.")
+	flMDNSInterfaces     iprdconfig.FlagSlice
 	flConfigFile         = flag.String("c", "", "Path to TOML configuration file. Overrides any other supplied flags.")
 	flWriteConfig        = flag.String("w", "", "Path to TOML configuration file. Writes the supplied arguments to new config file or updates an existing one.")
 )
@@ -53,6 +54,7 @@ func main() {
 	flag.Var(&flIgnoredDevices, "ignore", "List of source MAC addresses to exclude in BPF filter.\nThis flag supports chaining or comma-separated string.\n(Global: applies to all interface selectors.)")
 	flag.Var(&flNetworkInclusions, "add-network", "List of networks to append to BPF filter. Networks are IPv4 network numbers that can be written as a dotted quad, triple, pair or a single number.\nThis flag supports chaining or comma-separated string.\n(Global: applies to all interface selectors.)")
 	flag.Var(&flNetworkExclusions, "exclude", "List of networks to additionally exclude from BPF filter.\nThis flag supports chaining or comma-separated string.\n(Global: applies to all interface selectors.)")
+	flag.Var(&flMDNSInterfaces, "mdns-interface", "Interface names or indexes on which to advertise mDNS.\nThis flag supports chaining or comma-separated values. The interface owning forward_bind is always included.")
 	flag.Parse()
 
 	// print version information and exit.
@@ -103,9 +105,10 @@ func main() {
 			RotateCaptureFiles: *flRotateCaptureFiles,
 		},
 		ForwardConfig: iprdconfig.ForwardConfig{
-			Bind: *flForwardBind,
-			Port: *flForwardPort,
-			MDNS: *flMDNS,
+			Bind:           *flForwardBind,
+			Port:           *flForwardPort,
+			MDNS:           *flMDNS,
+			MDNSInterfaces: []string(flMDNSInterfaces),
 		},
 	}
 	// config mode
@@ -186,7 +189,7 @@ func main() {
 	// start opted-in mDNS service advertisement (_iprd._tcp.local.)
 	var mdnsAdvertiser *iprd.MDNSAdvertiser
 	if cfg.MDNS {
-		mdnsAdvertiser, err = iprd.NewMDNSAdvertiser(cfg.Bind, cfg.Port, VERSION)
+		mdnsAdvertiser, err = iprd.NewMDNSAdvertiser(cfg.Bind, cfg.Port, VERSION, cfg.MDNSInterfaces)
 		if err != nil {
 			log.Warn(fmt.Sprintf("failed to advertise mDNS service: %v", err))
 		} else {
