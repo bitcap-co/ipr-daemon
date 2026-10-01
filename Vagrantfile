@@ -64,6 +64,16 @@ Vagrant.configure("2") do |config|
   # shown above.
   config.vm.synced_folder ".", "/home/vagrant/ipr-daemon", create: true, disabled: false, id: 'source-code', type: 'rsync', rsync__exclude: [".claude/", ".vagrant/", "dist/"]
 
+  # `vagrant provision` does not synchronize rsync-backed folders first.
+  # Keep the guest source tree current when provisioning an already-running VM.
+  # Local inline commands need an explicit shell for pipelines and conditionals.
+  config.trigger.before :provision do |trigger|
+    trigger.info = "synchronizing source code..."
+    trigger.run = {
+      inline: %q{sh -c 'set -e; state=$(vagrant status default --machine-readable); if printf "%s\n" "$state" | grep -q ",state,running$"; then vagrant rsync default; fi'}
+    }
+  end
+
   config.vm.provider :virtualbox do |vb|
     vb.name = "ipr-daemon-freebsd"
     vb.gui = false
