@@ -30,14 +30,20 @@ go.work.sum
 # Editor/IDE
 # .idea/
 # .vscode/
+.zed/
+.delta/
 
-.debug
+# agents
+.claude/
+
+# debug
+.debug/
 *.pcap*
 !tests/testdata/captures/*.pcap*
 
-# binaries
-iprd-offline
-gen-testdata
+# build output
 dist/
 .vagrant/
 .vagrant-ssh
+iprd-offline
+gen-testdata
