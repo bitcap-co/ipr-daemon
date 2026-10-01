@@ -305,21 +305,27 @@ $(LINUX_ARMV7_S_NAME): .prepare
 ## freebsd : build static FreeBSD/amd64 binary with Vagrant VM
 freebsd: .vagrant-check
 	vagrant provision && vagrant up && vagrant ssh-config >.vagrant-ssh && \
-		scp -F .vagrant-ssh default:$(PROJECT_NAME)/dist/*freebsd* dist/
+		scp -F .vagrant-ssh \
+			default:$(PROJECT_NAME)/dist/$(OUTPUT_BINARY)-$(PROJECT_VERSION)-freebsd-amd64 \
+			default:$(PROJECT_NAME)/dist/$(OUTPUT_BINARY)-$(PROJECT_VERSION)-freebsd-arm64 dist/
 
 ## freebsd-package : build FreeBSD/amd64 .pkg package with Vagrant VM
 .PHONY: freebsd-package
 freebsd-package: .vagrant-check
 	vagrant provision && vagrant up && vagrant ssh-config >.vagrant-ssh && \
 		ssh -F .vagrant-ssh default 'sh -c "PATH=/usr/local/bin:$$PATH; cd $(PROJECT_NAME) && gmake .freebsd-package .freebsd-package-arm64"' && \
-		scp -F .vagrant-ssh default:$(PROJECT_NAME)/dist/*.pkg dist/
+		scp -F .vagrant-ssh \
+			default:$(PROJECT_NAME)/dist/iprd-$(VERSION_PKG)-freebsd-amd64.pkg \
+			default:$(PROJECT_NAME)/dist/iprd-$(VERSION_PKG)-freebsd-arm64.pkg dist/
 
 ## firewall-bundle : build private pfSense/OPNsense installer ZIPs for amd64/arm64
 .PHONY: firewall-bundle
 firewall-bundle: .vagrant-check
 	vagrant provision && vagrant up && vagrant ssh-config >.vagrant-ssh && \
 		ssh -F .vagrant-ssh default 'sh -c "PATH=/usr/local/bin:$$PATH; cd $(PROJECT_NAME) && gmake .firewall-bundle .firewall-bundle-arm64"' && \
-		scp -F .vagrant-ssh default:$(PROJECT_NAME)/dist/*-firewall.zip dist/
+		scp -F .vagrant-ssh \
+			default:$(PROJECT_NAME)/dist/iprd-$(VERSION_PKG)-freebsd-amd64-firewall.zip \
+			default:$(PROJECT_NAME)/dist/iprd-$(VERSION_PKG)-freebsd-arm64-firewall.zip dist/
 
 ## freebsd-shell : get shell in FreeBSD Vagrant VM
 freebsd-shell:
