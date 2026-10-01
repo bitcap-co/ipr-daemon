@@ -64,6 +64,41 @@ but not arbitrary files under `/conf/iprd`. OPNsense syshooks are also external
 to `config.xml`. Back up `/conf/iprd` separately and recreate the hooks after a
 full configuration restore.
 
+## Update to a new release
+
+Obtain the new release's FreeBSD binary for the firewall's architecture
+(`amd64` or `arm64`) and its helper scripts from a trusted source. Extract or
+copy them into a separate staging directory on the firewall, not directly into
+`/conf/iprd` or `/usr/local/libexec/iprd-private`. In a distribution bundle, the
+binary is already named `iprd`; rename a standalone release binary to `iprd`.
+
+Back up `/conf/iprd` separately before updating. Then, as root, run from the
+staging directory containing the new binary and scripts:
+
+```sh
+chmod +x iprd install-firewall.sh bootstrap.sh remove-firewall.sh
+./iprd -version
+./install-firewall.sh ./iprd
+```
+
+No configuration argument is needed for an existing installation. The installer
+preserves `/conf/iprd/iprd.toml`, replaces the persistent binary and checksum,
+updates the bootstrap and platform boot hooks, and restarts the daemon. Expect
+a brief interruption while it restarts. If the new daemon fails to start, the
+installer attempts to restore and start the previous payload when available.
+
+Verify the installed runtime version and daemon status:
+
+```sh
+/usr/local/libexec/iprd-private/iprd -version
+/conf/iprd/bootstrap.sh status
+```
+
+Do not update only the runtime binary: the bootstrap can replace it with the
+persistent copy on the next start. Do not overwrite `/conf/iprd/iprd` manually
+either, because its stored checksum would no longer match. Use the installer
+to keep both copies and the checksum consistent.
+
 ## Remove
 
 Remove the daemon, runtime files, and platform boot hook while preserving the
