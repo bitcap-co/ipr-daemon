@@ -19,7 +19,10 @@ unregister_pfsense_boot_command()
 <?php
 require_once("/etc/inc/config.inc");
 
-$command = "/conf/iprd/bootstrap.sh start";
+$iprdCommands = [
+    "/bin/sh /conf/iprd/bootstrap.sh start",
+    "/conf/iprd/bootstrap.sh start",
+];
 $changed = false;
 
 if (isset($config["system"]["shellcmd"])) {
@@ -28,8 +31,8 @@ if (isset($config["system"]["shellcmd"])) {
         : [$config["system"]["shellcmd"]];
     $filtered = array_values(array_filter(
         $commands,
-        static function ($entry) use ($command) {
-            return $entry !== $command;
+        static function ($entry) use ($iprdCommands) {
+            return !in_array($entry, $iprdCommands, true);
         }
     ));
     if ($filtered !== $commands) {
@@ -43,8 +46,8 @@ if (isset($config["installedpackages"]["shellcmdsettings"]["config"]) &&
     $entries = $config["installedpackages"]["shellcmdsettings"]["config"];
     $filtered = array_values(array_filter(
         $entries,
-        static function ($entry) use ($command) {
-            return ($entry["cmd"] ?? "") !== $command;
+        static function ($entry) use ($iprdCommands) {
+            return !in_array($entry["cmd"] ?? "", $iprdCommands, true);
         }
     ));
     if ($filtered !== $entries) {
@@ -93,7 +96,7 @@ fi
 trap 'rmdir "${LOCK_DIR}" 2>/dev/null' 0 HUP INT TERM
 
 if [ -x "${IPRD_DIR}/bootstrap.sh" ]; then
-    IPRD_LOCK_HELD=1 "${IPRD_DIR}/bootstrap.sh" stop ||
+    IPRD_LOCK_HELD=1 /bin/sh "${IPRD_DIR}/bootstrap.sh" stop ||
         fail "could not stop iprd"
 fi
 

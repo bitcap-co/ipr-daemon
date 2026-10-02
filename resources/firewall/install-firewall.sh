@@ -30,12 +30,19 @@ register_pfsense_boot_command()
 <?php
 require_once("config.inc");
 
-$command = "/conf/iprd/bootstrap.sh start";
+$command = "/bin/sh /conf/iprd/bootstrap.sh start";
+$legacyCommand = "/conf/iprd/bootstrap.sh start";
 if (!isset($config["system"]["shellcmd"])) {
     $config["system"]["shellcmd"] = [];
 } elseif (!is_array($config["system"]["shellcmd"])) {
     $config["system"]["shellcmd"] = [$config["system"]["shellcmd"]];
 }
+$config["system"]["shellcmd"] = array_values(array_filter(
+    $config["system"]["shellcmd"],
+    static function ($entry) use ($legacyCommand) {
+        return $entry !== $legacyCommand;
+    }
+));
 if (!in_array($command, $config["system"]["shellcmd"], true)) {
     $config["system"]["shellcmd"][] = $command;
 }
@@ -45,20 +52,26 @@ if (isset($config["installedpackages"]["shellcmdsettings"])) {
         !is_array($config["installedpackages"]["shellcmdsettings"]["config"])) {
         $config["installedpackages"]["shellcmdsettings"]["config"] = [];
     }
+    $entries = [];
     $found = false;
     foreach ($config["installedpackages"]["shellcmdsettings"]["config"] as $entry) {
-        if (($entry["cmd"] ?? "") === $command) {
-            $found = true;
-            break;
+        $entryCommand = $entry["cmd"] ?? "";
+        if ($entryCommand === $legacyCommand) {
+            continue;
         }
+        if ($entryCommand === $command) {
+            $found = true;
+        }
+        $entries[] = $entry;
     }
     if (!$found) {
-        $config["installedpackages"]["shellcmdsettings"]["config"][] = [
+        $entries[] = [
             "cmd" => $command,
             "cmdtype" => "shellcmd",
             "description" => "Start IPR Daemon",
         ];
     }
+    $config["installedpackages"]["shellcmdsettings"]["config"] = $entries;
 }
 
 $result = write_config("Registered persistent IPR Daemon boot command");
@@ -76,11 +89,11 @@ register_opnsense_hooks()
 
     cat > "${IPRD_DIR}/start-hook.new" <<'EOF' || return 1
 #!/bin/sh
-exec /conf/iprd/bootstrap.sh start
+exec /bin/sh /conf/iprd/bootstrap.sh start
 EOF
     cat > "${IPRD_DIR}/stop-hook.new" <<'EOF' || return 1
 #!/bin/sh
-exec /conf/iprd/bootstrap.sh stop
+exec /bin/sh /conf/iprd/bootstrap.sh stop
 EOF
     install -m 0755 "${IPRD_DIR}/start-hook.new" \
         /usr/local/etc/rc.syshook.d/start/50-iprd || return 1
@@ -99,7 +112,7 @@ restore_previous_payload()
         cp -p "${IPRD_DIR}/bootstrap.sh.previous" "${IPRD_DIR}/bootstrap.sh"
         rm -f "${IPRD_DIR}/installing"
         IPRD_LOCK_HELD=1 IPRD_INSTALLING=1 \
-            "${IPRD_DIR}/bootstrap.sh" start >/dev/null 2>&1 || true
+            /bin/sh "${IPRD_DIR}/bootstrap.sh" start >/dev/null 2>&1 || true
     else
         rm -f "${IPRD_DIR}/installing"
     fi
@@ -143,7 +156,7 @@ trap 'rmdir "${LOCK_DIR}" 2>/dev/null' 0 HUP INT TERM
 
 install -d -m 0700 "${IPRD_DIR}" || fail "could not create ${IPRD_DIR}"
 if [ -f "${IPRD_DIR}/installing" ] && [ -x "${IPRD_DIR}/bootstrap.sh" ]; then
-    IPRD_LOCK_HELD=1 "${IPRD_DIR}/bootstrap.sh" recover ||
+    IPRD_LOCK_HELD=1 /bin/sh "${IPRD_DIR}/bootstrap.sh" recover ||
         fail "could not recover the previous interrupted installation"
 fi
 
@@ -182,7 +195,8 @@ mv -f "${IPRD_DIR}/iprd.sha256.new" "${IPRD_DIR}/iprd.sha256" ||
 mv -f "${IPRD_DIR}/bootstrap.sh.new" "${IPRD_DIR}/bootstrap.sh" ||
     fail "could not install the bootstrap"
 
-if ! IPRD_LOCK_HELD=1 IPRD_INSTALLING=1 "${IPRD_DIR}/bootstrap.sh" restart; then
+if ! IPRD_LOCK_HELD=1 IPRD_INSTALLING=1 \
+    /bin/sh "${IPRD_DIR}/bootstrap.sh" restart; then
     restore_previous_payload
     fail "iprd failed to start; the previous payload was restored when available"
 fi
@@ -201,4 +215,4 @@ esac
 
 echo "Installed IPR Daemon for ${platform}."
 echo "Configuration: ${IPRD_DIR}/iprd.toml"
-echo "Control: ${IPRD_DIR}/bootstrap.sh {start|stop|restart|status}"
+echo "Control: /bin/sh ${IPRD_DIR}/bootstrap.sh {start|stop|restart|status}"

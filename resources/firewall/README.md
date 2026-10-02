@@ -47,14 +47,16 @@ On OPNsense, the installer creates native start and stop syshooks under
 ## Operation
 
 ```sh
-/conf/iprd/bootstrap.sh status
-/conf/iprd/bootstrap.sh restart
-/conf/iprd/bootstrap.sh stop
+/bin/sh /conf/iprd/bootstrap.sh status
+/bin/sh /conf/iprd/bootstrap.sh restart
+/bin/sh /conf/iprd/bootstrap.sh stop
 ```
 
 Edit `/conf/iprd/iprd.toml`, then restart the daemon to apply changes. The
 bootstrap verifies the persistent binary against `/conf/iprd/iprd.sha256` before
-installing or starting it.
+installing or starting it. Invoke the bootstrap through `/bin/sh` because `/conf`
+is persistent but may be mounted with execution disabled, notably on pfSense ZFS
+installations. Do not remount `/conf` with execution enabled.
 
 The locally generated checksum detects later payload corruption; it does not
 establish release authenticity. Obtain the binary from a trusted release source.
@@ -91,7 +93,7 @@ Verify the installed runtime version and daemon status:
 
 ```sh
 /usr/local/libexec/iprd-private/iprd -version
-/conf/iprd/bootstrap.sh status
+/bin/sh /conf/iprd/bootstrap.sh status
 ```
 
 Do not update only the runtime binary: the bootstrap can replace it with the
