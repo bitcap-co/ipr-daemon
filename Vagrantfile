@@ -62,7 +62,7 @@ Vagrant.configure("2") do |config|
   # by making sure your Vagrantfile isn't accessible to the vagrant box.
   # If you use this you may want to enable additional shared subfolders as
   # shown above.
-  config.vm.synced_folder ".", "/home/vagrant/ipr-daemon", create: true, disabled: false, id: 'source-code', type: 'rsync', rsync__exclude: [".claude/", ".vagrant/", "dist/"]
+  config.vm.synced_folder ".", "/home/vagrant/ipr-daemon", create: true, disabled: false, id: 'source-code', type: 'rsync', rsync__args: ["--verbose", "--archive", "--delete", "--compress", "--links"], rsync__exclude: [".claude/", ".vagrant/", "dist/"]
 
   # `vagrant provision` does not synchronize rsync-backed folders first.
   # Keep the guest source tree current when provisioning an already-running VM.
