@@ -26,7 +26,7 @@ no_root_network = false
 # This is similar to forward_known but applies at the BPF filter level instead.
 # Packets outside of these ports are dropped and not logged or captured.
 filter_known_ports = false
-# ignored_devices is a list of source MAC addresses to exclude in BPF filter.
+# ignored_devices is a list of MAC addresses to exclude in BPF filter.
 ignored_devices = [""]
 # network_inclusions is a list of networks to append in BPF filter.
 # networks are IPv4 network numbers that can be written as
