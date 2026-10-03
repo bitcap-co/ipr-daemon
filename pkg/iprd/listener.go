@@ -107,7 +107,7 @@ func (l *IPRListener) setupBPF(rootNetwork string) error {
 	}
 	fmt.Fprintf(&srcNetworks, ")")
 
-	// gather source MAC addresses to exclude
+	// gather MAC addresses to exclude
 	var ignored = []string{}
 	for _, mac := range l.cfg.IgnoredDevices {
 		if m := ParseMACAddress(mac); m != "" {
@@ -118,7 +118,7 @@ func (l *IPRListener) setupBPF(rootNetwork string) error {
 	// build ignored devices as BPF filter string
 	if len(ignored) > 0 {
 		var ignoredAddrs strings.Builder
-		ignoredAddrs.WriteString(" and not (ether src ")
+		ignoredAddrs.WriteString(" and not (ether host ")
 		for i, mac := range ignored {
 			sep := " or "
 			if i == len(ignored)-1 {
