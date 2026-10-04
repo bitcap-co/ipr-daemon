@@ -200,7 +200,7 @@ func (l *IPRListener) closeHandle() {
 	}
 }
 
-// Activate sets a new active pcap handle on iface. This must be called once before Listen().
+// Activate creates a new active handle on iface. Exclusive for use with Listen() and must be called once before.
 func (l *IPRListener) Activate() error {
 	l.telemetry.setState(ListenerStateStarting, nil)
 	if err := l.setupHandle(); err != nil {
@@ -210,6 +210,21 @@ func (l *IPRListener) Activate() error {
 	}
 	l.telemetry.setState(ListenerStateActive, nil)
 	return nil
+}
+
+// Listen starts reading packets from the active handle and sends raw capture
+// events to Packets() channel. It blocks until the handle errors which then closes the handle and stops.
+// Deprecated: Use Run() instead for persistent reconnects on handle errors/interface changes.
+func (l *IPRListener) Listen() {
+	defer l.closeHandle()
+	defer l.telemetry.setState(ListenerStateStopped, nil)
+	l.telemetry.setState(ListenerStateActive, nil)
+	l.log.Info("start listen...")
+	if err := l.capture(context.Background()); err != nil {
+		l.telemetry.captureErrors.Add(1)
+		l.telemetry.setState(ListenerStateStopped, err)
+		l.log.Error(fmt.Errorf("capture stopped: %w", err))
+	}
 }
 
 // Run supervises capture on the interface: it activates a handle, captures until the
@@ -272,21 +287,6 @@ func (l *IPRListener) activateForRun() error {
 		l.iface = nil
 	}
 	return l.setupHandle()
-}
-
-// Listen starts reading packets from the active handle and sends raw capture
-// events to Packets(). It blocks until the handle errors. For a resilient,
-// self-reconnecting listener use Run().
-func (l *IPRListener) Listen() {
-	defer l.closeHandle()
-	defer l.telemetry.setState(ListenerStateStopped, nil)
-	l.telemetry.setState(ListenerStateActive, nil)
-	l.log.Info("start listen...")
-	if err := l.capture(context.Background()); err != nil {
-		l.telemetry.captureErrors.Add(1)
-		l.telemetry.setState(ListenerStateStopped, err)
-		l.log.Error(fmt.Errorf("capture stopped: %w", err))
-	}
 }
 
 // capture reads packets from the active handle until ctx is cancelled (returns nil) or
