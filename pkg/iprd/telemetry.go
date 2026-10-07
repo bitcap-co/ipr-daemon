@@ -47,7 +47,7 @@ type ListenerStatus struct {
 	CaptureErrors      uint64        `json:"captureErrors"`
 	Reconnects         uint64        `json:"reconnects"`
 	LastError          string        `json:"lastError,omitempty"`
-	LastErrorAt        time.Time     `json:"lastErrorAt,omitempty"`
+	LastErrorAt        time.Time     `json:"lastErrorAt,omitzero"`
 }
 
 // ManagerStatus is a concurrency-safe snapshot of a ListenerManager. Degraded
@@ -64,10 +64,10 @@ type ManagerStatus struct {
 	CaptureWriteErrors  uint64           `json:"captureWriteErrors"`
 	Packets             PacketCounters   `json:"packets"`
 	Listeners           []ListenerStatus `json:"listeners"`
-	LastPacketAt        time.Time        `json:"lastPacketAt,omitempty"`
-	LastReportAt        time.Time        `json:"lastReportAt,omitempty"`
+	LastPacketAt        time.Time        `json:"lastPacketAt,omitzero"`
+	LastReportAt        time.Time        `json:"lastReportAt,omitzero"`
 	LastError           string           `json:"lastError,omitempty"`
-	LastErrorAt         time.Time        `json:"lastErrorAt,omitempty"`
+	LastErrorAt         time.Time        `json:"lastErrorAt,omitzero"`
 }
 
 type managerTelemetry struct {
