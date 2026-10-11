@@ -23,6 +23,7 @@ const (
 	Auradine    MinerTypeHint = "auradine"
 	IPollo      MinerTypeHint = "ipollo"
 	HiveGPU     MinerTypeHint = "hivegpu"
+	IBeLink     MinerTypeHint = "ibelink"
 )
 
 var (
@@ -39,6 +40,7 @@ var (
 		12345: Auradine,
 		54321: IPollo,
 		42069: HiveGPU,
+		6667:  IBeLink,
 	}
 	// msgPatterns is a map of MinerTypeHint to regex UDP payload patterns.
 	msgPatterns = map[MinerTypeHint]*regexp.Regexp{
