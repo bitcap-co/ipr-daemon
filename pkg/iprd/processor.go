@@ -13,8 +13,9 @@ import (
 )
 
 const (
-	defaultRecordCapacity       = 10
-	recordMinAge          int64 = 10_000
+	defaultRecordCapacity             = 10
+	recordMinAge                int64 = 10_000
+	maxDecompressedDatagramSize       = 64 * 1024
 
 	zlibSealMinerOffset int = 8
 )
@@ -77,6 +78,53 @@ func (p *PacketProcessor) isDuplicateAt(packet *IPReportPacket, observedAt time.
 	return false
 }
 
+func hasZlibHeader(data []byte) bool {
+	if len(data) < 2 {
+		return false
+	}
+
+	cmf := uint16(data[0])
+	flg := uint16(data[1])
+	return cmf&0x0f == 8 && cmf>>4 <= 7 && (cmf<<8|flg)%31 == 0
+}
+
+func (p *PacketProcessor) decompressDatagram(packet *IPReportPacket) error {
+	for _, offset := range zlibOffsets {
+		if offset >= len(packet.Datagram) || !hasZlibHeader(packet.Datagram[offset:]) {
+			continue
+		}
+
+		r, err := zlib.NewReader(bytes.NewReader(packet.Datagram[offset:]))
+		if err != nil {
+			continue
+		}
+		decompressed, err := io.ReadAll(io.LimitReader(r, maxDecompressedDatagramSize+1))
+		closeErr := r.Close()
+		if err != nil || closeErr != nil {
+			return fmt.Errorf("zlib read - %w", errors.Join(err, closeErr))
+		}
+		if len(decompressed) > maxDecompressedDatagramSize {
+			return fmt.Errorf("decompressed datagram exceeds %d bytes", maxDecompressedDatagramSize)
+		}
+		packet.Datagram = decompressed
+		return nil
+	}
+	return nil
+}
+
+func (p *PacketProcessor) removeInvalidUTF8(data []byte) []byte {
+	cleaned := data[:0]
+
+	for len(data) > 0 {
+		r, size := utf8.DecodeRune(data)
+		if r != utf8.RuneError || size != 1 {
+			cleaned = append(cleaned, data[:size]...)
+		}
+		data = data[size:]
+	}
+	return cleaned
+}
+
 // ParseIPReportPacket analyzes packet for a valid IP report packet. Returns an error if the packet is invalid or a duplicate.
 func (p *PacketProcessor) ParseIPReportPacket(packet *IPReportPacket) error {
 	return p.parseIPReportPacketAt(packet, time.Now())
@@ -97,32 +145,19 @@ func (p *PacketProcessor) parseIPReportPacketAt(packet *IPReportPacket, observed
 		return ErrDuplicatePacket
 	}
 
-	// check UDP payload for encoding/compression
 	if !utf8.Valid(packet.Datagram) {
-		// payload is not valid UTF-8, check for start of zlib payload given a list of known offsets
-		zlibStart := -1
-		for _, offset := range zlibOffsets {
-			if offset < len(packet.Datagram) && packet.Datagram[offset] == byte(0x78) {
-				zlibStart = offset
-				break
+		if err := p.decompressDatagram(packet); err != nil {
+			return fmt.Errorf("failed to decompress datagram - %w", err)
+		}
+		if !utf8.Valid(packet.Datagram) {
+			packet.Datagram = p.removeInvalidUTF8(packet.Datagram)
+			if len(packet.Datagram) == 0 {
+				return fmt.Errorf("failed to decode datagram - invalid UTF-8")
 			}
 		}
-		if zlibStart == -1 {
-			return fmt.Errorf("failed to decode payload - invalid utf8")
-		}
-		b := bytes.NewReader(packet.Datagram[zlibStart:])
-		r, err := zlib.NewReader(b)
-		if err != nil {
-			return fmt.Errorf("failed to decompress payload - %w", err)
-		}
-		defer r.Close()
-		packet.Datagram, err = io.ReadAll(r)
-		if err != nil {
-			return fmt.Errorf("zlib read - %w", err)
-		}
 	}
-
 	packet.Payload = string(packet.Datagram)
+
 	// Ignore packets that don't contain their source IP
 	if !bytes.Contains(packet.Datagram, []byte(packet.SrcIP)) {
 		// edge case: Elphapex sends static IP report payload without source IP
