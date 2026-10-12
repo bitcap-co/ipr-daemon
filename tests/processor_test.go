@@ -80,26 +80,6 @@ func TestPacketProcessorRejectsNilPacket(t *testing.T) {
 	}
 }
 
-func TestPacketProcessorCleansInvalidUTF8FromIBeLinkPacket(t *testing.T) {
-	processor := iprd.NewPacketProcessor(nil)
-	packet := validIPReportPacket("aa:bb:cc:dd:ee:04", 1, 6667)
-	packet.Datagram = append([]byte{'A', 'Z', 'Z', 0xf0, 0x01, 0x00, 0x00, 0x00}, []byte(packet.SrcIP)...)
-	want := append([]byte{'A', 'Z', 'Z', 0x01, 0x00, 0x00, 0x00}, []byte(packet.SrcIP)...)
-
-	if err := processor.ParseIPReportPacket(packet); err != nil {
-		t.Fatalf("ParseIPReportPacket() error = %v", err)
-	}
-	if !bytes.Equal(packet.Datagram, want) {
-		t.Fatalf("cleaned datagram = %v, want %v", packet.Datagram, want)
-	}
-	if packet.Payload != string(want) {
-		t.Fatalf("payload = %q, want %q", packet.Payload, want)
-	}
-	if packet.MinerHint != iprd.IBeLink {
-		t.Fatalf("miner hint = %v, want %v", packet.MinerHint, iprd.IBeLink)
-	}
-}
-
 func TestPacketProcessorLeavesValidPlaintextBeginningWithXUncompressed(t *testing.T) {
 	processor := iprd.NewPacketProcessor(nil)
 	packet := validIPReportPacket("aa:bb:cc:dd:ee:05", 1, 14235)
@@ -118,13 +98,13 @@ func TestPacketProcessorDoesNotMistakeInvalidPlaintextForZlib(t *testing.T) {
 	processor := iprd.NewPacketProcessor(nil)
 	packet := validIPReportPacket("aa:bb:cc:dd:ee:06", 1, 14235)
 	packet.Datagram = append([]byte{0xff, 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'x', ' '}, []byte(packet.SrcIP)...)
-	want := append([]byte("abcdefgx "), []byte(packet.SrcIP)...)
+	want := bytes.Clone(packet.Datagram)
 
 	if err := processor.ParseIPReportPacket(packet); err != nil {
 		t.Fatalf("ParseIPReportPacket() error = %v", err)
 	}
 	if !bytes.Equal(packet.Datagram, want) {
-		t.Fatalf("cleaned datagram = %v, want %v", packet.Datagram, want)
+		t.Fatalf("datagram = %v, want %v", packet.Datagram, want)
 	}
 }
 
@@ -191,7 +171,7 @@ func TestPacketProcessorLimitsDecompressedDatagramSize(t *testing.T) {
 
 			err := processor.ParseIPReportPacket(packet)
 			if tc.wantErr {
-				if err == nil || !strings.Contains(err.Error(), "decompressed datagram exceeds") {
+				if err == nil || !errors.Is(err, iprd.ErrPacketTooLarge) {
 					t.Fatalf("ParseIPReportPacket() error = %v, want size limit error", err)
 				}
 				return
@@ -203,16 +183,6 @@ func TestPacketProcessorLimitsDecompressedDatagramSize(t *testing.T) {
 				t.Fatalf("decompressed datagram size = %d, want %d", len(packet.Datagram), tc.size)
 			}
 		})
-	}
-}
-
-func TestPacketProcessorRejectsEntirelyInvalidUTF8(t *testing.T) {
-	processor := iprd.NewPacketProcessor(nil)
-	packet := validIPReportPacket("aa:bb:cc:dd:ee:08", 1, 14235)
-	packet.Datagram = []byte{0xff, 0xfe}
-
-	if err := processor.ParseIPReportPacket(packet); err == nil {
-		t.Fatal("ParseIPReportPacket() returned nil error")
 	}
 }
 

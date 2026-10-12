@@ -7,27 +7,29 @@ import (
 	"fmt"
 	"io"
 	"time"
-	"unicode/utf8"
 
 	"github.com/gopacket/gopacket"
 )
 
 const (
-	defaultRecordCapacity             = 10
-	recordMinAge                int64 = 10_000
-	maxDecompressedDatagramSize       = 64 * 1024
+	defaultRecordCapacity       = 10
+	minimumRecordAge      int64 = 10_000
+	maxDatagramSize             = 64 * 1024
 
-	zlibSealMinerOffset int = 8
+	sealMinerPayloadOffset int = 8
 )
 
 var (
-	// ErrDuplicatePacket indicates that the processor recently handled an IP
+	// ErrDuplicatePacket is returned when the processor recently handled an IP
 	// report from the same source MAC address.
 	ErrDuplicatePacket = errors.New("duplicate packet")
-	errNoSourceIP      = errors.New("no source IP found in datagram")
+	// ErrNoSourceIP is returned when the packet datagram does not contain it's source IP.
+	ErrNoSourceIP = errors.New("no source IP found")
+	// ErrPacketTooLarge is returned when the packet datagram is too large.
+	ErrPacketTooLarge = errors.New("packet too large")
 
-	// known zlib paylaod offsets
-	zlibOffsets = []int{0, zlibSealMinerOffset}
+	// seek offsets for zlib header
+	zlibSeekOffsets = []int{0, sealMinerPayloadOffset}
 )
 
 // PacketProcessor validates IP report packets and owns their duplicate record.
@@ -69,60 +71,42 @@ func (p *PacketProcessor) isDuplicateAt(packet *IPReportPacket, observedAt time.
 	if p.record.Length() == 0 {
 		return false
 	}
-	key := packet.SrcMAC
-	if ent, ok := p.record.Get(key); ok {
-		if observedAt.UnixMilli()-ent.UpdatedAt <= recordMinAge {
+	if ent, ok := p.record.Get(packet.SrcMAC); ok {
+		if observedAt.UnixMilli()-ent.UpdatedAt <= minimumRecordAge {
 			return true
 		}
 	}
 	return false
 }
 
-func hasZlibHeader(data []byte) bool {
-	if len(data) < 2 {
-		return false
-	}
-
-	cmf := uint16(data[0])
-	flg := uint16(data[1])
-	return cmf&0x0f == 8 && cmf>>4 <= 7 && (cmf<<8|flg)%31 == 0
-}
-
-func (p *PacketProcessor) decompressDatagram(packet *IPReportPacket) error {
-	for _, offset := range zlibOffsets {
+// findCompressedStream returns the start of the compressed stream if found, otherwise -1
+func (p *PacketProcessor) findCompressedStream(packet *IPReportPacket) int {
+	for _, offset := range zlibSeekOffsets {
 		if offset >= len(packet.Datagram) || !hasZlibHeader(packet.Datagram[offset:]) {
 			continue
 		}
-
-		r, err := zlib.NewReader(bytes.NewReader(packet.Datagram[offset:]))
-		if err != nil {
-			continue
-		}
-		decompressed, err := io.ReadAll(io.LimitReader(r, maxDecompressedDatagramSize+1))
-		closeErr := r.Close()
-		if err != nil || closeErr != nil {
-			return fmt.Errorf("zlib read - %w", errors.Join(err, closeErr))
-		}
-		if len(decompressed) > maxDecompressedDatagramSize {
-			return fmt.Errorf("decompressed datagram exceeds %d bytes", maxDecompressedDatagramSize)
-		}
-		packet.Datagram = decompressed
-		return nil
+		return offset
 	}
-	return nil
+	return -1
 }
 
-func (p *PacketProcessor) removeInvalidUTF8(data []byte) []byte {
-	cleaned := data[:0]
-
-	for len(data) > 0 {
-		r, size := utf8.DecodeRune(data)
-		if r != utf8.RuneError || size != 1 {
-			cleaned = append(cleaned, data[:size]...)
-		}
-		data = data[size:]
+func (p *PacketProcessor) decompressDatagram(packet *IPReportPacket, offset int) error {
+	r, err := zlib.NewReader(bytes.NewReader(packet.Datagram[offset:]))
+	if err != nil {
+		// A valid-looking two-byte header can occur in an uncompressed binary
+		// datagram. Treat a stream that cannot be opened as uncompressed.
+		return nil
 	}
-	return cleaned
+	decompressed, err := io.ReadAll(io.LimitReader(r, maxDatagramSize+1))
+	closeErr := r.Close()
+	if err != nil || closeErr != nil {
+		return fmt.Errorf("zlib read - %w", errors.Join(err, closeErr))
+	}
+	if len(decompressed) > maxDatagramSize {
+		return ErrPacketTooLarge
+	}
+	packet.Datagram = decompressed
+	return nil
 }
 
 // ParseIPReportPacket analyzes packet for a valid IP report packet. Returns an error if the packet is invalid or a duplicate.
@@ -135,35 +119,29 @@ func (p *PacketProcessor) parseIPReportPacketAt(packet *IPReportPacket, observed
 		return fmt.Errorf("packet must not be nil")
 	}
 
-	// retrieve miner hint from destination port
+	// identify miner from packet destination port
 	if minerHint, ok := GetMinerHintFromPort(packet.DstPort); ok {
 		packet.MinerHint = minerHint
 	}
 
-	// throw error if duplicate packet
+	// check if packet is a duplicate
 	if p.isDuplicateAt(packet, observedAt) {
 		return ErrDuplicatePacket
 	}
 
-	if !utf8.Valid(packet.Datagram) {
-		if err := p.decompressDatagram(packet); err != nil {
-			return fmt.Errorf("failed to decompress datagram - %w", err)
-		}
-		if !utf8.Valid(packet.Datagram) {
-			packet.Datagram = p.removeInvalidUTF8(packet.Datagram)
-			if len(packet.Datagram) == 0 {
-				return fmt.Errorf("failed to decode datagram - invalid UTF-8")
-			}
+	// check packet datagram for compression
+	if start := p.findCompressedStream(packet); start != -1 {
+		if err := p.decompressDatagram(packet, start); err != nil {
+			return fmt.Errorf("failed to decompress datagram: %w", err)
 		}
 	}
 	packet.Payload = string(packet.Datagram)
 
-	// Ignore packets that don't contain their source IP
+	// validate IP report packet; contains source IP
 	if !bytes.Contains(packet.Datagram, []byte(packet.SrcIP)) {
-		// edge case: Elphapex sends static IP report payload without source IP
 		pattern, ok := GetMsgPatternFromHint(Elphapex)
 		if packet.MinerHint != Elphapex || !ok || !pattern.Match(packet.Datagram) {
-			return errNoSourceIP
+			return ErrNoSourceIP
 		}
 	}
 	// update record with new IP report entry
@@ -174,4 +152,14 @@ func (p *PacketProcessor) parseIPReportPacketAt(packet *IPReportPacket, observed
 		CreatedAt: packet.Timestamp.UnixMilli(),
 	}, observedAt)
 	return nil
+}
+
+func hasZlibHeader(data []byte) bool {
+	if len(data) < 2 {
+		return false
+	}
+
+	cmf := uint16(data[0])
+	flg := uint16(data[1])
+	return cmf&0x0f == 8 && cmf>>4 <= 7 && (cmf<<8|flg)%31 == 0
 }
