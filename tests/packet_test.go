@@ -38,3 +38,41 @@ func TestNewIPRBroadcastMessageRejectsNilReport(t *testing.T) {
 		t.Fatal("NewIPRBroadcastMessage(nil) returned nil error")
 	}
 }
+
+func TestIPReportPacketValidUTF8(t *testing.T) {
+	for _, test := range []struct {
+		name     string
+		datagram []byte
+		expected string
+	}{
+		{
+			name:     "valid UTF-8",
+			datagram: []byte("Hello, 世界"),
+			expected: "Hello, 世界",
+		},
+		{
+			name:     "invalid UTF-8",
+			datagram: []byte("Hello, \xff"),
+			expected: "Hello, ",
+		},
+		{
+			name:     "empty",
+			datagram: []byte{},
+			expected: "",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			original := bytes.Clone(test.datagram)
+			report := &iprd.IPReportPacket{
+				Datagram: test.datagram,
+			}
+			valid := report.ValidUTF8()
+			if valid != test.expected {
+				t.Fatalf("ValidUTF8 returned %q, expected %q", valid, test.expected)
+			}
+			if !bytes.Equal(report.Datagram, original) {
+				t.Fatalf("ValidUTF8 modified datagram: got %v, want %v", report.Datagram, original)
+			}
+		})
+	}
+}

@@ -2,7 +2,9 @@ package iprd
 
 import (
 	"fmt"
+	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/goccy/go-json"
 	"github.com/google/uuid"
@@ -82,6 +84,25 @@ func (r IPReportPacket) String() string {
 		r.SrcMAC, r.DstMAC,
 		r.SrcPort, r.DstPort,
 		r.CaptureLength, r.MinerHint)
+}
+
+// ValidUTF8 returns the packet's datagram as a valid UTF-8 string, removing invalid/null bytes.
+func (r IPReportPacket) ValidUTF8() string {
+	if utf8.Valid(r.Datagram) {
+		return string(r.Datagram)
+	}
+
+	data := r.Datagram
+	var valid strings.Builder
+	valid.Grow(len(data))
+	for len(data) > 0 {
+		r, size := utf8.DecodeRune(data)
+		if r != 0 && r != utf8.RuneError || size != 1 {
+			valid.Write(data[:size])
+		}
+		data = data[size:]
+	}
+	return valid.String()
 }
 
 // Marshal creates and serializes an IPRBroadcastMessage.
