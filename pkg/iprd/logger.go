@@ -34,6 +34,13 @@ func (l *IPRLogger) Debug(msg string) {
 	l.Printf(debugColor, msg)
 }
 
+// IfDebug logs the message if debug flag is enabled.
+func (l *IPRLogger) IfDebug(msg string, debug bool) {
+	if debug {
+		l.Debug(msg)
+	}
+}
+
 func (l *IPRLogger) Info(raw string) {
 	if msg, ok := sanitizeMessage(raw); ok {
 		l.Printf(infoColor, msg)

@@ -83,13 +83,12 @@ func dumpPcap(fd string, debug bool, filter filterConfig) error {
 			return nil
 		}
 		prefix := fmt.Sprintf("%s cnt:%d", packet.Timestamp.Format("2006-01-02 15:04:05"), packet.Number)
-		if debug {
-			log.Debug(fmt.Sprintf("%s\n", packet.Packet.Dump()))
-		}
+		log.IfDebug(fmt.Sprintf("%s\n", packet.Packet.Dump()), debug)
 		if packet.Report == nil {
 			log.Error(fmt.Errorf("%s iface:%s - failed to decode packet: %w", prefix, packet.InterfaceName, packet.Err))
 			return nil
 		}
+		log.IfDebug(fmt.Sprintf("UTF-8: %q\n", packet.Report.ValidUTF8()), debug)
 		if packet.Err != nil {
 			if errors.Is(packet.Err, iprd.ErrDuplicatePacket) {
 				if debug {
