@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -94,6 +95,47 @@ func TestFrameAnonymizesHeadersAndPayloadConsistently(t *testing.T) {
 	}
 	if !bytes.Contains(udp.Payload, []byte(ip.SrcIP.To4())) || !bytes.Contains(udp.Payload, []byte(eth.SrcMAC)) {
 		t.Fatal("binary payload addresses do not match header mappings")
+	}
+}
+
+func TestFrameAnonymizesCompactMACPayload(t *testing.T) {
+	const (
+		originalIP  = "192.168.50.25"
+		originalMAC = "aa:bb:cc:dd:ee:25"
+	)
+	payload := []byte("device=" + strings.ToUpper(strings.ReplaceAll(originalMAC, ":", "")))
+
+	data, err := newAddressAnonymizer().frame(testFrameWithPayload(t, originalIP, originalMAC, payload), layers.LinkTypeEthernet)
+	if err != nil {
+		t.Fatal(err)
+	}
+	packet := gopacket.NewPacket(data, layers.LayerTypeEthernet, gopacket.Default)
+	udpPayload := packet.Layer(layers.LayerTypeUDP).(*layers.UDP).Payload
+	if bytes.Contains(udpPayload, []byte("AABBCCDDEE25")) {
+		t.Fatalf("payload retains compact source MAC: %q", udpPayload)
+	}
+	if !bytes.Contains(udpPayload, []byte("020000000001")) {
+		t.Fatalf("payload does not contain compact mapped source MAC: %q", udpPayload)
+	}
+}
+
+func TestPlainPayloadAnonymizesSensitiveJSONStrings(t *testing.T) {
+	anonymizer := newAddressAnonymizer()
+	payload := []byte(`{"MainBoardSN":"S127200251200340","BoardSnArray":[{"SN":"S124600251201353"},{"SN":"S124600251201353"}],"Pools":[{"URL":"stratum.example.com:3333","Worker":"account.private-worker","Password":"secret"}]}`)
+
+	anonymized := anonymizer.plainPayload(payload)
+	for _, sensitive := range []string{"S127200251200340", "S124600251201353", "stratum.example.com", "account.private-worker", "secret"} {
+		if bytes.Contains(anonymized, []byte(sensitive)) {
+			t.Fatalf("payload retains sensitive value %q: %s", sensitive, anonymized)
+		}
+	}
+	for _, replacement := range []string{`"MainBoardSN":"serial-1"`, `"SN":"serial-2"`, `"URL":"pool-1.example.invalid:3333"`, `"Worker":"worker-1"`, `"Password":"password-1"`} {
+		if !bytes.Contains(anonymized, []byte(replacement)) {
+			t.Fatalf("payload does not contain %s: %s", replacement, anonymized)
+		}
+	}
+	if got := bytes.Count(anonymized, []byte(`"SN":"serial-2"`)); got != 2 {
+		t.Fatalf("repeated serial replacement count = %d, want 2: %s", got, anonymized)
 	}
 }
 

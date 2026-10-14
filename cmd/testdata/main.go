@@ -1,6 +1,6 @@
 // gen-testdata publishes a live capture file (.pcap or .pcapng) to the tests/testdata/captures directory as a replayable test fixture.
-// PCAP files are automatically anonymized before publishing: replaces interface names, IP addresses, MAC addresses in
-// frame data and payloads with incremented generic values instead.
+// PCAP files are automatically anonymized before publishing: replaces interface names, network addresses, serial
+// numbers, and pool credentials in frame data and payloads with generic values instead.
 package main
 
 import (
@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"compress/zlib"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"flag"
 	"fmt"
@@ -33,10 +34,12 @@ var (
 const maxDecompressedPayloadSize = 64 * 1024 * 1024
 
 var (
-	pcapNGMagic      = []byte{0x0a, 0x0d, 0x0d, 0x0a}
-	payloadIPv4RE    = regexp.MustCompile(`\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\b`)
-	payloadMACRE     = regexp.MustCompile(`(?i)\b(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}\b`)
-	payloadIPv6Token = regexp.MustCompile(`(?i)\b[0-9a-f:.]*:[0-9a-f:.]+\b`)
+	pcapNGMagic              = []byte{0x0a, 0x0d, 0x0d, 0x0a}
+	payloadIPv4RE            = regexp.MustCompile(`\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\b`)
+	payloadMACRE             = regexp.MustCompile(`(?i)\b(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}\b`)
+	payloadCompactMACRE      = regexp.MustCompile(`(?i)\b[0-9a-f]{12}\b`)
+	payloadIPv6Token         = regexp.MustCompile(`(?i)\b[0-9a-f:.]*:[0-9a-f:.]+\b`)
+	payloadSensitiveStringRE = regexp.MustCompile(`(?i)"(mainboardsn|boardsn|sn|serial|serial[_-]?number|serial[_-]?no|pool|pool[_-]?url|url|worker|worker[_-]?name|user|user[_-]?name|password|pass)"(\s*:\s*)"([^"\\]*(?:\\.[^"\\]*)*)"`)
 )
 
 func main() {
@@ -238,20 +241,24 @@ func anonymizePCAPNG(reader io.Reader, writer io.Writer, anonymizer *addressAnon
 }
 
 type addressAnonymizer struct {
-	ips      map[string]net.IP
-	macs     map[string]net.HardwareAddr
-	nextIPv4 uint32
-	nextIPv6 uint64
-	nextMAC  uint64
+	ips             map[string]net.IP
+	macs            map[string]net.HardwareAddr
+	sensitiveValues map[string]string
+	nextIPv4        uint32
+	nextIPv6        uint64
+	nextMAC         uint64
+	nextSensitive   map[string]uint64
 }
 
 func newAddressAnonymizer() *addressAnonymizer {
 	return &addressAnonymizer{
-		ips:      make(map[string]net.IP),
-		macs:     make(map[string]net.HardwareAddr),
-		nextIPv4: 1,
-		nextIPv6: 1,
-		nextMAC:  1,
+		ips:             make(map[string]net.IP),
+		macs:            make(map[string]net.HardwareAddr),
+		sensitiveValues: make(map[string]string),
+		nextIPv4:        1,
+		nextIPv6:        1,
+		nextMAC:         1,
+		nextSensitive:   make(map[string]uint64),
 	}
 }
 
@@ -294,6 +301,51 @@ func (a *addressAnonymizer) mac(original net.HardwareAddr) net.HardwareAddr {
 
 func (a *addressAnonymizer) text(value string) string {
 	return string(a.plainPayload([]byte(value)))
+}
+
+func (a *addressAnonymizer) sensitiveValue(field, original string) string {
+	field = strings.ToLower(field)
+	category := field
+	switch field {
+	case "mainboardsn", "boardsn", "sn", "serial", "serialnumber", "serial_number", "serial-number", "serialno", "serial_no", "serial-no":
+		category = "serial"
+	case "pool", "poolurl", "pool_url", "pool-url", "url":
+		category = "pool"
+	case "worker", "workername", "worker_name", "worker-name", "user", "username", "user_name", "user-name":
+		category = "worker"
+	case "password", "pass":
+		category = "password"
+	}
+	key := category + "\x00" + original
+	if replacement, ok := a.sensitiveValues[key]; ok {
+		return replacement
+	}
+
+	a.nextSensitive[category]++
+	sequence := a.nextSensitive[category]
+	var replacement string
+	switch category {
+	case "pool":
+		replacement = fmt.Sprintf("pool-%d.example.invalid:3333", sequence)
+	default:
+		replacement = fmt.Sprintf("%s-%d", category, sequence)
+	}
+	a.sensitiveValues[key] = replacement
+	return replacement
+}
+
+func (a *addressAnonymizer) sensitiveStrings(payload []byte) []byte {
+	return payloadSensitiveStringRE.ReplaceAllFunc(payload, func(match []byte) []byte {
+		parts := payloadSensitiveStringRE.FindSubmatch(match)
+		if len(parts) != 4 {
+			return match
+		}
+		replacement := a.sensitiveValue(string(parts[1]), string(parts[3]))
+		prefixLength := len(parts[0]) - len(parts[3]) - 1
+		result := append([]byte(nil), match[:prefixLength]...)
+		result = append(result, replacement...)
+		return append(result, '"')
+	})
 }
 
 func (a *addressAnonymizer) payload(payload []byte) ([]byte, error) {
@@ -345,14 +397,27 @@ func zlibPayloadOffset(payload []byte) int {
 	return -1
 }
 
+func parsePayloadMAC(value []byte) (net.HardwareAddr, error) {
+	if len(value) != 12 {
+		return net.ParseMAC(string(value))
+	}
+	decoded := make([]byte, 6)
+	if _, err := hex.Decode(decoded, value); err != nil {
+		return nil, err
+	}
+	return net.HardwareAddr(decoded), nil
+}
+
 func (a *addressAnonymizer) plainPayload(payload []byte) []byte {
 	result := append([]byte(nil), payload...)
 
 	// Discover textual values first so binary occurrences of the same address use
 	// the same mapping as packet headers and human-readable payload fields.
-	for _, match := range payloadMACRE.FindAll(result, -1) {
-		if parsed, err := net.ParseMAC(string(match)); err == nil {
-			a.mac(parsed)
+	for _, expression := range []*regexp.Regexp{payloadMACRE, payloadCompactMACRE} {
+		for _, match := range expression.FindAll(result, -1) {
+			if parsed, err := parsePayloadMAC(match); err == nil {
+				a.mac(parsed)
+			}
 		}
 	}
 	for _, match := range payloadIPv4RE.FindAll(result, -1) {
@@ -388,6 +453,17 @@ func (a *addressAnonymizer) plainPayload(payload []byte) []byte {
 		}
 		return []byte(a.mac(parsed).String())
 	})
+	result = payloadCompactMACRE.ReplaceAllFunc(result, func(match []byte) []byte {
+		parsed, err := parsePayloadMAC(match)
+		if err != nil {
+			return match
+		}
+		replacement := strings.ReplaceAll(a.mac(parsed).String(), ":", "")
+		if string(match) == strings.ToUpper(string(match)) {
+			replacement = strings.ToUpper(replacement)
+		}
+		return []byte(replacement)
+	})
 	result = payloadIPv4RE.ReplaceAllFunc(result, func(match []byte) []byte {
 		return []byte(a.ip(net.ParseIP(string(match))).String())
 	})
@@ -401,7 +477,7 @@ func (a *addressAnonymizer) plainPayload(payload []byte) []byte {
 		}
 		return []byte(a.ip(parsed).String())
 	})
-	return result
+	return a.sensitiveStrings(result)
 }
 
 func (a *addressAnonymizer) frame(data []byte, linkType layers.LinkType) ([]byte, error) {
