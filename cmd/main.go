@@ -182,6 +182,13 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	broadcaster.SetDaemonInfo(iprd.DaemonInfo{
+		Version:    VERSION,
+		Tag:        TAG,
+		CommitHash: COMMIT,
+		Delta:      DELTA,
+		BuildTime:  BUILDINFO,
+	})
 	broadcaster.SetStatusProvider(manager)
 	// start listening for incoming connections.
 	go broadcaster.Listen()
