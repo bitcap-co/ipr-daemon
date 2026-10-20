@@ -117,7 +117,7 @@ func TestWriteStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
-		"IP Report Daemon 0.5.7 (v0.5.7, 89abcdef)",
+		"IP Report Daemon 0.5.7 (v0.5.7, 0123456)",
 		"Built: 2026-10-20T12:00:00Z",
 		"IP Report status: degraded",
 		"Listeners: 1/2 active",

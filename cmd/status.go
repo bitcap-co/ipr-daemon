@@ -69,8 +69,8 @@ func writeStatus(w io.Writer, response iprd.TCPResponse, asJSON bool) error {
 	}
 	if daemon := response.Daemon; daemon != nil {
 		commit := daemon.CommitHash
-		if len(commit) > 8 {
-			commit = commit[len(commit)-8:]
+		if len(commit) > 7 {
+			commit = commit[:7]
 		}
 		details := make([]string, 0, 2)
 		if daemon.Delta != "" {
