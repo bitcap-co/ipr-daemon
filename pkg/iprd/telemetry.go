@@ -6,6 +6,15 @@ import (
 	"time"
 )
 
+// DaemonInfo describes the running daemon build.
+type DaemonInfo struct {
+	Version    string `json:"version"`
+	Tag        string `json:"tag"`
+	CommitHash string `json:"commitHash"`
+	Delta      string `json:"delta"`
+	BuildTime  string `json:"buildTime"`
+}
+
 // ManagerState describes the current ListenerManager lifecycle state.
 type ManagerState string
 

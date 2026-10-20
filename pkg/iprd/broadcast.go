@@ -30,6 +30,7 @@ type TCPResponse struct {
 	Type      string         `json:"type"`
 	RequestID string         `json:"requestID,omitempty"`
 	Timestamp int64          `json:"timestamp"`
+	Daemon    *DaemonInfo    `json:"daemon,omitempty"`
 	Status    *ManagerStatus `json:"status,omitempty"`
 	Error     string         `json:"error,omitempty"`
 }
@@ -45,6 +46,7 @@ type IPRBroadcast struct {
 	counter        uint64
 	mu             sync.RWMutex
 	clients        map[uint64]net.Conn
+	daemonInfo     *DaemonInfo
 	statusProvider StatusProvider
 	Msgs           chan []byte
 	Errs           chan error
@@ -69,6 +71,13 @@ func NewBroadcaster(logger Logger, bind string, port int) (*IPRBroadcast, error)
 		Errs:     make(chan error, 64),
 	}
 	return b, nil
+}
+
+// SetDaemonInfo configures the build metadata included in status responses.
+func (b *IPRBroadcast) SetDaemonInfo(info DaemonInfo) {
+	b.mu.Lock()
+	b.daemonInfo = &info
+	b.mu.Unlock()
 }
 
 // SetStatusProvider configures the provider used by the iprd_status command.
@@ -140,8 +149,14 @@ func (b *IPRBroadcast) statusResponse(cmd TCPCommand) TCPResponse {
 		Timestamp: time.Now().Unix(),
 	}
 	b.mu.RLock()
+	var info *DaemonInfo
+	if b.daemonInfo != nil {
+		infoCopy := *b.daemonInfo
+		info = &infoCopy
+	}
 	provider := b.statusProvider
 	b.mu.RUnlock()
+	response.Daemon = info
 	if provider == nil {
 		response.Error = "status unavailable"
 		return response

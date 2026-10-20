@@ -71,6 +71,13 @@ func TestIPRBroadcastStatusCommand(t *testing.T) {
 			Duplicates: 2,
 		},
 	}
+	wantInfo := DaemonInfo{
+		Version:    "0.5.7",
+		Tag:        "v0.5.7",
+		CommitHash: "0123456789abcdef",
+		BuildTime:  "2026-10-20T12:00:00Z",
+	}
+	broadcaster.SetDaemonInfo(wantInfo)
 	broadcaster.SetStatusProvider(staticStatusProvider{status: want})
 
 	response := exchangeTCPCommand(t, broadcaster, TCPCommand{
@@ -89,6 +96,9 @@ func TestIPRBroadcastStatusCommand(t *testing.T) {
 	if response.Error != "" {
 		t.Fatalf("response error = %q", response.Error)
 	}
+	if response.Daemon == nil || *response.Daemon != wantInfo {
+		t.Fatalf("response daemon = %+v, want %+v", response.Daemon, wantInfo)
+	}
 	if response.Status == nil || response.Status.State != want.State || response.Status.Packets != want.Packets {
 		t.Fatalf("response status = %+v, want %+v", response.Status, want)
 	}
@@ -98,6 +108,9 @@ func TestIPRBroadcastStatusUnavailable(t *testing.T) {
 	response := exchangeTCPCommand(t, newTestBroadcaster(), TCPCommand{Command: TCPCommandStatus})
 	if response.Type != TCPCommandStatus || response.Error != "status unavailable" || response.Status != nil {
 		t.Fatalf("response = %+v", response)
+	}
+	if response.Daemon != nil {
+		t.Fatalf("response daemon = %+v, want nil", response.Daemon)
 	}
 }
 
