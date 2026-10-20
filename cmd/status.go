@@ -5,6 +5,7 @@ import (
 	"io"
 	"net"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/goccy/go-json"
@@ -65,6 +66,38 @@ func writeStatus(w io.Writer, response iprd.TCPResponse, asJSON bool) error {
 		}
 		_, err = fmt.Fprintln(w, string(data))
 		return err
+	}
+	if daemon := response.Daemon; daemon != nil {
+		commit := daemon.CommitHash
+		if len(commit) > 8 {
+			commit = commit[len(commit)-8:]
+		}
+		details := make([]string, 0, 2)
+		if daemon.Delta != "" {
+			if commit != "" {
+				details = append(details, commit)
+			}
+			details = append(details, fmt.Sprintf("%s-line delta", daemon.Delta))
+		} else {
+			if daemon.Tag != "" {
+				details = append(details, daemon.Tag)
+			}
+			if commit != "" {
+				details = append(details, commit)
+			}
+		}
+		versionInfo := ""
+		if len(details) > 0 {
+			versionInfo = " (" + strings.Join(details, ", ") + ")"
+		}
+		if _, err := fmt.Fprintf(w, "IP Report Daemon %s%s\n", daemon.Version, versionInfo); err != nil {
+			return err
+		}
+		if daemon.BuildTime != "" {
+			if _, err := fmt.Fprintf(w, "Built: %s\n", daemon.BuildTime); err != nil {
+				return err
+			}
+		}
 	}
 
 	status := response.Status

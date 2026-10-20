@@ -86,6 +86,12 @@ func TestWriteStatus(t *testing.T) {
 	response := iprd.TCPResponse{
 		Type:      iprd.TCPCommandStatus,
 		Timestamp: time.Now().Unix(),
+		Daemon: &iprd.DaemonInfo{
+			Version:    "0.5.7",
+			Tag:        "v0.5.7",
+			CommitHash: "0123456789abcdef",
+			BuildTime:  "2026-10-20T12:00:00Z",
+		},
 		Status: &iprd.ManagerStatus{
 			State:               iprd.ManagerStateDegraded,
 			ListenersConfigured: 2,
@@ -111,6 +117,8 @@ func TestWriteStatus(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, want := range []string{
+		"IP Report Daemon 0.5.7 (v0.5.7, 89abcdef)",
+		"Built: 2026-10-20T12:00:00Z",
 		"IP Report status: degraded",
 		"Listeners: 1/2 active",
 		"Packets: 10 processed, 6 reports, 2 duplicates, 1 invalid, 1 filtered",
@@ -131,5 +139,37 @@ func TestWriteStatus(t *testing.T) {
 	}
 	if decoded.Status == nil || decoded.Status.Packets.Processed != 10 {
 		t.Fatalf("JSON status = %+v", decoded.Status)
+	}
+	if decoded.Daemon == nil || decoded.Daemon.Version != "0.5.7" {
+		t.Fatalf("JSON daemon = %+v", decoded.Daemon)
+	}
+}
+
+func TestWriteStatusOptionalDaemonInfo(t *testing.T) {
+	response := iprd.TCPResponse{
+		Type:   iprd.TCPCommandStatus,
+		Status: &iprd.ManagerStatus{State: iprd.ManagerStateHealthy},
+	}
+
+	var withoutDaemon bytes.Buffer
+	if err := writeStatus(&withoutDaemon, response, false); err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(withoutDaemon.String(), "IP Report status: healthy") {
+		t.Fatalf("status without daemon info = %q", withoutDaemon.String())
+	}
+
+	response.Daemon = &iprd.DaemonInfo{
+		Version:    "unknown",
+		Tag:        "NO-TAG",
+		CommitHash: "unknown",
+		Delta:      "4",
+	}
+	var shortCommit bytes.Buffer
+	if err := writeStatus(&shortCommit, response, false); err != nil {
+		t.Fatal(err)
+	}
+	if want := "IP Report Daemon unknown (unknown, 4-line delta)"; !strings.Contains(shortCommit.String(), want) {
+		t.Fatalf("status missing %q:\n%s", want, shortCommit.String())
 	}
 }
