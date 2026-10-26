@@ -82,7 +82,7 @@ type AuradineIPReport struct {
 	InternalType string `json:"InternalType"`
 }
 
-type sealminerInfo struct {
+type SealminerInfo struct {
 	MACAddress       string          `json:"MAC"`
 	Type             string          `json:"Type"`
 	Firmware         string          `json:"Firmware"`
@@ -95,7 +95,7 @@ type sealminerInfo struct {
 	BoardSNArray     json.RawMessage `json:"BoardSNArray"`
 }
 
-type sealminerInterface struct {
+type SealminerInterface struct {
 	Interface  string `json:"Interface"`
 	Active     bool   `json:"Active"`
 	DHCP       bool   `json:"DHCP"`
@@ -108,14 +108,17 @@ type sealminerInterface struct {
 }
 
 // SealminerIPReport represents the IP report JSON payload from Sealminer miners.
+// IPAddress & MACAddress are extracted from the report.
 type SealminerIPReport struct {
-	Info       sealminerInfo
-	Interfaces []sealminerInterface
+	IPAddress  string
+	MACAddress string
+	Info       SealminerInfo
+	Interfaces []SealminerInterface
 }
 
-func (r *SealminerIPReport) parseInfo(data []any) (*sealminerInfo, error) {
-	var info *sealminerInfo
-	raw, err := json.Marshal(data[1])
+func (r *SealminerIPReport) parseInfo(data any) (*SealminerInfo, error) {
+	var info *SealminerInfo
+	raw, err := json.Marshal(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal info: %W", err)
 	}
@@ -125,9 +128,9 @@ func (r *SealminerIPReport) parseInfo(data []any) (*sealminerInfo, error) {
 	return info, nil
 }
 
-func (r *SealminerIPReport) parseInterfaces(data []any) (*[]sealminerInterface, error) {
-	var interfaces *[]sealminerInterface
-	raw, err := json.Marshal(data[2:4])
+func (r *SealminerIPReport) parseInterfaces(data []any) (*[]SealminerInterface, error) {
+	var interfaces *[]SealminerInterface
+	raw, err := json.Marshal(data)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal interfaces: %W", err)
 	}
@@ -153,16 +156,25 @@ func (r *SealminerIPReport) UnmarshalJSON(data []byte) error {
 	if len(t) != 7 {
 		return fmt.Errorf("invalid number of elements in array: got %d, want 7", len(t))
 	}
-	info, err := r.parseInfo(t)
+	info, err := r.parseInfo(t[1])
 	if err != nil {
 		return err
 	}
 	r.Info = *info
-	interfaces, err := r.parseInterfaces(t)
+	r.MACAddress = info.MACAddress
+
+	interfaces, err := r.parseInterfaces(t[2 : 2+info.NetInterfaceCnt])
 	if err != nil {
 		return err
 	}
 	r.Interfaces = *interfaces
+	// find active IPv4 address
+	for _, iface := range r.Interfaces {
+		if iface.Active {
+			r.IPAddress = iface.IPV4
+			break
+		}
+	}
 	return nil
 }
 
