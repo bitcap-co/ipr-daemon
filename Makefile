@@ -411,10 +411,10 @@ FIREWALL_BUNDLE_NAME  = $(DIST_DIR)$(FIREWALL_BUNDLE_BASE).zip
 	@rm -rf $(FIREWALL_BUNDLE_STAGE) $(FIREWALL_BUNDLE_NAME)
 	@mkdir -p $(FIREWALL_BUNDLE_STAGE)
 	@install -m 0755 $(FIREWALL_BIN) $(FIREWALL_BUNDLE_STAGE)/iprd
-	@install -m 0755 resources/firewall/bootstrap.sh $(FIREWALL_BUNDLE_STAGE)/bootstrap.sh
-	@install -m 0755 resources/firewall/install-firewall.sh $(FIREWALL_BUNDLE_STAGE)/install-firewall.sh
-	@install -m 0755 resources/firewall/remove-firewall.sh $(FIREWALL_BUNDLE_STAGE)/remove-firewall.sh
-	@install -m 0644 resources/firewall/README.md $(FIREWALL_BUNDLE_STAGE)/README.md
+	@install -m 0755 scripts/package/firewall/bootstrap.sh $(FIREWALL_BUNDLE_STAGE)/bootstrap.sh
+	@install -m 0755 scripts/package/firewall/install-firewall.sh $(FIREWALL_BUNDLE_STAGE)/install-firewall.sh
+	@install -m 0755 scripts/package/firewall/remove-firewall.sh $(FIREWALL_BUNDLE_STAGE)/remove-firewall.sh
+	@install -m 0644 scripts/package/firewall/README.md $(FIREWALL_BUNDLE_STAGE)/README.md
 	@cd $(DIST_DIR) && zip -qr $(notdir $(FIREWALL_BUNDLE_NAME)) $(notdir $(FIREWALL_BUNDLE_STAGE))
 	@rm -rf $(FIREWALL_BUNDLE_STAGE)
 	@echo "Created: $(FIREWALL_BUNDLE_NAME)"

@@ -59,15 +59,15 @@ contents:
 overrides:
   deb:
     scripts:
-      postinstall: "scripts/package/postinst"
-      preremove: "scripts/package/prerm"
-      postremove: "scripts/package/postrm"
+      postinstall: "scripts/package/debian/postinst"
+      preremove: "scripts/package/debian/prerm"
+      postremove: "scripts/package/debian/postrm"
   rpm:
     scripts:
-      postinstall: "scripts/rpm/postinstall"
-      preremove: "scripts/rpm/preremove"
-      postremove: "scripts/rpm/postremove"
+      postinstall: "scripts/package/rpm/postinstall"
+      preremove: "scripts/package/rpm/preremove"
+      postremove: "scripts/package/rpm/postremove"
   apk:
     scripts:
-      postinstall: "scripts/apk/post-install"
-      preremove: "scripts/apk/pre-deinstall"
+      postinstall: "scripts/package/apk/post-install"
+      preremove: "scripts/package/apk/pre-deinstall"
