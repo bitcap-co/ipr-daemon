@@ -169,7 +169,7 @@ func TestWriteStatusOptionalDaemonInfo(t *testing.T) {
 	if err := writeStatus(&shortCommit, response, false); err != nil {
 		t.Fatal(err)
 	}
-	if want := "IP Report Daemon unknown (unknown, 4-line delta)"; !strings.Contains(shortCommit.String(), want) {
+	if want := "IP Report Daemon unknown (unknown, dirty (4-line delta))"; !strings.Contains(shortCommit.String(), want) {
 		t.Fatalf("status missing %q:\n%s", want, shortCommit.String())
 	}
 }

@@ -68,22 +68,28 @@ func writeStatus(w io.Writer, response iprd.TCPResponse, asJSON bool) error {
 		return err
 	}
 	if daemon := response.Daemon; daemon != nil {
-		commit := daemon.CommitHash
-		if len(commit) > 7 {
-			commit = commit[:7]
+		shortCommit := daemon.CommitHash
+		if len(shortCommit) > 7 {
+			shortCommit = shortCommit[:7]
+		}
+		rootTag := daemon.Tag
+		if daemon.Tag != "" {
+			rootTag = strings.Split(daemon.Tag, "-")[0]
 		}
 		details := make([]string, 0, 2)
 		if daemon.Delta != "" {
-			if commit != "" {
-				details = append(details, commit)
+			// dirty build, show commit hash and delta
+			if shortCommit != "" {
+				details = append(details, shortCommit)
 			}
-			details = append(details, fmt.Sprintf("%s-line delta", daemon.Delta))
+			details = append(details, fmt.Sprintf("dirty (%s-line delta)", daemon.Delta))
 		} else {
-			if daemon.Tag != "" {
-				details = append(details, daemon.Tag)
+			// clean build, show root tag and commit hash
+			if rootTag != "" {
+				details = append(details, rootTag)
 			}
-			if commit != "" {
-				details = append(details, commit)
+			if shortCommit != "" {
+				details = append(details, shortCommit)
 			}
 		}
 		versionInfo := ""
