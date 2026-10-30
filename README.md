@@ -121,6 +121,26 @@ CONFIG_PATH=./default.toml docker compose up -d
 > (`--cap-add=NET_ADMIN`) to put the interface into promiscuous mode.
 
 ## IPR Daemon CLI
+### Interactive setup
+Run the guided setup to create a new TOML configuration:
+```bash
+sudo ./iprd -setup
+```
+The wizard covers capture interfaces or automatic LAN selection, the TCP bind
+address and port, mDNS advertisement, packet capture, known-miner filtering, and
+optional global BPF filters. It reviews the result before asking where to write
+it; the default destination for a new configuration is `/etc/iprd.toml`. In an
+interactive terminal, press Tab to complete filesystem paths for capture files
+and the configuration destination.
+
+To load and modify an existing configuration, combine setup mode with `-c`:
+```bash
+sudo ./iprd -setup -c /etc/iprd.toml
+```
+The existing path becomes the default write destination. Run a generated
+configuration with `iprd -c /etc/iprd.toml`. Packaged service installations that
+use `/etc/iprd.conf` should set `ARGS=-c /etc/iprd.toml` and restart the service.
+
 ### Finding interfaces
 To see all available network interfaces that the daemon can listen on, run with the `-list` argument:
 ```
