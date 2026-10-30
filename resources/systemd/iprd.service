@@ -8,6 +8,8 @@ Environment=IPRD_CONFIG=/etc/iprd/config.toml
 EnvironmentFile=-/etc/iprd.conf
 User=root
 Group=root
+LogsDirectory=iprd
+LogsDirectoryMode=0755
 ExecCondition=/usr/bin/test -f ${IPRD_CONFIG}
 ExecStart=/usr/bin/iprd -c ${IPRD_CONFIG}
 Restart=on-failure

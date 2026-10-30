@@ -10,10 +10,14 @@ command_args="-c ${IPRD_CONFIG}"
 required_files="${IPRD_CONFIG}"
 command_background="yes"
 pidfile="/run/iprd.pid"
-output_log="/var/log/iprd.log"
-error_log="/var/log/iprd.log"
+output_log="/var/log/iprd/iprd.log"
+error_log="/var/log/iprd/iprd.log"
 
 depend() {
 	need net
 	after firewall
+}
+
+start_pre() {
+	checkpath --directory --mode 0755 /var/log/iprd
 }

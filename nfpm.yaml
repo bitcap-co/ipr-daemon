@@ -25,6 +25,11 @@ contents:
     file_info:
       mode: 0755
 
+  - dst: "/var/log/iprd"
+    type: dir
+    file_info:
+      mode: 0755
+
   # --- systemd (deb + rpm) ---
   - src: "resources/systemd/iprd.service"
     dst: "/usr/lib/systemd/system/iprd.service"

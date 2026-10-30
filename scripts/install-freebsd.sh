@@ -45,7 +45,8 @@ required_files="\${iprd_config}"
 start_precmd="\${name}_prestart"
 iprd_prestart()
 {
-    rc_flags="-c \${iprd_config} \${rc_flags} > /var/log/iprd.log &"
+    install -d -m 0755 /var/log/iprd || return 1
+    rc_flags="-c \${iprd_config} \${rc_flags} > /var/log/iprd/iprd.log &"
 }
 
 run_rc_command "\$1"
