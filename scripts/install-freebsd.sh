@@ -35,17 +35,19 @@ cat > /usr/local/etc/rc.d/iprd << EOF
 
 name=iprd
 desc="IP Report Daemon"
-rcvar=iprd_enable
+rcvar="\${name}_enable"
 command="/usr/local/sbin/\${name}"
 
-start_precmd="\${name}_prestart"
+load_rc_config "\${name}"
+: "\${iprd_config:=/usr/local/etc/iprd/config.toml}"
+required_files="\${iprd_config}"
 
+start_precmd="\${name}_prestart"
 iprd_prestart()
 {
-    rc_flags="-a \${rc_flags} > /var/log/iprd.log &"
+    rc_flags="-c \${iprd_config} \${rc_flags} > /var/log/iprd.log &"
 }
 
-load_rc_config \$name
 run_rc_command "\$1"
 EOF
 chmod 0555 /usr/local/etc/rc.d/iprd
@@ -53,8 +55,13 @@ chmod 0555 /usr/local/etc/rc.d/iprd
 echo "Enable iprd service in /etc/rc.conf..."
 sysrc iprd_enable=YES
 
-echo "Starting iprd service..."
-service iprd start
+if [ -f /usr/local/etc/iprd/config.toml ]; then
+    echo "Starting iprd service..."
+    service iprd start
+else
+    echo "iprd is enabled but was not started: no configuration at /usr/local/etc/iprd/config.toml"
+    echo "Run 'iprd -setup', then 'service iprd start'."
+fi
 
 echo "Done!"
 exit 0

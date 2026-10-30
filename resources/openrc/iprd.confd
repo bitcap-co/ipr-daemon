@@ -1,2 +1,3 @@
-# Arguments passed to iprd by the OpenRC service. See `iprd -h` for all options.
-ARGS="-a"
+# Configuration file loaded by the iprd OpenRC service.
+# Override this path if the daemon configuration is stored elsewhere.
+IPRD_CONFIG="/etc/iprd/config.toml"

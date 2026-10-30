@@ -4,10 +4,12 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-EnvironmentFile=/etc/iprd.conf
+Environment=IPRD_CONFIG=/etc/iprd/config.toml
+EnvironmentFile=-/etc/iprd.conf
 User=root
 Group=root
-ExecStart=/usr/bin/iprd $ARGS
+ExecCondition=/usr/bin/test -f ${IPRD_CONFIG}
+ExecStart=/usr/bin/iprd -c ${IPRD_CONFIG}
 Restart=on-failure
 RestartSec=5
 

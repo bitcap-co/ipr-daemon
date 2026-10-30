@@ -14,7 +14,16 @@ scripts: {
   post-install: <<EOS
 #!/bin/sh
 sysrc iprd_enable=YES
-service iprd start
+iprd_config=$(sysrc -n iprd_config 2>/dev/null || true)
+if [ -z "${iprd_config}" ]; then
+    iprd_config=/usr/local/etc/iprd/config.toml
+fi
+if [ -f "${iprd_config}" ]; then
+    service iprd start
+else
+    echo "iprd is enabled but was not started: no configuration at ${iprd_config}"
+    echo "Run 'iprd -setup', then 'service iprd start'."
+fi
 EOS
   pre-deinstall: <<EOS
 #!/bin/sh

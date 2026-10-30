@@ -1,11 +1,13 @@
 #!/sbin/openrc-run
 # OpenRC service for iprd (Alpine and other OpenRC systems).
-# Flags are read from /etc/conf.d/iprd (ARGS), mirroring the systemd EnvironmentFile.
+# IPRD_CONFIG may be overridden in /etc/conf.d/iprd.
 
 name="iprd"
 description="ASIC Miner IP Report listener"
 command="/usr/bin/iprd"
-command_args="${ARGS:--a}"
+: "${IPRD_CONFIG:=/etc/iprd/config.toml}"
+command_args="-c ${IPRD_CONFIG}"
+required_files="${IPRD_CONFIG}"
 command_background="yes"
 pidfile="/run/iprd.pid"
 output_log="/var/log/iprd.log"
