@@ -74,7 +74,9 @@ Remove with `sudo dpkg -r iprd` or `sudo rpm -e iprd`.
 Once installed, the service is controlled with `sudo systemctl {start|stop|status} iprd`.
 The `IPRD_CONFIG=` value in `/etc/iprd.conf` can override the default configuration
 path. The service cleanly remains inactive when that file is absent. Edits to
-`/etc/iprd.conf` are preserved across package upgrades.
+`/etc/iprd.conf` are preserved across package upgrades. Service output is stored
+in the systemd journal and can be read with `journalctl -u iprd`;
+`/var/log/iprd` is created for packet captures.
 
 ### FreeBSD/pfSense/OPNsense setup
 The FreeBSD binary is statically built (no `libpcap` needed on the target) and can
@@ -92,7 +94,9 @@ This installs `/usr/local/sbin/iprd`, registers the rc service at
 `/usr/local/etc/rc.d/iprd`, and enables it. If
 `/usr/local/etc/iprd/config.toml` exists, the service is also started; otherwise
 run `iprd -setup` followed by `service iprd start`. Set `iprd_config` in
-`/etc/rc.conf` to override the configuration path. Remove with `pkg delete iprd`.
+`/etc/rc.conf` to override the configuration path. Service output is written to
+`/var/log/iprd/iprd.log`, alongside the default capture location. Remove with
+`pkg delete iprd`.
 
 ### Docker container
 Prebuilt Linux amd64/arm64 images are published to Docker Hub at
@@ -223,8 +227,11 @@ To retain capture history, enable capture rotation together with a capture path:
 sudo ./iprd -i "eth0" -capture-file /var/log/iprd/capture.pcapng -rotate-capture
 ```
 Captures are written in PCAP-NG format so packets retain their source interface.
-A supplied extension such as `.pcap` is normalized to `.pcapng`. Each capture is
-limited to 4 MiB. Rotation keeps four files total: the active `capture.pcapng`,
+The setup wizard suggests `/var/log/iprd/capture.pcapng` on Linux and FreeBSD,
+`/Library/Logs/iprd/capture.pcapng` on macOS, and the `iprd\\logs` directory
+under `%ProgramData%` on Windows. It offers to create the suggested directory
+when needed. A supplied extension such as `.pcap` is normalized to `.pcapng`.
+Each capture is limited to 4 MiB. Rotation keeps four files total: the active `capture.pcapng`,
 then `capture.1.pcapng` through `capture.3.pcapng` from newest to oldest. Without
 `-rotate-capture`, the active capture is flushed at 4 MiB. TOML configurations
 can enable the same behavior with `rotate_capture_files = true`. Existing classic
