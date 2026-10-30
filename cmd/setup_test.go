@@ -128,17 +128,51 @@ func TestRunSetupEditsExistingConfigurationWithExplicitFalseValues(t *testing.T)
 	}
 }
 
+func TestSetupConfigPathUsesPlatformSystemDirectories(t *testing.T) {
+	tests := map[string]string{
+		"linux":   "/etc/iprd/config.toml",
+		"freebsd": "/usr/local/etc/iprd/config.toml",
+	}
+	for goos, want := range tests {
+		t.Run(goos, func(t *testing.T) {
+			if got := setupConfigPath(goos, ""); got != want {
+				t.Fatalf("setup config path = %q, want %q", got, want)
+			}
+		})
+	}
+}
+
+func TestWriteDestinationCreatesMissingDefaultDirectory(t *testing.T) {
+	defaultPath := filepath.Join(t.TempDir(), "iprd", "config.toml")
+	var output bytes.Buffer
+	prompter := &setupPrompter{
+		reader: bufio.NewReader(strings.NewReader("\n\n")),
+		out:    &output,
+	}
+
+	got, write, err := prompter.writeDestination(defaultPath)
+	if err != nil {
+		t.Fatalf("writeDestination: %v", err)
+	}
+	if !write || got != defaultPath {
+		t.Fatalf("write destination = %q, %v; want %q, true", got, write, defaultPath)
+	}
+	if info, err := os.Stat(filepath.Dir(defaultPath)); err != nil || !info.IsDir() {
+		t.Fatalf("default destination directory was not created: %v", err)
+	}
+}
+
 func TestWriteDestinationRepromptsForMissingDirectory(t *testing.T) {
 	root := t.TempDir()
 	missing := filepath.Join(root, "missing", "iprd.toml")
 	valid := filepath.Join(root, "iprd.toml")
 	var output bytes.Buffer
 	prompter := &setupPrompter{
-		reader: bufio.NewReader(strings.NewReader(missing + "\n" + valid + "\n")),
+		reader: bufio.NewReader(strings.NewReader(missing + "\nn\n" + valid + "\n")),
 		out:    &output,
 	}
 
-	got, write, err := prompter.writeDestination(defaultSetupPath)
+	got, write, err := prompter.writeDestination(defaultSetupConfigPath())
 	if err != nil {
 		t.Fatalf("writeDestination: %v", err)
 	}

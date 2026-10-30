@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"strings"
@@ -17,10 +18,7 @@ import (
 	"github.com/ergochat/readline"
 )
 
-const (
-	defaultSetupPath   = "/etc/iprd.toml"
-	defaultCapturePath = "/var/log/iprd/capture.pcapng"
-)
+const defaultCapturePath = "/var/log/iprd/capture.pcapng"
 
 type setupPrompter struct {
 	reader   *bufio.Reader
@@ -29,6 +27,34 @@ type setupPrompter struct {
 }
 
 type setupInterfaceProvider func() ([]iprd.IPRInterface, error)
+
+type missingSetupDirectoryError struct {
+	path string
+}
+
+func (err *missingSetupDirectoryError) Error() string {
+	return fmt.Sprintf("destination directory %q does not exist", err.path)
+}
+
+func defaultSetupConfigPath() string {
+	return setupConfigPath(runtime.GOOS, os.Getenv("ProgramData"))
+}
+
+func setupConfigPath(goos, programData string) string {
+	switch goos {
+	case "freebsd":
+		return "/usr/local/etc/iprd/config.toml"
+	case "darwin":
+		return "/Library/Application Support/iprd/config.toml"
+	case "windows":
+		if programData == "" {
+			programData = `C:\ProgramData`
+		}
+		return filepath.Join(programData, "iprd", "config.toml")
+	default:
+		return "/etc/iprd/config.toml"
+	}
+}
 
 func newSetupPrompter(in io.Reader, out io.Writer) (*setupPrompter, error) {
 	prompter := &setupPrompter{reader: bufio.NewReader(in), out: out}
@@ -104,7 +130,7 @@ func runSetup(in io.Reader, out io.Writer, configPath string, getInterfaces setu
 
 	defaultPath := configPath
 	if defaultPath == "" {
-		defaultPath = defaultSetupPath
+		defaultPath = defaultSetupConfigPath()
 	}
 	destination, write, err := prompter.writeDestination(defaultPath)
 	if err != nil {
@@ -387,8 +413,24 @@ func (p *setupPrompter) writeDestination(defaultPath string) (string, bool, erro
 		}
 		destination = filepath.Clean(expandHomeDirectory(destination))
 		if err := validateSetupDestination(destination); err != nil {
-			fmt.Fprintf(p.out, "%v\n", err)
-			continue
+			var missingDirectory *missingSetupDirectoryError
+			if !errors.As(err, &missingDirectory) {
+				fmt.Fprintf(p.out, "%v\n", err)
+				continue
+			}
+
+			defaultDestination := filepath.Clean(expandHomeDirectory(defaultPath))
+			create, promptErr := p.yesNo(fmt.Sprintf("%v. Create it?", missingDirectory), destination == defaultDestination)
+			if promptErr != nil {
+				return "", false, promptErr
+			}
+			if !create {
+				fmt.Fprintln(p.out, "Enter a path in an existing directory.")
+				continue
+			}
+			if err := os.MkdirAll(missingDirectory.path, 0o755); err != nil {
+				return "", false, fmt.Errorf("create destination directory %q: %w", missingDirectory.path, err)
+			}
 		}
 		return destination, true, nil
 	}
@@ -404,7 +446,7 @@ func validateSetupDestination(destination string) error {
 	directory := filepath.Dir(destination)
 	info, err := os.Stat(directory)
 	if errors.Is(err, os.ErrNotExist) {
-		return fmt.Errorf("destination directory %q does not exist; enter a path in an existing directory", directory)
+		return &missingSetupDirectoryError{path: directory}
 	}
 	if err != nil {
 		return fmt.Errorf("inspect destination directory %q: %w", directory, err)
