@@ -18,8 +18,6 @@ import (
 	"github.com/ergochat/readline"
 )
 
-const defaultCapturePath = "/var/log/iprd/capture.pcapng"
-
 type setupPrompter struct {
 	reader   *bufio.Reader
 	out      io.Writer
@@ -53,6 +51,32 @@ func setupConfigPath(goos, programData string) string {
 		return filepath.Join(programData, "iprd", "config.toml")
 	default:
 		return "/etc/iprd/config.toml"
+	}
+}
+
+func defaultCaptureFilePath() string {
+	return setupCapturePath(runtime.GOOS, os.Getenv("ProgramData"))
+}
+
+func setupCapturePath(goos, programData string) string {
+	return filepath.Join(setupLogDirectory(goos, programData), "capture.pcapng")
+}
+
+func setupLogPath(goos, programData string) string {
+	return filepath.Join(setupLogDirectory(goos, programData), "iprd.log")
+}
+
+func setupLogDirectory(goos, programData string) string {
+	switch goos {
+	case "darwin":
+		return "/Library/Logs/iprd"
+	case "windows":
+		if programData == "" {
+			programData = `C:\ProgramData`
+		}
+		return filepath.Join(programData, "iprd", "logs")
+	default:
+		return "/var/log/iprd"
 	}
 }
 
@@ -264,17 +288,24 @@ func (p *setupPrompter) configure(cfg *iprdconfig.IPRDConfig, getInterfaces setu
 	if captureEnabled {
 		captureDefault := cfg.CaptureFile
 		if captureDefault == "" {
-			captureDefault = defaultCapturePath
+			captureDefault = defaultCaptureFilePath()
 		}
 		for {
 			cfg.CaptureFile, err = p.path("Capture file path", captureDefault)
 			if err != nil {
 				return err
 			}
-			if cfg.CaptureFile != "" {
+			if cfg.CaptureFile == "" {
+				fmt.Fprintln(p.out, "Capture file path cannot be empty.")
+				continue
+			}
+			ready, err := p.prepareDestination(cfg.CaptureFile, defaultCaptureFilePath())
+			if err != nil {
+				return err
+			}
+			if ready {
 				break
 			}
-			fmt.Fprintln(p.out, "Capture file path cannot be empty.")
 		}
 		cfg.RotateCaptureFiles, err = p.yesNo("Keep rotated capture history?", cfg.RotateCaptureFiles)
 		if err != nil {
@@ -412,28 +443,38 @@ func (p *setupPrompter) writeDestination(defaultPath string) (string, bool, erro
 			destination = answer
 		}
 		destination = filepath.Clean(expandHomeDirectory(destination))
-		if err := validateSetupDestination(destination); err != nil {
-			var missingDirectory *missingSetupDirectoryError
-			if !errors.As(err, &missingDirectory) {
-				fmt.Fprintf(p.out, "%v\n", err)
-				continue
-			}
-
-			defaultDestination := filepath.Clean(expandHomeDirectory(defaultPath))
-			create, promptErr := p.yesNo(fmt.Sprintf("%v. Create it?", missingDirectory), destination == defaultDestination)
-			if promptErr != nil {
-				return "", false, promptErr
-			}
-			if !create {
-				fmt.Fprintln(p.out, "Enter a path in an existing directory.")
-				continue
-			}
-			if err := os.MkdirAll(missingDirectory.path, 0o755); err != nil {
-				return "", false, fmt.Errorf("create destination directory %q: %w", missingDirectory.path, err)
-			}
+		ready, err := p.prepareDestination(destination, defaultPath)
+		if err != nil {
+			return "", false, err
 		}
-		return destination, true, nil
+		if ready {
+			return destination, true, nil
+		}
 	}
+}
+
+func (p *setupPrompter) prepareDestination(destination, suggestedPath string) (bool, error) {
+	if err := validateSetupDestination(destination); err != nil {
+		var missingDirectory *missingSetupDirectoryError
+		if !errors.As(err, &missingDirectory) {
+			fmt.Fprintf(p.out, "%v\n", err)
+			return false, nil
+		}
+
+		suggestedPath = filepath.Clean(expandHomeDirectory(suggestedPath))
+		create, promptErr := p.yesNo(fmt.Sprintf("%v. Create it?", missingDirectory), destination == suggestedPath)
+		if promptErr != nil {
+			return false, promptErr
+		}
+		if !create {
+			fmt.Fprintln(p.out, "Enter a path in an existing directory.")
+			return false, nil
+		}
+		if err := os.MkdirAll(missingDirectory.path, 0o755); err != nil {
+			return false, fmt.Errorf("create destination directory %q: %w", missingDirectory.path, err)
+		}
+	}
+	return true, nil
 }
 
 func validateSetupDestination(destination string) error {

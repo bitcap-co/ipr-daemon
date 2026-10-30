@@ -128,15 +128,38 @@ func TestRunSetupEditsExistingConfigurationWithExplicitFalseValues(t *testing.T)
 	}
 }
 
-func TestSetupConfigPathUsesPlatformSystemDirectories(t *testing.T) {
-	tests := map[string]string{
-		"linux":   "/etc/iprd/config.toml",
-		"freebsd": "/usr/local/etc/iprd/config.toml",
+func TestSetupPathsUsePlatformSystemDirectories(t *testing.T) {
+	tests := map[string]struct {
+		config  string
+		log     string
+		capture string
+	}{
+		"linux": {
+			config:  "/etc/iprd/config.toml",
+			log:     "/var/log/iprd/iprd.log",
+			capture: "/var/log/iprd/capture.pcapng",
+		},
+		"freebsd": {
+			config:  "/usr/local/etc/iprd/config.toml",
+			log:     "/var/log/iprd/iprd.log",
+			capture: "/var/log/iprd/capture.pcapng",
+		},
+		"darwin": {
+			config:  "/Library/Application Support/iprd/config.toml",
+			log:     "/Library/Logs/iprd/iprd.log",
+			capture: "/Library/Logs/iprd/capture.pcapng",
+		},
 	}
 	for goos, want := range tests {
 		t.Run(goos, func(t *testing.T) {
-			if got := setupConfigPath(goos, ""); got != want {
-				t.Fatalf("setup config path = %q, want %q", got, want)
+			if got := setupConfigPath(goos, ""); got != want.config {
+				t.Fatalf("setup config path = %q, want %q", got, want.config)
+			}
+			if got := setupLogPath(goos, ""); got != want.log {
+				t.Fatalf("setup log path = %q, want %q", got, want.log)
+			}
+			if got := setupCapturePath(goos, ""); got != want.capture {
+				t.Fatalf("setup capture path = %q, want %q", got, want.capture)
 			}
 		})
 	}
