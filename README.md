@@ -66,14 +66,15 @@ sudo dpkg -i ./iprd_<version>_<arch>.deb
 # or
 sudo rpm -i ./iprd-<version>-<arch>.rpm
 ```
-This installs `/usr/bin/iprd`, the systemd unit `/etc/systemd/system/iprd.service`,
-and the config `/etc/iprd.conf`, then enables + starts the service. Remove with
-`sudo dpkg -r iprd` or `sudo rpm -e iprd`.
+This installs `/usr/bin/iprd`, the systemd unit, and `/etc/iprd.conf`, then
+enables the service. If `/etc/iprd/config.toml` exists, the service is also
+started; otherwise run `sudo iprd -setup` followed by `sudo systemctl start iprd`.
+Remove with `sudo dpkg -r iprd` or `sudo rpm -e iprd`.
 
 Once installed, the service is controlled with `sudo systemctl {start|stop|status} iprd`.
-Arguments are passed via the `ARGS=` line in `/etc/iprd.conf` (defaults to `-a`); run
-`sudo systemctl restart iprd` after editing. Your edits to `/etc/iprd.conf` are
-preserved across package upgrades.
+The `IPRD_CONFIG=` value in `/etc/iprd.conf` can override the default configuration
+path. The service cleanly remains inactive when that file is absent. Edits to
+`/etc/iprd.conf` are preserved across package upgrades.
 
 ### FreeBSD/pfSense/OPNsense setup
 The FreeBSD binary is statically built (no `libpcap` needed on the target) and can
@@ -88,7 +89,10 @@ then install:
 pkg add ./iprd-<version>-<arch>.pkg
 ```
 This installs `/usr/local/sbin/iprd`, registers the rc service at
-`/usr/local/etc/rc.d/iprd`, and enables + starts it. Remove with `pkg delete iprd`.
+`/usr/local/etc/rc.d/iprd`, and enables it. If
+`/usr/local/etc/iprd/config.toml` exists, the service is also started; otherwise
+run `iprd -setup` followed by `service iprd start`. Set `iprd_config` in
+`/etc/rc.conf` to override the configuration path. Remove with `pkg delete iprd`.
 
 ### Docker container
 Prebuilt Linux amd64/arm64 images are published to Docker Hub at
@@ -129,17 +133,19 @@ sudo ./iprd -setup
 The wizard covers capture interfaces or automatic LAN selection, the TCP bind
 address and port, mDNS advertisement, packet capture, known-miner filtering, and
 optional global BPF filters. It reviews the result before asking where to write
-it; the default destination for a new configuration is `/etc/iprd.toml`. In an
-interactive terminal, press Tab to complete filesystem paths for capture files
-and the configuration destination.
+it. The default destination is `/etc/iprd/config.toml` on Linux and
+`/usr/local/etc/iprd/config.toml` on FreeBSD; the wizard offers to create the
+application directory when needed. In an interactive terminal, press Tab to
+complete filesystem paths for capture files and the configuration destination.
 
 To load and modify an existing configuration, combine setup mode with `-c`:
 ```bash
-sudo ./iprd -setup -c /etc/iprd.toml
+sudo ./iprd -setup -c /etc/iprd/config.toml
 ```
 The existing path becomes the default write destination. Run a generated
-configuration with `iprd -c /etc/iprd.toml`. Packaged service installations that
-use `/etc/iprd.conf` should set `ARGS=-c /etc/iprd.toml` and restart the service.
+configuration with `iprd -c /etc/iprd/config.toml`. Linux packages use this path
+by default; set `IPRD_CONFIG` in `/etc/iprd.conf` or `/etc/conf.d/iprd` to
+override it.
 
 ### Finding interfaces
 To see all available network interfaces that the daemon can listen on, run with the `-list` argument:
