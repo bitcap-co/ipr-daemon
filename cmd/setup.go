@@ -264,18 +264,44 @@ func (p *setupPrompter) configure(cfg *iprdconfig.IPRDConfig, getInterfaces setu
 		return err
 	}
 	if cfg.MDNS {
+		explicitBind := isExplicitForwardBind(cfg.Bind)
 		advertiseDefault := strings.Join(cfg.MDNSInterfaces, ",")
-		if advertiseDefault == "" {
+		query := "mDNS interfaces, comma-separated (use 'all' for all suitable interfaces)"
+		if explicitBind {
+			query = fmt.Sprintf("Additional mDNS interfaces, comma-separated (the interface owning %s is always included)", cfg.Bind)
+			if advertiseDefault == "" {
+				advertiseDefault = "none"
+			}
+		} else if advertiseDefault == "" {
 			advertiseDefault = "all"
 		}
-		advertise, err := p.text("mDNS interfaces, comma-separated (use 'all' for all suitable interfaces)", advertiseDefault)
-		if err != nil {
-			return err
-		}
-		if strings.EqualFold(advertise, "all") || advertise == "*" {
-			cfg.MDNSInterfaces = nil
-		} else {
+
+		for {
+			advertise, err := p.text(query, advertiseDefault)
+			if err != nil {
+				return err
+			}
+			if explicitBind {
+				if strings.EqualFold(advertise, "none") {
+					cfg.MDNSInterfaces = nil
+					break
+				}
+				if strings.EqualFold(advertise, "all") || advertise == "*" {
+					fmt.Fprintln(p.out, "With an explicit bind address, enter additional interface names/indexes or 'none'.")
+					continue
+				}
+			} else {
+				if strings.EqualFold(advertise, "all") || advertise == "*" {
+					cfg.MDNSInterfaces = nil
+					break
+				}
+				if strings.EqualFold(advertise, "none") {
+					fmt.Fprintln(p.out, "A wildcard bind advertises on all suitable interfaces unless specific interfaces are supplied.")
+					continue
+				}
+			}
 			cfg.MDNSInterfaces = splitValues(advertise)
+			break
 		}
 	} else {
 		cfg.MDNSInterfaces = nil
@@ -398,6 +424,15 @@ func (p *setupPrompter) selectInterfaces(interfaces []iprd.IPRInterface, current
 	}
 }
 
+func isExplicitForwardBind(bind string) bool {
+	bind = strings.TrimSpace(bind)
+	if bind == "" {
+		return false
+	}
+	address := net.ParseIP(bind)
+	return address != nil && !address.IsUnspecified()
+}
+
 func (p *setupPrompter) printSummary(cfg *iprdconfig.IPRDConfig) {
 	fmt.Fprintln(p.out)
 	fmt.Fprintln(p.out, "Configuration summary")
@@ -412,8 +447,18 @@ func (p *setupPrompter) printSummary(cfg *iprdconfig.IPRDConfig) {
 	}
 	fmt.Fprintf(p.out, "  Forward endpoint:   %s, port %d\n", bind, cfg.Port)
 	fmt.Fprintf(p.out, "  mDNS:               %s\n", enabledText(cfg.MDNS))
-	if cfg.MDNS && len(cfg.MDNSInterfaces) > 0 {
-		fmt.Fprintf(p.out, "  mDNS interfaces:    %s\n", strings.Join(cfg.MDNSInterfaces, ", "))
+	if cfg.MDNS {
+		switch {
+		case isExplicitForwardBind(cfg.Bind):
+			fmt.Fprintf(p.out, "  mDNS interface:     Interface owning %s\n", cfg.Bind)
+			if len(cfg.MDNSInterfaces) > 0 {
+				fmt.Fprintf(p.out, "  mDNS additional:    %s\n", strings.Join(cfg.MDNSInterfaces, ", "))
+			}
+		case len(cfg.MDNSInterfaces) == 0:
+			fmt.Fprintln(p.out, "  mDNS interfaces:    All suitable interfaces")
+		default:
+			fmt.Fprintf(p.out, "  mDNS interfaces:    %s\n", strings.Join(cfg.MDNSInterfaces, ", "))
+		}
 	}
 	if cfg.CaptureFile == "" {
 		fmt.Fprintln(p.out, "  Packet capture:     Disabled")

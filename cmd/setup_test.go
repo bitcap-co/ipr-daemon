@@ -263,6 +263,58 @@ func TestPathCompleterCompletesFilesAndDirectories(t *testing.T) {
 	}
 }
 
+func TestExplicitForwardBind(t *testing.T) {
+	tests := map[string]bool{
+		"":               false,
+		"0.0.0.0":        false,
+		"::":             false,
+		"192.168.1.20":   true,
+		"2001:db8::1234": true,
+	}
+	for bind, want := range tests {
+		if got := isExplicitForwardBind(bind); got != want {
+			t.Errorf("isExplicitForwardBind(%q) = %v, want %v", bind, got, want)
+		}
+	}
+}
+
+func TestSetupSummaryDescribesMDNSInterfaceSelection(t *testing.T) {
+	tests := []struct {
+		name string
+		cfg  *iprdconfig.IPRDConfig
+		want []string
+	}{
+		{
+			name: "unspecified bind uses all interfaces",
+			cfg: &iprdconfig.IPRDConfig{ForwardConfig: iprdconfig.ForwardConfig{
+				Bind: "0.0.0.0",
+				MDNS: true,
+			}},
+			want: []string{"mDNS interfaces:    All suitable interfaces"},
+		},
+		{
+			name: "explicit bind includes owner and additional interfaces",
+			cfg: &iprdconfig.IPRDConfig{ForwardConfig: iprdconfig.ForwardConfig{
+				Bind:           "192.168.1.20",
+				MDNS:           true,
+				MDNSInterfaces: []string{"vlan20"},
+			}},
+			want: []string{"Interface owning 192.168.1.20", "mDNS additional:    vlan20"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var output bytes.Buffer
+			(&setupPrompter{out: &output}).printSummary(tt.cfg)
+			for _, want := range tt.want {
+				if !strings.Contains(output.String(), want) {
+					t.Fatalf("summary does not contain %q:\n%s", want, output.String())
+				}
+			}
+		})
+	}
+}
+
 func TestSelectedInterfaceConfigsPreservesIndexBasedOverrides(t *testing.T) {
 	interfaces := []iprd.IPRInterface{{Index: 7, Name: "eth0", FriendlyName: "eth0"}}
 	configs := []iprdconfig.InterfaceConfig{{
