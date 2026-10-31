@@ -1,6 +1,17 @@
 #!/bin/sh
 # RPM %post — $1 is 1 on initial install, 2 on upgrade.
 set -e
+
+IPRD_CONFIG=/etc/iprd/config.toml
+if [ -r /etc/iprd.conf ]; then
+    . /etc/iprd.conf
+fi
+
 systemctl daemon-reload || true
 systemctl enable iprd.service || true
-systemctl start iprd.service || true
+if [ -f "${IPRD_CONFIG}" ]; then
+    systemctl start iprd.service || true
+else
+    echo "iprd is enabled but was not started: no configuration at ${IPRD_CONFIG}"
+    echo "Run 'sudo iprd -setup', then 'sudo systemctl start iprd'."
+fi

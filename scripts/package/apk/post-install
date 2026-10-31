@@ -1,4 +1,15 @@
 #!/bin/sh
-# apk post-install — register the OpenRC service and start it.
+# apk post-install — register the OpenRC service and start it when configured.
+
+IPRD_CONFIG=/etc/iprd/config.toml
+if [ -r /etc/conf.d/iprd ]; then
+    . /etc/conf.d/iprd
+fi
+
 rc-update add iprd default 2>/dev/null || true
-rc-service iprd start 2>/dev/null || true
+if [ -f "${IPRD_CONFIG}" ]; then
+    rc-service iprd start 2>/dev/null || true
+else
+    echo "iprd is enabled but was not started: no configuration at ${IPRD_CONFIG}"
+    echo "Run 'iprd -setup', then 'rc-service iprd start'."
+fi

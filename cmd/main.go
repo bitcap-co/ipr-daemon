@@ -27,6 +27,7 @@ var (
 
 	// flags
 	flVersion            = flag.Bool("version", false, "Prints ipr-daemon version information and exits.")
+	flSetup              = flag.Bool("setup", false, "Runs an interactive configuration wizard and exits. Use -c to edit an existing configuration.")
 	flList               = flag.Bool("list", false, "Lists all available network interfaces for IP report listening and exits.")
 	flStatus             = flag.Bool("status", false, "Queries health/status of a running daemon and exits.\nDefaults to local daemon, use -b, -p, -c flags to specify a remote endpoint.")
 	flStatusJSON         = flag.Bool("status-json", false, "Queries health/status of a running daemon and prints as JSON.")
@@ -56,6 +57,26 @@ func main() {
 	flag.Var(&flNetworkExclusions, "exclude", "List of networks to additionally exclude from BPF filter.\nThis flag supports chaining or comma-separated string.\n(Global: applies to all interface selectors.)")
 	flag.Var(&flMDNSInterfaces, "advertise", "Interface names or indexes on which to advertise mDNS.\nThis flag supports chaining or comma-separated values. The interface owning forward_bind is always included.")
 	flag.Parse()
+
+	// interactive configuration mode.
+	if *flSetup {
+		var incompatible []string
+		flag.Visit(func(supplied *flag.Flag) {
+			if supplied.Name != "setup" && supplied.Name != "c" {
+				incompatible = append(incompatible, "-"+supplied.Name)
+			}
+		})
+		if len(incompatible) > 0 {
+			log.Fatal(fmt.Errorf("-setup cannot be combined with %s", strings.Join(incompatible, ", ")))
+		}
+		if len(flag.Args()) > 0 {
+			log.Fatal(fmt.Errorf("-setup does not accept positional arguments"))
+		}
+		if err := runSetup(os.Stdin, os.Stdout, *flConfigFile, iprd.GetInterfaces); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 
 	// print version information and exit.
 	if *flVersion {

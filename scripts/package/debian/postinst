@@ -1,5 +1,16 @@
 #!/bin/sh
 set -e
+
+IPRD_CONFIG=/etc/iprd/config.toml
+if [ -r /etc/iprd.conf ]; then
+    . /etc/iprd.conf
+fi
+
 systemctl daemon-reload
 systemctl enable iprd.service
-systemctl start iprd.service
+if [ -f "${IPRD_CONFIG}" ]; then
+    systemctl start iprd.service
+else
+    echo "iprd is enabled but was not started: no configuration at ${IPRD_CONFIG}"
+    echo "Run 'sudo iprd -setup', then 'sudo systemctl start iprd'."
+fi

@@ -1,4 +1,6 @@
 #!/bin/sh
+# rc.subr consumes the service metadata variables declared below.
+# shellcheck disable=SC2034
 #
 # PROVIDE: iprd
 # KEYWORD: shutdown
@@ -9,13 +11,16 @@ name=iprd
 desc="IP Report Daemon"
 rcvar="${name}_enable"
 command="/usr/local/sbin/${name}"
-iprd_flags="-a"  # iprd args; see iprd -h
+
+load_rc_config "${name}"
+: "${iprd_config:=/usr/local/etc/iprd/config.toml}"
+required_files="${iprd_config}"
 
 start_precmd="${name}_prestart"
 iprd_prestart()
 {
-    rc_flags="${iprd_flags} > /var/log/iprd.log &"
+    install -d -m 0755 /var/log/iprd || return 1
+    rc_flags="-c ${iprd_config} ${rc_flags} > /var/log/iprd/iprd.log &"
 }
 
-load_rc_config $name
 run_rc_command "$1"
