@@ -369,11 +369,11 @@ func (p *setupPrompter) configure(cfg *iprdconfig.IPRDConfig, getInterfaces setu
 
 func (p *setupPrompter) printInterfaces(interfaces []iprd.IPRInterface) {
 	fmt.Fprintln(p.out, "Available capture interfaces:")
-	for i, iface := range interfaces {
+	for _, iface := range interfaces {
 		if iface.Description != "" {
-			fmt.Fprintln(p.out, fmt.Sprintf("  %d) (%s) %-12s %-15s %s", i+1, iface.Description, iface.FriendlyName, iface.IPAddr(), iface.MACAddr()))
+			fmt.Fprintf(p.out, "  %d: %-12s %-15s %s (%s)\n", iface.Index, iface.FriendlyName, iface.IPAddr(), iface.MACAddr(), iface.Description)
 		} else {
-			fmt.Fprintln(p.out, fmt.Sprintf("  %d) %-12s %-15s %s", i+1, iface.FriendlyName, iface.IPAddr(), iface.MACAddr()))
+			fmt.Fprintf(p.out, "  %d: %-12s %-15s %s\n", iface.Index, iface.FriendlyName, iface.IPAddr(), iface.MACAddr())
 		}
 	}
 	fmt.Fprintln(p.out)
@@ -681,15 +681,14 @@ func parseInterfaceSelection(interfaces []iprd.IPRInterface, selection string) (
 		}
 		if matched == "" {
 			if number, err := strconv.Atoi(value); err == nil {
-				if number >= 1 && number <= len(interfaces) {
-					matched = interfaces[number-1].Name
-				} else {
-					for _, iface := range interfaces {
-						if number == iface.Index {
-							matched = iface.Name
-							break
-						}
+				for _, iface := range interfaces {
+					if number == iface.Index {
+						matched = iface.Name
+						break
 					}
+				}
+				if matched == "" && number >= 1 && number <= len(interfaces) {
+					matched = interfaces[number-1].Name
 				}
 			}
 		}

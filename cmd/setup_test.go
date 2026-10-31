@@ -279,6 +279,21 @@ func TestSelectedInterfaceConfigsPreservesIndexBasedOverrides(t *testing.T) {
 	}
 }
 
+func TestParseInterfaceSelectionPrefersDisplayedInterfaceIndex(t *testing.T) {
+	interfaces := []iprd.IPRInterface{
+		{Index: 2, Name: "eth0", FriendlyName: "Ethernet"},
+		{Index: 7, Name: "eth1", FriendlyName: "LAN"},
+	}
+
+	got, err := parseInterfaceSelection(interfaces, "2")
+	if err != nil {
+		t.Fatalf("parseInterfaceSelection: %v", err)
+	}
+	if len(got) != 1 || got[0] != "eth0" {
+		t.Fatalf("selectors = %v, want displayed interface index 2 (eth0)", got)
+	}
+}
+
 func TestParseInterfaceSelectionAcceptsMenuNumbersNamesAndIndexes(t *testing.T) {
 	interfaces := []iprd.IPRInterface{
 		{Index: 7, Name: "eth0", FriendlyName: "eth0"},
