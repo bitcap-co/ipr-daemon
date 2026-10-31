@@ -86,7 +86,7 @@ Vagrant.configure("2") do |config|
     trigger.name = "build-binary"
     trigger.run = {inline: "vagrant rsync"}
     trigger.run_remote = {
-      inline: "sh -c 'PATH=/usr/local/bin:${PATH} cd ipr-daemon && gmake freebsd-binaries'",
+      inline: "sh -c 'PATH=/usr/local/bin:${PATH} cd ipr-daemon && gmake -B freebsd-binaries'",
       privileged: false
     }
   end

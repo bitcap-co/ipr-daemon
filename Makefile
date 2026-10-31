@@ -313,7 +313,7 @@ freebsd: .vagrant-check
 .PHONY: freebsd-package
 freebsd-package: .vagrant-check
 	vagrant provision && vagrant up && vagrant ssh-config >.vagrant-ssh && \
-		ssh -F .vagrant-ssh default 'sh -c "PATH=/usr/local/bin:$$PATH; cd $(PROJECT_NAME) && gmake .freebsd-package .freebsd-package-arm64"' && \
+		ssh -F .vagrant-ssh default 'sh -c "PATH=/usr/local/bin:$$PATH; cd $(PROJECT_NAME) && gmake -B .freebsd-package .freebsd-package-arm64"' && \
 		scp -F .vagrant-ssh \
 			default:$(PROJECT_NAME)/dist/iprd-$(VERSION_PKG)-freebsd-amd64.pkg \
 			default:$(PROJECT_NAME)/dist/iprd-$(VERSION_PKG)-freebsd-arm64.pkg dist/
@@ -322,7 +322,7 @@ freebsd-package: .vagrant-check
 .PHONY: firewall-bundle
 firewall-bundle: .vagrant-check
 	vagrant provision && vagrant up && vagrant ssh-config >.vagrant-ssh && \
-		ssh -F .vagrant-ssh default 'sh -c "PATH=/usr/local/bin:$$PATH; cd $(PROJECT_NAME) && gmake .firewall-bundle .firewall-bundle-arm64"' && \
+		ssh -F .vagrant-ssh default 'sh -c "PATH=/usr/local/bin:$$PATH; cd $(PROJECT_NAME) && gmake -B .firewall-bundle .firewall-bundle-arm64"' && \
 		scp -F .vagrant-ssh \
 			default:$(PROJECT_NAME)/dist/iprd-$(VERSION_PKG)-freebsd-amd64-firewall.zip \
 			default:$(PROJECT_NAME)/dist/iprd-$(VERSION_PKG)-freebsd-arm64-firewall.zip dist/
