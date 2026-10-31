@@ -469,6 +469,19 @@ func (p *setupPrompter) printSummary(cfg *iprdconfig.IPRDConfig) {
 	fmt.Fprintf(p.out, "  Known ports only:   %s\n", enabledText(cfg.FilterKnownPorts))
 	advanced := cfg.NoRootNetwork || len(cfg.NetworkInclusions) > 0 || len(cfg.NetworkExclusions) > 0 || len(cfg.IgnoredDevices) > 0
 	fmt.Fprintf(p.out, "  Advanced BPF:       %s\n", enabledText(advanced))
+	if advanced {
+		fmt.Fprintf(p.out, "     No root network:    %s\n", enabledText(cfg.NoRootNetwork))
+		if len(cfg.NetworkInclusions) > 0 {
+			fmt.Fprintf(p.out, "     Network inclusions: %s\n", strings.Join(cfg.NetworkInclusions, ", "))
+		}
+		if len(cfg.NetworkExclusions) > 0 {
+			fmt.Fprintf(p.out, "     Network exclusions: %s\n", strings.Join(cfg.NetworkExclusions, ", "))
+		}
+		if len(cfg.IgnoredDevices) > 0 {
+			fmt.Fprintf(p.out, "     Ignored devices:    %s\n", strings.Join(cfg.IgnoredDevices, ", "))
+		}
+	}
+
 	fmt.Fprintln(p.out)
 }
 
