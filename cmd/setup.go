@@ -229,7 +229,7 @@ func (p *setupPrompter) configure(cfg *iprdconfig.IPRDConfig, getInterfaces setu
 
 	bindDefault := cfg.Bind
 	if bindDefault == "" {
-		bindDefault = "all"
+		bindDefault = defaultForwardBind(cfg.Auto, cfg.ListenInterfaces, interfaces)
 	}
 	for {
 		bind, err := p.text("TCP bind address (use 'all' for all local addresses)", bindDefault)
@@ -422,6 +422,37 @@ func (p *setupPrompter) selectInterfaces(interfaces []iprd.IPRInterface, current
 			fmt.Fprintln(p.out, "Select at least one interface.")
 		}
 	}
+}
+
+func defaultForwardBind(auto bool, selectors []string, interfaces []iprd.IPRInterface) string {
+	if auto {
+		for _, iface := range interfaces {
+			if iface.IsLAN() {
+				return iface.IPAddr()
+			}
+		}
+		return "all"
+	}
+
+	firstAddress := ""
+	for _, name := range selectors {
+		for _, iface := range interfaces {
+			if iface.Name != name {
+				continue
+			}
+			if firstAddress == "" {
+				firstAddress = iface.IPAddr()
+			}
+			if iface.IsLAN() {
+				return iface.IPAddr()
+			}
+			break
+		}
+	}
+	if firstAddress != "" {
+		return firstAddress
+	}
+	return "all"
 }
 
 func isExplicitForwardBind(bind string) bool {

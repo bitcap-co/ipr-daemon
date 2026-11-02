@@ -278,6 +278,38 @@ func TestExplicitForwardBind(t *testing.T) {
 	}
 }
 
+func TestDefaultForwardBind(t *testing.T) {
+	interfaces := []iprd.IPRInterface{
+		{Index: 2, Name: "eth0", FriendlyName: "eth0", Description: "WAN", IPv4: net.ParseIP("10.0.0.20")},
+		{Index: 7, Name: "eth1", FriendlyName: "eth1", Description: "LAN", IPv4: net.ParseIP("192.168.1.20")},
+		{Index: 11, Name: "eth2", FriendlyName: "eth2", Description: "OPT1", IPv4: net.ParseIP("172.16.0.20")},
+	}
+	tests := []struct {
+		name       string
+		auto       bool
+		selectors  []string
+		interfaces []iprd.IPRInterface
+		want       string
+	}{
+		{name: "auto uses LAN", auto: true, want: "192.168.1.20"},
+		{name: "manual prefers selected LAN", selectors: []string{"eth0", "eth1"}, want: "192.168.1.20"},
+		{name: "manual falls back to first selected", selectors: []string{"eth2", "eth0"}, want: "172.16.0.20"},
+		{name: "auto without LAN uses all", auto: true, interfaces: interfaces[:1], want: "all"},
+		{name: "manual without selection uses all", want: "all"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			available := tt.interfaces
+			if available == nil {
+				available = interfaces
+			}
+			if got := defaultForwardBind(tt.auto, tt.selectors, available); got != tt.want {
+				t.Errorf("defaultForwardBind() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}
+
 func TestSetupSummaryDescribesMDNSInterfaceSelection(t *testing.T) {
 	tests := []struct {
 		name string
