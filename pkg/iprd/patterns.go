@@ -3,6 +3,8 @@ package iprd
 import (
 	"bytes"
 	"fmt"
+	"net"
+	"net/netip"
 	"regexp"
 	"strconv"
 	"strings"
@@ -31,7 +33,7 @@ var (
 	validMAC = regexp.MustCompile(`([0-9A-Fa-f]{2}[:-]){5}([0-9A-Fa-f]{2})`)
 	// minerPorts is a map of UDP destination ports to MinerTypeHint.
 	minerPorts = map[int]MinerTypeHint{
-		14235: Antminer, // This is a known common port for multiple miner types (i.e. Volcminer, Hammer)
+		14235: Antminer, // Known common port for other miner types as well (blackminer/hammer)
 		11503: Iceriver,
 		8888:  Whatsminer,
 		1314:  Goldshell,
@@ -39,7 +41,7 @@ var (
 		9999:  Elphapex,
 		12345: Auradine,
 		54321: IPollo,
-		42069: HiveGPU,
+		42069: HiveGPU, // Custom port for HiveOS
 		6667:  IBeLink,
 	}
 	// msgPatterns is a map of MinerTypeHint to regex UDP payload patterns.
@@ -204,11 +206,11 @@ func ParseIPAddress(address string) string {
 	if address == "" {
 		return ""
 	}
-	address = strings.TrimSpace(address)
-	if !validIP.MatchString(address) {
+	addr, err := netip.ParseAddr(strings.TrimSpace(address))
+	if err != nil || !addr.Is4() {
 		return ""
 	}
-	return address
+	return addr.String()
 }
 
 // ParseMACAddress parses address and returns a normalized MAC address.
@@ -234,7 +236,7 @@ func ParseMACAddress(address string) string {
 		return ""
 	}
 
-	if !validMAC.MatchString(address) {
+	if _, err := net.ParseMAC(address); err != nil {
 		return ""
 	}
 
