@@ -55,6 +55,41 @@ var (
 	}
 )
 
+// IPReport provides access to structured IP report data.
+type IPReport interface {
+	// IPAddr returns the IP address of the miner.
+	IPAddr() string
+	// MacAddr returns the MAC address of the miner.
+	MacAddr() string
+	// SerialNum returns the serial number of the miner if available.
+	SerialNum() string
+	// Parse parses the raw IP report data into the IPReport object.
+	Parse([]byte) error
+}
+
+var (
+	_ IPReport = (*GoldshellIPReport)(nil)
+	_ IPReport = (*AuradineIPReport)(nil)
+	_ IPReport = (*SealminerIPReport)(nil)
+)
+
+type ipReportFactory func() IPReport
+
+var reportFactories = map[MinerTypeHint]ipReportFactory{
+	Goldshell: func() IPReport { return &GoldshellIPReport{} },
+	Sealminer: func() IPReport { return &SealminerIPReport{} },
+	Auradine:  func() IPReport { return &AuradineIPReport{} },
+}
+
+// NewIPReportFromHint returns a new IPReport for the given MinerTypeHint, if known.
+func NewIPReportFromHint(hint MinerTypeHint) (IPReport, bool) {
+	factory, ok := reportFactories[hint]
+	if !ok {
+		return nil, false
+	}
+	return factory(), true
+}
+
 // GoldshellIPReport represents the IP report JSON payload from Goldshell miners.
 type GoldshellIPReport struct {
 	Version     string          `json:"version"`
@@ -72,6 +107,36 @@ type GoldshellIPReport struct {
 	LEDStatus   bool            `json:"ledstatus"`
 }
 
+func (r *GoldshellIPReport) IPAddr() string {
+	return r.IPAddress
+}
+
+func (r *GoldshellIPReport) MacAddr() string {
+	return r.MACAddress
+}
+
+func (r *GoldshellIPReport) SerialNum() string {
+	return r.Serial
+}
+
+func (r *GoldshellIPReport) Parse(data []byte) error {
+	var report GoldshellIPReport
+	if err := json.Unmarshal(data, &report); err != nil {
+		return err
+	}
+	report.IPAddress = ParseIPAddress(report.IPAddress)
+	if report.IPAddress == "" {
+		return fmt.Errorf("invalid IP address")
+	}
+	report.MACAddress = ParseMACAddress(report.MACAddress)
+	if report.MACAddress == "" {
+		return fmt.Errorf("invalid MAC address")
+	}
+
+	*r = report
+	return nil
+}
+
 // AuradineIPReport represents the IP report JSON payload from Auradine miners.
 type AuradineIPReport struct {
 	Command      string `json:"command"`
@@ -82,6 +147,35 @@ type AuradineIPReport struct {
 	Version      string `json:"version"`
 	Hostname     string `json:"hostname"`
 	InternalType string `json:"InternalType"`
+}
+
+func (r *AuradineIPReport) IPAddr() string {
+	return r.IPAddress
+}
+
+func (r *AuradineIPReport) MacAddr() string {
+	return r.MACAddress
+}
+
+func (r *AuradineIPReport) SerialNum() string {
+	return r.SerialNo
+}
+
+func (r *AuradineIPReport) Parse(data []byte) error {
+	var report AuradineIPReport
+	if err := json.Unmarshal(data, &report); err != nil {
+		return err
+	}
+	report.IPAddress = ParseIPAddress(report.IPAddress)
+	if report.IPAddress == "" {
+		return fmt.Errorf("invalid IP address")
+	}
+	report.MACAddress = ParseMACAddress(report.MACAddress)
+	if report.MACAddress == "" {
+		return fmt.Errorf("invalid MAC address")
+	}
+	*r = report
+	return nil
 }
 
 type SealminerInfo struct {
@@ -118,33 +212,47 @@ type SealminerIPReport struct {
 	Interfaces []SealminerInterface
 }
 
-func (r *SealminerIPReport) parseInfo(data any) (*SealminerInfo, error) {
-	var info *SealminerInfo
+func (r *SealminerIPReport) parseInfo(data any) (SealminerInfo, error) {
+	var info SealminerInfo
 	raw, err := json.Marshal(data)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal info: %W", err)
+		return SealminerInfo{}, fmt.Errorf("failed to marshal info: %w", err)
 	}
 	if err := json.Unmarshal(raw, &info); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal info: %W", err)
+		return SealminerInfo{}, fmt.Errorf("failed to unmarshal info: %w", err)
 	}
 	return info, nil
 }
 
-func (r *SealminerIPReport) parseInterfaces(data []any) (*[]SealminerInterface, error) {
-	var interfaces *[]SealminerInterface
+func (r *SealminerIPReport) parseInterfaces(data []any) ([]SealminerInterface, error) {
+	var interfaces []SealminerInterface
 	raw, err := json.Marshal(data)
 	if err != nil {
-		return nil, fmt.Errorf("failed to marshal interfaces: %W", err)
+		return nil, fmt.Errorf("failed to marshal interfaces: %w", err)
 	}
 	if err := json.Unmarshal(raw, &interfaces); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal interfaces: %W", err)
+		return nil, fmt.Errorf("failed to unmarshal interfaces: %w", err)
 	}
 	return interfaces, nil
 }
 
-func (r *SealminerIPReport) UnmarshalJSON(data []byte) error {
-	// remove null bytes
-	data = bytes.ReplaceAll(data, []byte(`\x00`), []byte{})
+func (r *SealminerIPReport) IPAddr() string {
+	return r.IPAddress
+}
+
+func (r *SealminerIPReport) MacAddr() string {
+	return r.MACAddress
+}
+
+func (r *SealminerIPReport) SerialNum() string {
+	return ""
+}
+
+func (r *SealminerIPReport) Parse(data []byte) error {
+	var report SealminerIPReport
+	// Remove real NUL bytes from datagrams and escaped NULs from text fixtures.
+	data = bytes.ReplaceAll(data, []byte{0x00}, nil)
+	data = bytes.ReplaceAll(data, []byte(`\x00`), nil)
 	// add commas between objects
 	data = bytes.ReplaceAll(data, []byte("}{"), []byte("}, {"))
 	// fix JSON booleans
@@ -153,7 +261,7 @@ func (r *SealminerIPReport) UnmarshalJSON(data []byte) error {
 
 	var t []any
 	if err := json.Unmarshal(data, &t); err != nil {
-		return fmt.Errorf("failed to unmarshal: %W", err)
+		return fmt.Errorf("failed to unmarshal: %w", err)
 	}
 	if len(t) != 7 {
 		return fmt.Errorf("invalid number of elements in array: got %d, want 7", len(t))
@@ -162,21 +270,32 @@ func (r *SealminerIPReport) UnmarshalJSON(data []byte) error {
 	if err != nil {
 		return err
 	}
-	r.Info = *info
-	r.MACAddress = info.MACAddress
-
-	interfaces, err := r.parseInterfaces(t[2 : 2+info.NetInterfaceCnt])
+	report.Info = info
+	report.MACAddress = ParseMACAddress(info.MACAddress)
+	if report.MACAddress == "" {
+		return fmt.Errorf("invalid MAC address")
+	}
+	interfacesEnd := 2 + info.NetInterfaceCnt
+	if info.NetInterfaceCnt < 0 || interfacesEnd > len(t) {
+		return fmt.Errorf("invalid number of interfaces")
+	}
+	interfaces, err := r.parseInterfaces(t[2:interfacesEnd])
 	if err != nil {
 		return err
 	}
-	r.Interfaces = *interfaces
+	report.Interfaces = interfaces
 	// find active IPv4 address
-	for _, iface := range r.Interfaces {
+	for _, iface := range report.Interfaces {
 		if iface.Active {
-			r.IPAddress = iface.IPV4
+			report.IPAddress = iface.IPV4
 			break
 		}
 	}
+	report.IPAddress = ParseIPAddress(report.IPAddress)
+	if report.IPAddress == "" {
+		return fmt.Errorf("invalid IP address")
+	}
+	*r = report
 	return nil
 }
 
