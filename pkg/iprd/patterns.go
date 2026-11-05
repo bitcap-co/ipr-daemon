@@ -53,10 +53,39 @@ var (
 		IPollo:     regexp.MustCompile(fmt.Sprintf(`^IP Addr:\[%s\].*?MAC Addr:\[%s\]`, validIP, validMAC)),
 		HiveGPU:    regexp.MustCompile(fmt.Sprintf(`^HiveOS %s`, validIP)),
 	}
+	reportModels = map[MinerTypeHint]reportModelFactory{
+		Goldshell: func() IPReportModel { return &GoldshellIPReport{} },
+		IBeLink:   func() IPReportModel { return &IBeLinkIPReport{} },
+		Sealminer: func() IPReportModel { return &SealminerIPReport{} },
+		Auradine:  func() IPReportModel { return &AuradineIPReport{} },
+	}
 )
 
-// IPReport provides access to structured IP report data.
-type IPReport interface {
+// GetMsgPatternFromHint returns the UDP payload regex pattern for the given MinerTypeHint, if known.
+func GetMsgPatternFromHint(hint MinerTypeHint) (*regexp.Regexp, bool) {
+	pattern, ok := msgPatterns[hint]
+	return pattern, ok
+}
+
+// GetMinerHintFromPort returns the MinerTypeHint for the given port, if known.
+func GetMinerHintFromPort(port int) (MinerTypeHint, bool) {
+	hint, ok := minerPorts[port]
+	return hint, ok
+}
+
+// GetKnownMinerPorts returns a list of known miner UDP destination ports.
+func GetKnownMinerPorts() []int {
+	var ports []int
+	for p := range minerPorts {
+		ports = append(ports, p)
+	}
+	return ports
+}
+
+type reportModelFactory func() IPReportModel
+
+// IPReportModel provides access to structured IP report data.
+type IPReportModel interface {
 	// IPAddr returns the IP address of the miner.
 	IPAddr() string
 	// MacAddr returns the MAC address of the miner.
@@ -67,29 +96,13 @@ type IPReport interface {
 	Parse([]byte) error
 }
 
-var (
-	_ IPReport = (*GoldshellIPReport)(nil)
-	_ IPReport = (*AuradineIPReport)(nil)
-	_ IPReport = (*SealminerIPReport)(nil)
-	_ IPReport = (*IBeLinkIPReport)(nil)
-)
-
-type ipReportFactory func() IPReport
-
-var reportFactories = map[MinerTypeHint]ipReportFactory{
-	Goldshell: func() IPReport { return &GoldshellIPReport{} },
-	IBeLink:   func() IPReport { return &IBeLinkIPReport{} },
-	Sealminer: func() IPReport { return &SealminerIPReport{} },
-	Auradine:  func() IPReport { return &AuradineIPReport{} },
-}
-
 // NewIPReportFromHint returns a new IPReport for the given MinerTypeHint, if known.
-func NewIPReportFromHint(hint MinerTypeHint) (IPReport, bool) {
-	factory, ok := reportFactories[hint]
+func NewIPReportFromHint(hint MinerTypeHint) (IPReportModel, bool) {
+	model, ok := reportModels[hint]
 	if !ok {
 		return nil, false
 	}
-	return factory(), true
+	return model(), true
 }
 
 // GoldshellIPReport represents the IP report JSON payload from Goldshell miners.
@@ -286,16 +299,15 @@ func (r *SealminerIPReport) Parse(data []byte) error {
 		return err
 	}
 	report.Interfaces = interfaces
-	// find active IPv4 address
+	// find first active IPv4 address
 	for _, iface := range report.Interfaces {
 		if iface.Active {
-			report.IPAddress = iface.IPV4
+			report.IPAddress = ParseIPAddress(iface.IPV4)
+			if report.IPAddress == "" {
+				return fmt.Errorf("invalid IP address")
+			}
 			break
 		}
-	}
-	report.IPAddress = ParseIPAddress(report.IPAddress)
-	if report.IPAddress == "" {
-		return fmt.Errorf("invalid IP address")
 	}
 	*r = report
 	return nil
@@ -354,27 +366,6 @@ func (r *IBeLinkIPReport) Parse(data []byte) error {
 	report.Datagram = data
 	*r = report
 	return nil
-}
-
-// GetMsgPatternFromHint returns the UDP payload regex pattern for the given MinerTypeHint, if known.
-func GetMsgPatternFromHint(hint MinerTypeHint) (*regexp.Regexp, bool) {
-	pattern, ok := msgPatterns[hint]
-	return pattern, ok
-}
-
-// GetMinerHintFromPort returns the MinerTypeHint for the given port, if known.
-func GetMinerHintFromPort(port int) (MinerTypeHint, bool) {
-	hint, ok := minerPorts[port]
-	return hint, ok
-}
-
-// GetKnownMinerPorts returns a list of known miner UDP destination ports.
-func GetKnownMinerPorts() []int {
-	var ports []int
-	for p := range minerPorts {
-		ports = append(ports, p)
-	}
-	return ports
 }
 
 // ParseIPAddress parses address and returns a normalized IP address.
