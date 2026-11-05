@@ -184,17 +184,17 @@ Instead of explicitly handling each miner's specific packet format, the daemon u
 ### Known Miners:
 ```go
 minerPorts = map[int]MinerTypeHint{
-		14235: Antminer, // Known common port for other miner types as well (blackminer/hammer)
-		11503: Iceriver,
-		8888:  Whatsminer,
-		1314:  Goldshell,
-		18650: Sealminer,
-		9999:  Elphapex,
-		12345: Auradine,
-		54321: IPollo,
-		42069: HiveGPU, // Custom port for HiveOS
-		6667:  IBeLink,
-	}
+	14235: Antminer, // Known common port for other miner types as well (blackminer/hammer)
+	11503: Iceriver,
+	8888:  Whatsminer,
+	1314:  Goldshell,
+	18650: Sealminer,
+	9999:  Elphapex,
+	12345: Auradine,
+	54321: IPollo,
+	42069: HiveGPU, // Custom port for HiveOS
+	6667:  IBeLink,
+}
 ```
 
 ## iprd (package)
