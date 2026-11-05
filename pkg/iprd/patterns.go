@@ -71,12 +71,14 @@ var (
 	_ IPReport = (*GoldshellIPReport)(nil)
 	_ IPReport = (*AuradineIPReport)(nil)
 	_ IPReport = (*SealminerIPReport)(nil)
+	_ IPReport = (*IBeLinkIPReport)(nil)
 )
 
 type ipReportFactory func() IPReport
 
 var reportFactories = map[MinerTypeHint]ipReportFactory{
 	Goldshell: func() IPReport { return &GoldshellIPReport{} },
+	IBeLink:   func() IPReport { return &IBeLinkIPReport{} },
 	Sealminer: func() IPReport { return &SealminerIPReport{} },
 	Auradine:  func() IPReport { return &AuradineIPReport{} },
 }
@@ -295,6 +297,61 @@ func (r *SealminerIPReport) Parse(data []byte) error {
 	if report.IPAddress == "" {
 		return fmt.Errorf("invalid IP address")
 	}
+	*r = report
+	return nil
+}
+
+var (
+	iBeLinkPayloadMagic      = []byte{0x41, 0x5a, 0x5a, 0xf0, 0x01}
+	iBeLinkHeaderSize    int = 8
+	iBelinkAddressFields int = 4
+)
+
+type IBeLinkIPReport struct {
+	IPAddress  string
+	MACAddress string
+	Datagram   []byte
+}
+
+func (r *IBeLinkIPReport) IPAddr() string {
+	return r.IPAddress
+}
+
+func (r *IBeLinkIPReport) MacAddr() string {
+	return r.MACAddress
+}
+
+func (r *IBeLinkIPReport) SerialNum() string {
+	return ""
+}
+
+func (r *IBeLinkIPReport) Parse(data []byte) error {
+	var report IBeLinkIPReport
+	if len(data) < iBeLinkHeaderSize {
+		return fmt.Errorf("datagram too short")
+	}
+	if !bytes.Equal(data[:5], iBeLinkPayloadMagic) {
+		return fmt.Errorf("invalid magic")
+	}
+	var addressFields []string
+	fields := bytes.Split(data[iBeLinkHeaderSize:], []byte{0x00})
+	for _, field := range fields {
+		if len(field) > 0 {
+			addressFields = append(addressFields, string(field))
+		}
+	}
+	if len(addressFields) < iBelinkAddressFields {
+		return fmt.Errorf("invalid address fields")
+	}
+	report.IPAddress = ParseIPAddress(addressFields[0])
+	if report.IPAddress == "" {
+		return fmt.Errorf("invalid ip: %s", addressFields[0])
+	}
+	report.MACAddress = ParseMACAddress(addressFields[3])
+	if report.MACAddress == "" {
+		return fmt.Errorf("invalid mac: %s", addressFields[3])
+	}
+	report.Datagram = data
 	*r = report
 	return nil
 }
