@@ -128,122 +128,15 @@ CONFIG_PATH=./default.toml docker compose up -d
 > fails, the container may also need the `NET_ADMIN` capability
 > (`--cap-add=NET_ADMIN`) to put the interface into promiscuous mode.
 
-## IPR Daemon CLI
-### Interactive setup
-Run the guided setup to create a new TOML configuration:
-```bash
-sudo ./iprd -setup
-```
-The wizard covers capture interfaces or automatic LAN selection, the TCP bind
-address and port, mDNS advertisement, packet capture, known-miner filtering, and
-optional global BPF filters. It reviews the result before asking where to write
-it. The default destination is `/etc/iprd/config.toml` on Linux and
-`/usr/local/etc/iprd/config.toml` on FreeBSD; the wizard offers to create the
-application directory when needed. In an interactive terminal, press Tab to
-complete filesystem paths for capture files and the configuration destination.
+## Known Issues & Workarounds
+ - MacOS binary is damaged/unknown source
+  > For MacOS, if you get a message along the lines of "this application is damaged" or similar, run the following as root to exclude the binary path from the anti-virus:
+  > ```bash
+  > sudo xattr -dr com.apple.quarantine </path/to/iprd/binary>
+  > ```
 
-To load and modify an existing configuration, combine setup mode with `-c`:
-```bash
-sudo ./iprd -setup -c /etc/iprd/config.toml
-```
-The existing path becomes the default write destination. Run a generated
-configuration with `iprd -c /etc/iprd/config.toml`. Linux packages use this path
-by default; set `IPRD_CONFIG` in `/etc/iprd.conf` or `/etc/conf.d/iprd` to
-override it.
-
-### Finding interfaces
-To see all available network interfaces that the daemon can listen on, run with the `-list` argument:
-```
-./iprd -list
-
-# example output
-3: eth0 (eth0) Desc:""
-   Hardware:aa:bb:cc:dd:ee:ff
-   IPv4:192.168.1.xx
-```
-Using an interface index or name, specify one or more interfaces with `-i`.
-The flag supports chaining, comma-separated values, and inclusive interface index ranges:
-```bash
-sudo ./iprd -i "eth0" -i "eth1"
-sudo ./iprd -i "eth0,eth1"
-sudo ./iprd -i "8-21,23"
-```
-Index ranges can also use per-interface BPF options, which are applied to every
-index in the range (for example, `-i "8-21:known-ports"`).
-Each interface has an independent capture and reconnect loop. Packets are
-processed through one duplicate record, capture file, and TCP broadcast stream.
-
-It also worth noting that `iprd` requires running under the `root` user to run.
-
-### Modifying BPF filters
-the CLI allows direct modification of BPF filters for interfaces to add/exclude networks and ignoring specific devices on the network.
-
-Available global BPF interface (applies to all interfaces):
- - `-add-network <NETWORK>` - Append a IPv4 network number to BPF filter. (i.e. -add-network 172.16,192.168.1,10). Can be used multple times or comma-separated values.
- - `-no-root-network` - By default, the "root" network of interface is included in the BPF filter. Use this flag to exclude it. `add-network` must follow this flag if supplied.
- - `-exclude <NETWORK>` - Exclude a IPv4 network number from BPF filter. Can be used multple times or comma-separated values.
- - `-ignore <MAC_ADDR>` - Ignore a specific network device (MAC Address) from BPF filter. Can be used multple times or comma-separated values.
-
- For configuring interface-specific BPF filters, options similar to the global flags can be used like so:
-```bash
-sudo ./iprd -i eth0:no-root-network,add-network=172.16 \ # exclude root network and add 172.16 for eth0
-    -i eth1:add-network=10,exclude=192.168.1 \ # exclude 192.168.1 for eth1
-    -ignore "aa:bb:cc:dd:ee:ff" # global flags can also be used in conjuntction! ignore MAC address aa:bb:cc:dd:ee:ff for both interfaces.
-```
-
-### Configuring TCP Stream/Broadcast
-To configure the TCP stream port, use `-p` to supply:
-```bash
-sudo ./iprd -i "eth0" -p <SOME_PORT>
-```
-
-By default the TCP stream binds all interfaces. On a multi-homed host you can restrict
-it to a single local IP with `-b`:
-```bash
-sudo ./iprd -i "eth0" -b 192.168.1.10
-```
-
-### Enabling MDNS Advertisement
-To make the TCP endpoint discoverable by applications on the same LAN, enable
-mDNS/DNS-SD advertisement:
-```bash
-sudo ./iprd -i "eth0" -mdns
-```
-This publishes `_iprd._tcp.local.` with the daemon's hostname, configured TCP
-port, and subscription metadata. TOML configurations can use `mdns = true`.
-Discovery can be verified with Avahi on Linux or `dns-sd` on macOS:
-```bash
-avahi-browse -rt _iprd._tcp
-# or
-dns-sd -B _iprd._tcp local.
-```
-mDNS is link-local multicast, so discovery normally stays within the same
-LAN/VLAN unless the network has an mDNS reflector. No secrets are included in
-the advertised TXT records.
-
-### Capturing
-To retain capture history, enable capture rotation together with a capture path:
-```bash
-sudo ./iprd -i "eth0" -capture-file /var/log/iprd/capture.pcapng -rotate-capture
-```
-Captures are written in PCAP-NG format so packets retain their source interface.
-The setup wizard suggests `/var/log/iprd/capture.pcapng` on Linux and FreeBSD,
-`/Library/Logs/iprd/capture.pcapng` on macOS, and the `iprd\\logs` directory
-under `%ProgramData%` on Windows. It offers to create the suggested directory
-when needed. A supplied extension such as `.pcap` is normalized to `.pcapng`.
-Each capture is limited to 4 MiB. Rotation keeps four files total: the active `capture.pcapng`,
-then `capture.1.pcapng` through `capture.3.pcapng` from newest to oldest. Without
-`-rotate-capture`, the active capture is flushed at 4 MiB. TOML configurations
-can enable the same behavior with `rotate_capture_files = true`. Existing classic
-PCAP captures remain readable with `iprd-offline`.
-
-Also see `iprd -h` for a list of all available options.
-
-> [!NOTE]
-> MacOS: if you get a message along the lines of "this application is damaged" or similar, run the following as root to exclude the binary path from the anti-virus:
-> ```bash
-> sudo xattr -dr com.apple.quarantine </path/to/iprd/binary>
-> ```
+## IPR Daemon CLI Usage/Configuration
+See [`cmd/README.md`](cmd/README.md) for more details on initial configuration and CLI usage.
 
 ## Subscribing to TCP broadcast
 By default, the TCP broadcast listens on port 7788.
@@ -282,24 +175,26 @@ requests should only be exposed to a trusted LAN. Bind to localhost with
 required; status responses include interface names and recent listener errors.
 
 ## Miner Support
-the daemon isn't bound to any specific UDP ports by default, so it can receive any IP report message from ANY source. Any packet containing its own source IP address in the payload is deemed as a valid IP report packet to be forwarded.
+The daemon isn't bound to any specific UDP ports by default, so it can receive any IP report message from ANY source. Any packet containing its own source IP address in the payload is deemed as a valid IP report packet to be forwarded. While this approach allows the daemon to be miner-agnostic, it may result in false positives being forwarded from other devices on the network.
 
-The obvious downside of this approach is the possibility of false positives being forwarded as valid IP reports from other devices on the network. However, this can be refined as necessary with further configuration via the CLI (see [Modifying BPF filters](#modifying-bpf-filters) or available filtering options in `iprd -h`).
+However, this can be refined as needed with further configuration via the CLI (see [Modifying BPF filters](./cmd/README.md#modifying-bpf-filters) or available filtering options in `iprd -h`).
 
-Instead of explicitly handling each miner's specific packet format, the daemon uses the destination port of the packet to provide a type hint for the miner if known.
+Instead of explicitly handling each miner's specific packet format, the daemon uses a lookup table to map destination ports to miner types. This allows the daemon to forward valid IP report packets from any source, while still providing a type hint for the miner if known.
 
 ### Known Miners:
 ```go
 minerPorts = map[int]MinerTypeHint{
-	14235: Antminer,
-	11503: Iceriver,
-	8888:  Whatsminer,
-	1314:  Goldshell,
-	18650: Sealminer,
-	9999:  Elphapex,
-	12345: Auradine,
-	54321: IPollo,
-}
+		14235: Antminer, // Known common port for other miner types as well (blackminer/hammer)
+		11503: Iceriver,
+		8888:  Whatsminer,
+		1314:  Goldshell,
+		18650: Sealminer,
+		9999:  Elphapex,
+		12345: Auradine,
+		54321: IPollo,
+		42069: HiveGPU, // Custom port for HiveOS
+		6667:  IBeLink,
+	}
 ```
 
 ## iprd (package)
