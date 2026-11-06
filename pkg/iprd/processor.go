@@ -126,8 +126,8 @@ func (p *PacketProcessor) parseIPReportPacketAt(packet *IPReportPacket, observed
 
 	// validate IP report packet; contains source IP
 	if !bytes.Contains(packet.Datagram, []byte(packet.SrcIP)) {
-		pattern, ok := GetMsgPatternFromHint(Elphapex)
-		if packet.MinerHint != Elphapex || !ok || !pattern.Match(packet.Datagram) {
+		// Elphapex sends static message not containing source IP
+		if packet.MinerHint != Elphapex || !msgPatterns[Elphapex].Match(packet.Datagram) {
 			return ErrNoSourceIP
 		}
 	}

@@ -47,12 +47,12 @@ var (
 	}
 	// msgPatterns is a map of MinerTypeHint to regex UDP payload patterns.
 	msgPatterns = map[MinerTypeHint]*regexp.Regexp{
-		Antminer:   regexp.MustCompile(fmt.Sprintf(`^%s,%s`, validIP, validMAC)),
-		Iceriver:   regexp.MustCompile(fmt.Sprintf(`^addr:%s`, validIP)),
-		Whatsminer: regexp.MustCompile(fmt.Sprintf(`^IP:%sMAC:%s`, validIP, validMAC)),
-		Elphapex:   regexp.MustCompile(`^DG_IPREPORT_ONLY`),
+		Antminer:   regexp.MustCompile(fmt.Sprintf(`^%s,%s$`, validIP, validMAC)),
+		Iceriver:   regexp.MustCompile(fmt.Sprintf(`^addr:%s$`, validIP)),
+		Whatsminer: regexp.MustCompile(fmt.Sprintf(`^IP:%sMAC:%s$`, validIP, validMAC)),
+		Elphapex:   regexp.MustCompile(`^DG_IPREPORT_ONLY$`),
 		IPollo:     regexp.MustCompile(fmt.Sprintf(`^IP Addr:\[%s\].*?MAC Addr:\[%s\]`, validIP, validMAC)),
-		HiveGPU:    regexp.MustCompile(fmt.Sprintf(`^HiveOS %s`, validIP)),
+		HiveGPU:    regexp.MustCompile(fmt.Sprintf(`^HiveOS %s$`, validIP)),
 	}
 	reportModels = map[MinerTypeHint]reportModelFactory{
 		Goldshell: func() IPReportModel { return &GoldshellIPReport{} },
