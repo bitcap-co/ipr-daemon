@@ -7,8 +7,6 @@ import (
 	"fmt"
 	"io"
 	"time"
-
-	"github.com/gopacket/gopacket"
 )
 
 const (
@@ -46,18 +44,6 @@ func NewPacketProcessor(record *Record) *PacketProcessor {
 		record = NewRecord(defaultRecordCapacity)
 	}
 	return &PacketProcessor{record: record}
-}
-
-// ToIPRPacket decodes a captured packet into an IPReportPacket.
-func (p *PacketProcessor) ToIPRPacket(captured CapturedPacket) (*IPReportPacket, error) {
-	packet := gopacket.NewPacket(captured.Data, captured.LinkType, gopacket.Default)
-	packet.Metadata().CaptureInfo = captured.CaptureInfo
-
-	iprPacket, err := NewIPReportPacket(packet)
-	if err != nil {
-		return nil, err
-	}
-	return iprPacket, nil
 }
 
 // IsDuplicate returns true if the packet is a duplicate based on the processor's record.

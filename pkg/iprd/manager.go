@@ -250,10 +250,7 @@ func (m *ListenerManager) processCapturedPacket(captured CapturedPacket) *IPRepo
 	}
 	m.telemetry.recordPacket(packetAt)
 
-	packet := gopacket.NewPacket(captured.Data, captured.LinkType, gopacket.Default)
-	packet.Metadata().CaptureInfo = captured.CaptureInfo
-
-	ipr, err := NewIPReportPacket(packet)
+	ipr, err := captured.ToIPRPacket()
 	if err != nil {
 		m.telemetry.invalid.Add(1)
 		return nil
@@ -275,6 +272,8 @@ func (m *ListenerManager) processCapturedPacket(captured CapturedPacket) *IPRepo
 		if m.cfg.Debug {
 			m.log.Error(fmt.Errorf("%s - not valid: %w", ipr.String(), err))
 			m.log.Debug("--- PACKET DUMP ---")
+			packet := gopacket.NewPacket(captured.Data, captured.LinkType, gopacket.Default)
+			packet.Metadata().CaptureInfo = captured.CaptureInfo
 			m.log.Debug(fmt.Sprintf("%s\n", packet.Dump()))
 		}
 		return nil

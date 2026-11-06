@@ -21,6 +21,14 @@ type CapturedPacket struct {
 	Interface   IPRInterface
 }
 
+// ToIPRPacket converts the captured packet to an IPReportPacket.
+func (p CapturedPacket) ToIPRPacket() (*IPReportPacket, error) {
+	packet := gopacket.NewPacket(p.Data, p.LinkType, gopacket.Default)
+	packet.Metadata().CaptureInfo = p.CaptureInfo
+
+	return NewIPReportPacket(packet)
+}
+
 // IPRBroadcastMessage describes the JSON message structure of a IPReportPacket.
 type IPRBroadcastMessage struct {
 	Timestamp int64         `json:"timestamp"`
