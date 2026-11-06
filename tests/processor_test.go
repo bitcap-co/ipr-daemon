@@ -4,12 +4,26 @@ import (
 	"bytes"
 	"compress/zlib"
 	"errors"
+	"fmt"
+	"io"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
+	"github.com/gopacket/gopacket/pcapgo"
 )
+
+func generateValidPayload(srcIP, srcMAC string, dstPort int) []byte {
+	switch dstPort {
+	case 14235:
+		return []byte(fmt.Sprintf("%s,%s", srcIP, srcMAC))
+	default:
+		return []byte("IP report from " + srcIP)
+	}
+}
 
 func validIPReportPacket(mac string, interfaceIndex int, port int) *iprd.IPReportPacket {
 	return &iprd.IPReportPacket{
@@ -18,9 +32,60 @@ func validIPReportPacket(mac string, interfaceIndex int, port int) *iprd.IPRepor
 		SrcIP:          "192.168.1.100",
 		SrcMAC:         mac,
 		DstPort:        port,
-		Datagram:       []byte("IP report from 192.168.1.100"),
+		Datagram:       generateValidPayload("192.168.1.100", mac, port),
 		MinerHint:      iprd.UnknownType,
 	}
+}
+
+func sealminerFixturePacket(t *testing.T) *iprd.IPReportPacket {
+	t.Helper()
+
+	file, err := os.Open(filepath.Join("testdata", "captures", "sealminer.pcapng"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+
+	reader, err := pcapgo.NewNgReader(file, pcapgo.NgReaderOptions{WantMixedLinkType: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	data, captureInfo, err := reader.ReadPacketData()
+	if err != nil {
+		t.Fatal(err)
+	}
+	intf, err := reader.Interface(captureInfo.InterfaceIndex)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	packet, err := iprd.CapturedPacket{
+		Data:        data,
+		CaptureInfo: captureInfo,
+		LinkType:    intf.LinkType,
+	}.ToIPRPacket()
+	if err != nil {
+		t.Fatal(err)
+	}
+	return packet
+}
+
+func decompressSealminerFixture(t *testing.T, datagram []byte) []byte {
+	t.Helper()
+	if len(datagram) <= 8 {
+		t.Fatalf("Sealminer fixture datagram length = %d, want more than 8", len(datagram))
+	}
+
+	reader, err := zlib.NewReader(bytes.NewReader(datagram[8:]))
+	if err != nil {
+		t.Fatal(err)
+	}
+	decompressed, readErr := io.ReadAll(reader)
+	closeErr := reader.Close()
+	if err := errors.Join(readErr, closeErr); err != nil {
+		t.Fatal(err)
+	}
+	return decompressed
 }
 
 func TestIPReportPacketStringIncludesInterfaceName(t *testing.T) {
@@ -82,7 +147,7 @@ func TestPacketProcessorRejectsNilPacket(t *testing.T) {
 
 func TestPacketProcessorLeavesValidPlaintextBeginningWithXUncompressed(t *testing.T) {
 	processor := iprd.NewPacketProcessor(nil)
-	packet := validIPReportPacket("aa:bb:cc:dd:ee:05", 1, 14235)
+	packet := validIPReportPacket("aa:bb:cc:dd:ee:05", 1, 7777)
 	packet.Datagram = []byte("x IP report from " + packet.SrcIP)
 	want := bytes.Clone(packet.Datagram)
 
@@ -96,7 +161,7 @@ func TestPacketProcessorLeavesValidPlaintextBeginningWithXUncompressed(t *testin
 
 func TestPacketProcessorDoesNotMistakeInvalidPlaintextForZlib(t *testing.T) {
 	processor := iprd.NewPacketProcessor(nil)
-	packet := validIPReportPacket("aa:bb:cc:dd:ee:06", 1, 14235)
+	packet := validIPReportPacket("aa:bb:cc:dd:ee:06", 1, 7777)
 	packet.Datagram = append([]byte{0xff, 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'x', ' '}, []byte(packet.SrcIP)...)
 	want := bytes.Clone(packet.Datagram)
 
@@ -111,26 +176,20 @@ func TestPacketProcessorDoesNotMistakeInvalidPlaintextForZlib(t *testing.T) {
 func TestPacketProcessorDecompressesZlibDatagrams(t *testing.T) {
 	for _, tc := range []struct {
 		name   string
-		prefix []byte
+		offset int
 	}{
-		{name: "stream at offset zero"},
-		{name: "stream at offset eight", prefix: make([]byte, 8)},
+		{name: "stream at offset zero", offset: 0},
+		{name: "stream at offset eight", offset: 8},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			processor := iprd.NewPacketProcessor(nil)
-			packet := validIPReportPacket("aa:bb:cc:dd:ee:07", 1, 18650)
-			want := []byte("IP report from " + packet.SrcIP)
-
-			var compressed bytes.Buffer
-			compressed.Write(tc.prefix)
-			writer := zlib.NewWriter(&compressed)
-			if _, err := writer.Write(want); err != nil {
-				t.Fatal(err)
+			packet := sealminerFixturePacket(t)
+			want := decompressSealminerFixture(t, packet.Datagram)
+			if tc.offset == 0 {
+				packet.Datagram = bytes.Clone(packet.Datagram[8:])
+			} else {
+				packet.Datagram = bytes.Clone(packet.Datagram)
 			}
-			if err := writer.Close(); err != nil {
-				t.Fatal(err)
-			}
-			packet.Datagram = compressed.Bytes()
 
 			if err := processor.ParseIPReportPacket(packet); err != nil {
 				t.Fatalf("ParseIPReportPacket() error = %v", err)
@@ -155,9 +214,12 @@ func TestPacketProcessorLimitsDecompressedDatagramSize(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			processor := iprd.NewPacketProcessor(nil)
-			packet := validIPReportPacket("aa:bb:cc:dd:ee:09", 1, 18650)
-			payload := bytes.Repeat([]byte{'a'}, tc.size)
-			copy(payload, packet.SrcIP)
+			packet := sealminerFixturePacket(t)
+			payload := decompressSealminerFixture(t, packet.Datagram)
+			if len(payload) > tc.size {
+				t.Fatalf("Sealminer fixture payload length = %d, want at most %d", len(payload), tc.size)
+			}
+			payload = append(payload, bytes.Repeat([]byte{' '}, tc.size-len(payload))...)
 
 			var compressed bytes.Buffer
 			writer := zlib.NewWriter(&compressed)

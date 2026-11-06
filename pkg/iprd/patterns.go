@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/netip"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -273,6 +274,8 @@ func (r *SealminerIPReport) Parse(data []byte) error {
 	// fix JSON booleans
 	data = bytes.ReplaceAll(data, []byte("TRUE"), []byte("true"))
 	data = bytes.ReplaceAll(data, []byte("FALSE"), []byte("false"))
+	// wrap in array since payload is naked list of unassociated objects
+	data = slices.Concat([]byte("["), data, []byte("]"))
 
 	var t []any
 	if err := json.Unmarshal(data, &t); err != nil {

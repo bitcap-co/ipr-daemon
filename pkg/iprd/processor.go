@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 	"time"
 )
 
@@ -130,10 +131,20 @@ func (p *PacketProcessor) parseIPReportPacketAt(packet *IPReportPacket, observed
 			return ErrNoSourceIP
 		}
 	}
+	if pattern, ok := GetMsgPatternFromHint(packet.MinerHint); ok {
+		if !pattern.Match(packet.Datagram) {
+			return fmt.Errorf("failed to validate %s packet: failed match", packet.MinerHint)
+		}
+	}
+	if report, ok := NewIPReportFromHint(packet.MinerHint); ok {
+		if err := report.Parse(packet.Datagram); err != nil {
+			return fmt.Errorf("failed to validate %s packet: %w", packet.MinerHint, err)
+		}
+	}
 	// update record with new IP report entry
 	p.record.addAt(packet.SrcMAC, RecordEntry{
 		SrcIP:     packet.SrcIP,
-		SrcMAC:    packet.SrcMAC,
+		SrcMAC:    strings.ToLower(packet.SrcMAC),
 		MinerHint: packet.MinerHint,
 		CreatedAt: packet.Timestamp.UnixMilli(),
 	}, observedAt)

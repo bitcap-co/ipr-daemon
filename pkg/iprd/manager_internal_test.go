@@ -13,6 +13,16 @@ import (
 	"github.com/gopacket/gopacket/layers"
 )
 
+func generateValidPayload(srcIP, srcMAC string, dstPort int) []byte {
+	minerHint, _ := GetMinerHintFromPort(dstPort)
+	switch minerHint {
+	case Antminer:
+		return []byte(fmt.Sprintf("%s,%s", srcIP, srcMAC))
+	default:
+		return []byte("IP report from " + srcIP)
+	}
+}
+
 func capturedIPReport(t *testing.T, srcMAC string, dstPort layers.UDPPort, interfaceIndex int) CapturedPacket {
 	t.Helper()
 
@@ -33,10 +43,11 @@ func capturedIPReport(t *testing.T, srcMAC string, dstPort layers.UDPPort, inter
 		t.Fatal(err)
 	}
 	buf := gopacket.NewSerializeBuffer()
+	payload := generateValidPayload("192.168.1.100", srcMAC, int(dstPort))
 	if err := gopacket.SerializeLayers(buf, gopacket.SerializeOptions{
 		FixLengths:       true,
 		ComputeChecksums: true,
-	}, eth, ip, udp, gopacket.Payload("IP report from 192.168.1.100")); err != nil {
+	}, eth, ip, udp, gopacket.Payload(payload)); err != nil {
 		t.Fatal(err)
 	}
 	data := append([]byte(nil), buf.Bytes()...)

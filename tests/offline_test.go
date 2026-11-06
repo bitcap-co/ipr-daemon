@@ -33,11 +33,12 @@ func offlineCapturePacket(t *testing.T) ([]byte, gopacket.CaptureInfo) {
 	if err := udp.SetNetworkLayerForChecksum(ip); err != nil {
 		t.Fatal(err)
 	}
+	payload := generateValidPayload("192.168.1.100", "aa:bb:cc:dd:ee:31", 14235)
 	buffer := gopacket.NewSerializeBuffer()
 	if err := gopacket.SerializeLayers(buffer, gopacket.SerializeOptions{
 		FixLengths:       true,
 		ComputeChecksums: true,
-	}, eth, ip, udp, gopacket.Payload("IP report from 192.168.1.100")); err != nil {
+	}, eth, ip, udp, gopacket.Payload(payload)); err != nil {
 		t.Fatal(err)
 	}
 	data := append([]byte(nil), buffer.Bytes()...)
