@@ -9,7 +9,7 @@ Additionally, `iprd.GetInterfaceByName()` & `iprd.GetInterfaceByIndex()` allow r
 For FreeBSD-based routers (OPNsense, pfSense), `iprd.FindLanInterface()` allows finding the detected LAN interface using the interface's description.
 
 ### Listening for IP Reports
-IP report listening is facilitated by the `ListenerManager` type. It manages a configured set of `IPRListener`s (one for each `IPRInterface`), capture writing, the processing & forwarding of captured packets to a unified readable channel.
+IP report listening is facilitated by the `ListenerManager` type. It manages a configured set of `IPRListener`s (one for each `IPRInterface`), capture writing, and the processing & forwarding of captured packets to a unified readable channel.
 
 #### Basic usage
 ```go
@@ -64,6 +64,7 @@ broadcaster.SetStatusProvider(manager)
 go broadcaster.Listen()
 
 report := <-manager.Reports()
+// serialize the report into a broadcast message (i.e., `IPRBroadcastMessage`)
 message, err := iprd.NewIPRBroadcastMessage(report)
 if err != nil {
 	return err

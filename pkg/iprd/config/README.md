@@ -15,21 +15,21 @@ Use `DefaultListenerConfig()`, `DefaultForwardConfig()`, or `DefaultIPRDConfig()
 
 ```go
 cfg, err := iprdconfig.ParseConfig(&iprdconfig.IPRDConfig{
-	ListenerConfig: iprdconfig.ListenerConfig{
-		ListenInterfaces: []string{"eth0", "eth1"},
-		ForwardKnown:     true,
-		Interfaces: []iprdconfig.InterfaceConfig{
-			{
-				Selector:         "eth1",
-				FilterKnownPorts: true,
-			},
-		},
-	},
-	ForwardConfig: iprdconfig.ForwardConfig{
-		Bind: "0.0.0.0",
-		Port: 7788,
-		MDNS: true,
-	},
+    ListenerConfig: iprdconfig.ListenerConfig{
+        ListenInterfaces: []string{"eth0", "eth1"},
+        ForwardKnown:     true,
+        Interfaces: []iprdconfig.InterfaceConfig{
+            {
+                Selector:         "eth1",
+                FilterKnownPorts: true,
+            },
+        },
+    },
+    ForwardConfig: iprdconfig.ForwardConfig{
+        Bind: "0.0.0.0",
+        Port: 7788,
+        MDNS: true,
+    },
 })
 if err != nil {
 	return err
