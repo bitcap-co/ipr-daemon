@@ -197,20 +197,31 @@ minerPorts = map[int]MinerTypeHint{
 }
 ```
 
-## iprd (package)
-The core tooling/functionality of IPR Daemon can be found in `pkg/iprd`.
-See [README](./pkg/iprd/README.md) for more details on how to use within your own programs!
+## Getting Started with iprd (package)
+All the core functionality of IPR Daemon can be found in `pkg/iprd`.
+See [README](./pkg/iprd/README.md) to get familiar with the package and learn how to use it within your own programs!
 
-For documentation, see:
+For the latest documentation, run in the `ipr-daemon` project:
 ```bash
 go doc -http ./pkg/iprd
 ```
+or can browse online at [pkg.go.dev](https://pkg.go.dev/github.com/bitcap-co/ipr-daemon/pkg/iprd)
 
-To include into a local project:
-```
+### Importing
+To include into a local project, download this repository:
+```bash
 go get github.com/bitcap-co/ipr-daemon
 ```
-then to import the `iprd` package, simply import:
+then import the `iprd` package:
 ```go
 import "github.com/bitcap-co/ipr-daemon/pkg/iprd"
+```
+
+iprd's configuration library is separate pcap-free sub-package of `iprd` at `iprd/config`.
+
+To use the config library, import it as follows:
+```go
+import (
+	iprdconfig "github.com/bitcap-co/ipr-daemon/pkg/iprd/config"
+)
 ```
