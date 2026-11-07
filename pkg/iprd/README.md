@@ -23,24 +23,24 @@ defer cancel()
 // Create a new ListenerManager with the given config and logger
 manager, err := iprd.NewListenerManager(cfg, logger)
 if err != nil {
-	// invalid configuration...
+    // invalid configuration...
 }
 
 // Message handler func. Reads reports directly from the
 // provided Reports() channel.
 go func() {
-	for {
-		select {
-		case report, ok := <-manager.Reports():
-			if !ok {
-				return
-			}
-			// process reports...
-			fmt.Println(report)
-		case <-ctx.Done():
-			return
-		}
-	}
+    for {
+        select {
+        case report, ok := <-manager.Reports():
+            if !ok {
+                return
+            }
+            // process reports...
+            fmt.Println(report)
+        case <-ctx.Done():
+            return
+        }
+    }
 }()
 
 // Start the listener manager; supervises IPRListeners derived from the config
