@@ -32,7 +32,7 @@ cfg, err := iprdconfig.ParseConfig(&iprdconfig.IPRDConfig{
     },
 })
 if err != nil {
-	return err
+    return err
 }
 ```
 
@@ -75,11 +75,11 @@ network_exclusions = ["10"]
 ```go
 cfg, err := iprdconfig.NewIPRDConfigFromFile("iprd.toml")
 if err != nil {
-	return err
+    return err
 }
 
 if err := iprdconfig.WriteIPRDConfigToFile(cfg, "normalized.toml"); err != nil {
-	return err
+    return err
 }
 ```
 
