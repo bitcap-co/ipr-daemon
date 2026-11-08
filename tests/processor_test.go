@@ -263,3 +263,31 @@ func TestPacketProcessorAllowsStaticElphapexPacket(t *testing.T) {
 		t.Fatalf("packet miner hint = %v, want %v", packet.MinerHint, iprd.Elphapex)
 	}
 }
+
+func TestPacketProcessorValidatesPatternContainingNullBytes(t *testing.T) {
+	record := iprd.NewRecord(5)
+	processor := iprd.NewPacketProcessor(record)
+	packet := validIPReportPacket("aa:bb:cc:dd:ee:ff", 1, 14235)
+	packet.Datagram = append(packet.Datagram, '\x00')
+	if err := processor.ParseIPReportPacket(packet); err != nil {
+		t.Fatalf("ParseIPReportPacket() error = %v, want nil", err)
+	}
+	if record.Length() != 1 {
+		t.Fatalf("record length = %d, want 1", record.Length())
+	}
+	if packet.MinerHint != iprd.Antminer {
+		t.Fatalf("packet miner hint = %v, want %v", packet.MinerHint, iprd.Antminer)
+	}
+
+	secondPacket := validIPReportPacket("aa:bb:cc:dd:ee:10", 1, 9999)
+	secondPacket.Datagram = append([]byte("DG_IPREPORT_ONLY"), '\x00', '\x00')
+	if err := processor.ParseIPReportPacket(secondPacket); err != nil {
+		t.Fatalf("ParseIPReportPacket() error = %v, want nil", err)
+	}
+	if record.Length() != 2 {
+		t.Fatalf("record length = %d, want 2", record.Length())
+	}
+	if secondPacket.MinerHint != iprd.Elphapex {
+		t.Fatalf("packet miner hint = %v, want %v", secondPacket.MinerHint, iprd.Elphapex)
+	}
+}

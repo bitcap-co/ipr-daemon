@@ -349,8 +349,8 @@ func (r *IBeLinkIPReport) Parse(data []byte) error {
 		return fmt.Errorf("invalid magic")
 	}
 	var addressFields []string
-	fields := bytes.Split(data[iBeLinkHeaderSize:], []byte{0x00})
-	for _, field := range fields {
+	fields := bytes.SplitSeq(data[iBeLinkHeaderSize:], []byte{0x00})
+	for field := range fields {
 		if len(field) > 0 {
 			addressFields = append(addressFields, string(field))
 		}

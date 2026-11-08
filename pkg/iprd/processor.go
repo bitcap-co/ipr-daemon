@@ -124,19 +124,22 @@ func (p *PacketProcessor) parseIPReportPacketAt(packet *IPReportPacket, observed
 	}
 	packet.Payload = string(packet.Datagram)
 
+	// Ignore trailing NUL padding when validating textual payload patterns
+	message := bytes.TrimRight(packet.Datagram, "\x00")
 	// validate IP report packet; contains source IP
 	if !bytes.Contains(packet.Datagram, []byte(packet.SrcIP)) {
 		// Elphapex sends static message not containing source IP
-		if packet.MinerHint != Elphapex || !msgPatterns[Elphapex].Match(packet.Datagram) {
+		if packet.MinerHint != Elphapex || !msgPatterns[Elphapex].Match(message) {
 			return ErrNoSourceIP
 		}
 	}
 	if pattern, ok := GetMsgPatternFromHint(packet.MinerHint); ok {
-		if !pattern.Match(packet.Datagram) {
+		if !pattern.Match(message) {
 			return fmt.Errorf("failed to validate %s packet: failed match", packet.MinerHint)
 		}
 	}
 	if report, ok := NewIPReportFromHint(packet.MinerHint); ok {
+		// parse raw datagram bytes in case of delimiting/padding bytes
 		if err := report.Parse(packet.Datagram); err != nil {
 			return fmt.Errorf("failed to validate %s packet: %w", packet.MinerHint, err)
 		}
