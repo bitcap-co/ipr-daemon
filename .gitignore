@@ -24,8 +24,13 @@ profile.cov
 go.work
 go.work.sum
 
-# env file
+# Environment files
 .env
+.venv/
+venv/
+
+# ansible
+ansible/
 
 # Editor/IDE
 # .idea/
