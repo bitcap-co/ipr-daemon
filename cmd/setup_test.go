@@ -7,6 +7,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 
@@ -73,6 +74,49 @@ func TestRunSetupCreatesConfiguration(t *testing.T) {
 	modePosition := strings.Index(output.String(), "Capture interface mode:")
 	if interfacePosition < 0 || modePosition < 0 || interfacePosition > modePosition {
 		t.Fatalf("available interfaces were not shown before capture mode:\n%s", output.String())
+	}
+}
+
+func TestRunSetupCanonicalizesMDNSIndexToOSInterfaceName(t *testing.T) {
+	destination := filepath.Join(t.TempDir(), "iprd.toml")
+	input := strings.Join([]string{
+		"1",
+		"1",
+		"",
+		"",
+		"y",
+		"7,Ethernet 3,missing",
+		"n",
+		"n",
+		"n",
+		"n",
+		destination,
+	}, "\n") + "\n"
+	interfaces := []iprd.IPRInterface{{
+		Index:        7,
+		Name:         `\\Device\\NPF_{CAPTURE-ID}`,
+		FriendlyName: "Ethernet 3",
+		IPv4:         net.ParseIP("192.168.1.20"),
+	}}
+	var output bytes.Buffer
+
+	err := runSetup(strings.NewReader(input), &output, "", func() ([]iprd.IPRInterface, error) {
+		return interfaces, nil
+	})
+	if err != nil {
+		t.Fatalf("runSetup: %v\noutput:\n%s", err, output.String())
+	}
+
+	cfg, err := iprdconfig.NewIPRDConfigFromFile(destination)
+	if err != nil {
+		t.Fatalf("read generated config: %v", err)
+	}
+	want := []string{"Ethernet 3", "missing"}
+	if !reflect.DeepEqual(cfg.MDNSInterfaces, want) {
+		t.Fatalf("mDNS interfaces = %v, want %v", cfg.MDNSInterfaces, want)
+	}
+	if got := cfg.ListenInterfaces; len(got) != 1 || got[0] != interfaces[0].Name {
+		t.Fatalf("capture interfaces = %v, want pcap name %q", got, interfaces[0].Name)
 	}
 }
 

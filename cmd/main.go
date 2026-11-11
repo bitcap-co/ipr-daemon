@@ -138,20 +138,17 @@ func main() {
 		// normalize the output file path to .toml extension
 		*flWriteConfig = strings.Split(*flWriteConfig, ".")[0]
 		*flWriteConfig = *flWriteConfig + ".toml"
+		finalCfg := &rawCfg
 		if curr, err := iprdconfig.NewIPRDConfigFromFile(*flWriteConfig); err == nil {
 			// config file exists, merge with current config.
-			mergedCfg, err := updateExistingConfig(curr, &rawCfg)
+			finalCfg, err = updateExistingConfig(curr, &rawCfg)
 			if err != nil {
 				log.Fatal(err)
 			}
-			if err := iprdconfig.WriteIPRDConfigToFile(mergedCfg, *flWriteConfig); err != nil {
-				log.Fatal(err)
-			}
-		} else {
-			// write new config file.
-			if err := iprdconfig.WriteIPRDConfigToFile(&rawCfg, *flWriteConfig); err != nil {
-				log.Fatal(err)
-			}
+		}
+		normalizeDaemonConfig(finalCfg, iprd.GetInterfaces, net.Interfaces)
+		if err := iprdconfig.WriteIPRDConfigToFile(finalCfg, *flWriteConfig); err != nil {
+			log.Fatal(err)
 		}
 		log.Info(fmt.Sprintf("successfully wrote -> %s", *flWriteConfig))
 		return
@@ -182,6 +179,10 @@ func main() {
 	}
 
 	// enter run mode
+	normalizeDaemonConfig(cfg, iprd.GetInterfaces, net.Interfaces)
+	if err := cfg.Validate(); err != nil {
+		log.Fatal(err)
+	}
 	// no interface providers; exit. Auto mode discovers its interface at runtime.
 	if !cfg.Auto && len(cfg.ListenInterfaces) == 0 {
 		flag.Usage()

@@ -300,7 +300,7 @@ func (p *setupPrompter) configure(cfg *iprdconfig.IPRDConfig, getInterfaces setu
 					continue
 				}
 			}
-			cfg.MDNSInterfaces = splitValues(advertise)
+			cfg.MDNSInterfaces = normalizeSetupMDNSSelectors(splitValues(advertise), interfaces)
 			break
 		}
 	} else {
@@ -832,6 +832,30 @@ func selectedInterfaceConfigs(configs []iprdconfig.InterfaceConfig, selectors []
 		}
 	}
 	return selected
+}
+
+func normalizeSetupMDNSSelectors(selectors []string, interfaces []iprd.IPRInterface) []string {
+	namesByIndex := make(map[int]string, len(interfaces))
+	for _, iface := range interfaces {
+		if iface.Index <= 0 || iface.FriendlyName == "" {
+			continue
+		}
+		if _, exists := namesByIndex[iface.Index]; !exists {
+			namesByIndex[iface.Index] = iface.FriendlyName
+		}
+	}
+	resolve := func(selector string) string {
+		selector = strings.TrimSpace(selector)
+		index, err := strconv.Atoi(selector)
+		if err != nil || index <= 0 {
+			return selector
+		}
+		if name := namesByIndex[index]; name != "" {
+			return name
+		}
+		return selector
+	}
+	return resolveUniqueSelectors(selectors, resolve)
 }
 
 func splitValues(value string) []string {
