@@ -11,6 +11,25 @@ import (
 	"github.com/gopacket/gopacket"
 )
 
+const (
+	defaultSuppressionThreshold int = 5
+)
+
+// suppressionStore is used as a simple in-memory store for invalid packet noise suppression.
+// It tracks the number of invalid packets per key and suppresses a key if it exceeds the threshold.
+type suppressionStore map[string]int
+
+func (s suppressionStore) add(key string) {
+	s[key]++
+}
+
+func (s suppressionStore) isSuppressed(key string) bool {
+	if _, ok := s[key]; !ok {
+		return false
+	}
+	return s[key] >= defaultSuppressionThreshold
+}
+
 var (
 	// ErrListenerManagerAlreadyStarted is returned when the listener manager is started more than once.
 	ErrListenerManagerAlreadyStarted = errors.New("listener manager may only be run once")
@@ -19,14 +38,15 @@ var (
 // ListenerManager coordinates interface listeners, capture writing, packet
 // processing, and a single combined IP report stream.
 type ListenerManager struct {
-	cfg       *iprdconfig.ListenerConfig
-	log       Logger
-	listeners []*IPRListener
-	processor *PacketProcessor
-	capture   *CaptureWriter
-	reports   chan *IPReportPacket
-	runOnce   sync.Once
-	telemetry managerTelemetry
+	cfg         *iprdconfig.ListenerConfig
+	log         Logger
+	listeners   []*IPRListener
+	processor   *PacketProcessor
+	capture     *CaptureWriter
+	reports     chan *IPReportPacket
+	runOnce     sync.Once
+	telemetry   managerTelemetry
+	suppression suppressionStore
 }
 
 // NewListenerManager returns a manager with one listener per configured
@@ -43,14 +63,28 @@ func NewListenerManager(cfg *iprdconfig.ListenerConfig, logger Logger) (*Listene
 	managerCfg.CaptureFile = capture.Path()
 	cfg = managerCfg
 	return &ListenerManager{
-		cfg:       cfg,
-		log:       logger,
-		listeners: newManagedListeners(cfg, logger),
-		processor: NewPacketProcessor(nil),
-		capture:   capture,
-		reports:   make(chan *IPReportPacket, 256),
-		telemetry: newManagerTelemetry(),
+		cfg:         cfg,
+		log:         logger,
+		listeners:   newManagedListeners(cfg, logger),
+		processor:   NewPacketProcessor(nil),
+		capture:     capture,
+		reports:     make(chan *IPReportPacket, 256),
+		telemetry:   newManagerTelemetry(),
+		suppression: make(suppressionStore),
 	}, nil
+}
+
+// SuppressedDevices returns the list of actively noise-suppressed source MAC addresses.
+// A device is automatically suppressed by the manager when its invalid packet count exceeds
+// the suppression threshold.
+func (m *ListenerManager) SuppressedDevices() []string {
+	var suppressed []string
+	for key, count := range m.suppression {
+		if count >= defaultSuppressionThreshold {
+			suppressed = append(suppressed, key)
+		}
+	}
+	return suppressed
 }
 
 // Reports returns the manager's combined stream of validated IP reports.
@@ -64,6 +98,7 @@ func (m *ListenerManager) Reports() <-chan *IPReportPacket {
 // packet and listener diagnostics. Calling Status does not reset any counters.
 func (m *ListenerManager) Status() ManagerStatus {
 	status := m.telemetry.snapshot()
+	status.SuppressedDeviceCount = len(m.SuppressedDevices())
 	status.ListenersConfigured = len(m.listeners)
 	status.Listeners = make([]ListenerStatus, 0, len(m.listeners))
 	for _, listener := range m.listeners {
@@ -262,12 +297,24 @@ func (m *ListenerManager) processCapturedPacket(captured CapturedPacket) *IPRepo
 	if ipr.InterfaceName == "" {
 		ipr.InterfaceName = fmt.Sprintf("#%d", captured.Interface.Index)
 	}
+
+	if m.suppression.isSuppressed(ipr.SrcMAC) {
+		m.telemetry.suppressed.Add(1)
+		m.log.Warn(fmt.Sprintf("%s - suppressed device: %s", ipr.String(), ipr.SrcMAC))
+		return nil
+	}
+
 	if err := m.processor.ParseIPReportPacket(ipr); err != nil {
 		if errors.Is(err, ErrDuplicatePacket) {
 			m.telemetry.duplicates.Add(1)
 			m.log.Warn(fmt.Sprintf("%s - %s", ipr.String(), err))
+		} else if IsInvalidIPReportError(err) {
+			m.telemetry.invalid.Add(1)
+			m.log.Warn(fmt.Sprintf("%s - %s", ipr.String(), err))
 		} else {
 			m.telemetry.invalid.Add(1)
+			// increment source MAC invalid count towards noise suppression.
+			m.suppression.add(ipr.SrcMAC)
 		}
 		if m.cfg.Debug {
 			m.log.Error(fmt.Errorf("%s - not valid: %w", ipr.String(), err))
