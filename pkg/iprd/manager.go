@@ -101,7 +101,7 @@ func NewListenerManager(cfg *iprdconfig.ListenerConfig, logger Logger) (*Listene
 }
 
 // SuppressedDevices returns the list of actively noise-suppressed source MAC addresses.
-// A device is automatically suppressed by the manager when its invalid packet count exceeds
+// A device is automatically suppressed by the manager when its invalid packet count reaches
 // the suppression threshold.
 func (m *ListenerManager) SuppressedDevices() []string {
 	return m.suppression.suppressedKeys()
