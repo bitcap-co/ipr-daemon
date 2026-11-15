@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 
@@ -25,6 +26,12 @@ func generateValidPayload(srcIP, srcMAC string, dstPort int) []byte {
 
 func capturedIPReport(t *testing.T, srcMAC string, dstPort layers.UDPPort, interfaceIndex int) CapturedPacket {
 	t.Helper()
+	payload := generateValidPayload("192.168.1.100", srcMAC, int(dstPort))
+	return capturedUDPPacket(t, srcMAC, dstPort, interfaceIndex, payload)
+}
+
+func capturedUDPPacket(t *testing.T, srcMAC string, dstPort layers.UDPPort, interfaceIndex int, payload []byte) CapturedPacket {
+	t.Helper()
 
 	eth := &layers.Ethernet{
 		SrcMAC:       mustHardwareAddr(t, srcMAC),
@@ -43,7 +50,6 @@ func capturedIPReport(t *testing.T, srcMAC string, dstPort layers.UDPPort, inter
 		t.Fatal(err)
 	}
 	buf := gopacket.NewSerializeBuffer()
-	payload := generateValidPayload("192.168.1.100", srcMAC, int(dstPort))
 	if err := gopacket.SerializeLayers(buf, gopacket.SerializeOptions{
 		FixLengths:       true,
 		ComputeChecksums: true,
@@ -74,6 +80,58 @@ func mustHardwareAddr(t *testing.T, value string) net.HardwareAddr {
 		t.Fatal(err)
 	}
 	return addr
+}
+
+func TestSuppressionStoreThresholdAndIsolation(t *testing.T) {
+	store := newSuppressionStore()
+	belowThreshold := "aa:bb:cc:dd:ee:01"
+	suppressedSecond := "aa:bb:cc:dd:ee:03"
+	suppressedFirst := "aa:bb:cc:dd:ee:02"
+
+	for i := 0; i < defaultSuppressionThreshold-1; i++ {
+		store.add(belowThreshold)
+	}
+	for i := 0; i < defaultSuppressionThreshold; i++ {
+		store.add(suppressedSecond)
+		store.add(suppressedFirst)
+	}
+
+	if store.shouldSuppress(belowThreshold) {
+		t.Fatalf("device was suppressed below threshold %d", defaultSuppressionThreshold)
+	}
+	if !store.shouldSuppress(suppressedFirst) || !store.shouldSuppress(suppressedSecond) {
+		t.Fatalf("devices were not suppressed at threshold %d", defaultSuppressionThreshold)
+	}
+	want := []string{suppressedFirst, suppressedSecond}
+	if got := store.suppressedKeys(); !reflect.DeepEqual(got, want) {
+		t.Fatalf("suppressed keys = %v, want %v", got, want)
+	}
+}
+
+func TestSuppressionStoreConcurrentAccess(t *testing.T) {
+	store := newSuppressionStore()
+	key := "aa:bb:cc:dd:ee:01"
+
+	var wg sync.WaitGroup
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 1_000; i++ {
+			store.add(key)
+		}
+	}()
+	go func() {
+		defer wg.Done()
+		for i := 0; i < 1_000; i++ {
+			_ = store.shouldSuppress(key)
+			_ = store.suppressedKeys()
+		}
+	}()
+	wg.Wait()
+
+	if !store.shouldSuppress(key) {
+		t.Fatal("device was not suppressed after concurrent updates")
+	}
 }
 
 func TestListenerManagerInitialStatus(t *testing.T) {
@@ -221,6 +279,7 @@ func TestListenerManagerStatusConcurrent(t *testing.T) {
 			manager.listeners[0].telemetry.setState(ListenerStateActive, nil)
 			manager.listeners[0].telemetry.reconnects.Add(1)
 			manager.listeners[0].telemetry.setState(ListenerStateReconnecting, fmt.Errorf("reconnect %d", i))
+			manager.suppression.add("aa:bb:cc:dd:ee:01")
 		}
 	}()
 	for i := 0; i < 1_000; i++ {
@@ -283,6 +342,69 @@ func TestListenerManagerPacketStatus(t *testing.T) {
 	fresh := manager.Status()
 	if fresh.Packets.Processed != 4 || len(fresh.Listeners) != len(manager.listeners) {
 		t.Fatalf("mutating snapshot changed manager status: %+v", fresh)
+	}
+}
+
+func TestListenerManagerSuppressesGenericNetworkNoise(t *testing.T) {
+	manager, err := NewListenerManager(iprdconfig.DefaultListenerConfig(), NewLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
+	mac := "aa:bb:cc:dd:ee:20"
+	noise := capturedUDPPacket(t, mac, 14235, 1, []byte("unrelated network noise"))
+
+	for i := 0; i < defaultSuppressionThreshold; i++ {
+		if report := manager.processCapturedPacket(noise); report != nil {
+			t.Fatalf("noise packet %d returned a report", i+1)
+		}
+	}
+	if got := manager.SuppressedDevices(); !reflect.DeepEqual(got, []string{mac}) {
+		t.Fatalf("suppressed devices = %v, want [%s]", got, mac)
+	}
+
+	valid := capturedIPReport(t, mac, 14235, 1)
+	if report := manager.processCapturedPacket(valid); report != nil {
+		t.Fatal("valid packet from suppressed device returned a report")
+	}
+	status := manager.Status()
+	if status.SuppressedDeviceCount != 1 {
+		t.Fatalf("suppressed device count = %d, want 1", status.SuppressedDeviceCount)
+	}
+	want := PacketCounters{
+		Processed:  uint64(defaultSuppressionThreshold + 1),
+		Suppressed: 1,
+		Invalid:    uint64(defaultSuppressionThreshold),
+	}
+	if status.Packets != want {
+		t.Fatalf("packet counters = %+v, want %+v", status.Packets, want)
+	}
+}
+
+func TestListenerManagerDoesNotSuppressTypedValidationFailures(t *testing.T) {
+	manager, err := NewListenerManager(iprdconfig.DefaultListenerConfig(), NewLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
+	mac := "aa:bb:cc:dd:ee:21"
+	invalidReport := capturedUDPPacket(t, mac, 14235, 1, []byte("invalid report from 192.168.1.100"))
+
+	for i := 0; i < defaultSuppressionThreshold+1; i++ {
+		if report := manager.processCapturedPacket(invalidReport); report != nil {
+			t.Fatalf("invalid report packet %d returned a report", i+1)
+		}
+	}
+	if manager.suppression.shouldSuppress(mac) {
+		t.Fatal("typed validation failures suppressed the device")
+	}
+	if got := manager.SuppressedDevices(); len(got) != 0 {
+		t.Fatalf("suppressed devices = %v, want none", got)
+	}
+	status := manager.Status()
+	if status.Packets.Invalid != uint64(defaultSuppressionThreshold+1) {
+		t.Fatalf("invalid packet count = %d, want %d", status.Packets.Invalid, defaultSuppressionThreshold+1)
+	}
+	if status.Packets.Suppressed != 0 || status.SuppressedDeviceCount != 0 {
+		t.Fatalf("unexpected suppression status: %+v", status)
 	}
 }
 

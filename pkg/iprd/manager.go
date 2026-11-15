@@ -16,8 +16,8 @@ const (
 	defaultSuppressionThreshold int = 5
 )
 
-// suppressionStore is used as a simple in-memory store for invalid packet noise suppression.
-// It tracks the number of invalid packets per key and suppresses a key if it exceeds the threshold.
+// suppressionStore is used as a simple in-memory store for generic noise suppression on the network.
+// It tracks the number of invalid packets per key and marks a key as suppressed if it reaches the threshold.
 type suppressionStore struct {
 	mu     sync.RWMutex
 	counts map[string]int
@@ -35,7 +35,7 @@ func (s *suppressionStore) add(key string) {
 	s.mu.Unlock()
 }
 
-func (s *suppressionStore) isSuppressed(key string) bool {
+func (s *suppressionStore) shouldSuppress(key string) bool {
 	s.mu.RLock()
 	suppressed := s.counts[key] >= defaultSuppressionThreshold
 	s.mu.RUnlock()
@@ -318,7 +318,7 @@ func (m *ListenerManager) processCapturedPacket(captured CapturedPacket) *IPRepo
 		ipr.InterfaceName = fmt.Sprintf("#%d", captured.Interface.Index)
 	}
 
-	if m.suppression.isSuppressed(ipr.SrcMAC) {
+	if m.suppression.shouldSuppress(ipr.SrcMAC) {
 		m.telemetry.suppressed.Add(1)
 		m.log.Warn(fmt.Sprintf("%s - suppressed device: %s", ipr.String(), ipr.SrcMAC))
 		return nil
