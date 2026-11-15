@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -17,17 +18,42 @@ const (
 
 // suppressionStore is used as a simple in-memory store for invalid packet noise suppression.
 // It tracks the number of invalid packets per key and suppresses a key if it exceeds the threshold.
-type suppressionStore map[string]int
-
-func (s suppressionStore) add(key string) {
-	s[key]++
+type suppressionStore struct {
+	mu     sync.RWMutex
+	counts map[string]int
 }
 
-func (s suppressionStore) isSuppressed(key string) bool {
-	if _, ok := s[key]; !ok {
-		return false
+func newSuppressionStore() *suppressionStore {
+	return &suppressionStore{
+		counts: make(map[string]int),
 	}
-	return s[key] >= defaultSuppressionThreshold
+}
+
+func (s *suppressionStore) add(key string) {
+	s.mu.Lock()
+	s.counts[key]++
+	s.mu.Unlock()
+}
+
+func (s *suppressionStore) isSuppressed(key string) bool {
+	s.mu.RLock()
+	suppressed := s.counts[key] >= defaultSuppressionThreshold
+	s.mu.RUnlock()
+	return suppressed
+}
+
+func (s *suppressionStore) suppressedKeys() []string {
+	s.mu.RLock()
+	suppressed := make([]string, 0)
+	for key, count := range s.counts {
+		if count >= defaultSuppressionThreshold {
+			suppressed = append(suppressed, key)
+		}
+	}
+	s.mu.RUnlock()
+
+	sort.Strings(suppressed)
+	return suppressed
 }
 
 var (
@@ -46,7 +72,7 @@ type ListenerManager struct {
 	reports     chan *IPReportPacket
 	runOnce     sync.Once
 	telemetry   managerTelemetry
-	suppression suppressionStore
+	suppression *suppressionStore
 }
 
 // NewListenerManager returns a manager with one listener per configured
@@ -70,7 +96,7 @@ func NewListenerManager(cfg *iprdconfig.ListenerConfig, logger Logger) (*Listene
 		capture:     capture,
 		reports:     make(chan *IPReportPacket, 256),
 		telemetry:   newManagerTelemetry(),
-		suppression: make(suppressionStore),
+		suppression: newSuppressionStore(),
 	}, nil
 }
 
@@ -78,13 +104,7 @@ func NewListenerManager(cfg *iprdconfig.ListenerConfig, logger Logger) (*Listene
 // A device is automatically suppressed by the manager when its invalid packet count exceeds
 // the suppression threshold.
 func (m *ListenerManager) SuppressedDevices() []string {
-	var suppressed []string
-	for key, count := range m.suppression {
-		if count >= defaultSuppressionThreshold {
-			suppressed = append(suppressed, key)
-		}
-	}
-	return suppressed
+	return m.suppression.suppressedKeys()
 }
 
 // Reports returns the manager's combined stream of validated IP reports.
