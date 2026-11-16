@@ -18,6 +18,8 @@ const (
 	sealMinerPayloadOffset int = 8
 )
 
+// InvalidIPReportError is returned when an known/recognized IP report datagram fails validation.
+// Err is the underlying validation/parse error (Optional).
 type InvalidIPReportError struct {
 	Reason string
 	Err    error
@@ -30,6 +32,7 @@ func (e *InvalidIPReportError) Error() string {
 	return fmt.Sprintf("failed to validate: %s", e.Reason)
 }
 
+// IsInvalidIPReportError returns true if the error is an InvalidIPReportError.
 func IsInvalidIPReportError(err error) bool {
 	var e *InvalidIPReportError
 	return errors.As(err, &e)
