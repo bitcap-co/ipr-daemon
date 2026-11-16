@@ -29,6 +29,7 @@ func TestRunSetupCreatesConfiguration(t *testing.T) {
 		"y",
 		"y",
 		"y",
+		"y",
 		"n",
 		destination,
 	}, "\n") + "\n"
@@ -67,6 +68,9 @@ func TestRunSetupCreatesConfiguration(t *testing.T) {
 	if !cfg.ForwardKnown || !cfg.FilterKnownPorts {
 		t.Fatalf("known filtering = forward %v, ports %v; want both enabled", cfg.ForwardKnown, cfg.FilterKnownPorts)
 	}
+	if !cfg.PersistSuppressed {
+		t.Fatalf("persist suppressed = %v; want enabled", cfg.PersistSuppressed)
+	}
 	if !strings.Contains(output.String(), "Configuration written to "+destination) {
 		t.Fatalf("setup output did not confirm destination:\n%s", output.String())
 	}
@@ -86,6 +90,7 @@ func TestRunSetupCanonicalizesMDNSIndexToOSInterfaceName(t *testing.T) {
 		"",
 		"y",
 		"7,Ethernet 3,missing",
+		"n",
 		"n",
 		"n",
 		"n",
@@ -139,6 +144,7 @@ func TestRunSetupEditsExistingConfigurationWithExplicitFalseValues(t *testing.T)
 		"",
 		"",
 		"",
+		"n",
 		"n",
 		"n",
 		"n",
@@ -256,6 +262,7 @@ func TestRunSetupCanCancelWithoutWriting(t *testing.T) {
 		"2",
 		"",
 		"",
+		"n",
 		"n",
 		"n",
 		"n",

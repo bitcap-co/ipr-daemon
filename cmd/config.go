@@ -70,6 +70,10 @@ func updateExistingConfig(curr, target *iprdconfig.IPRDConfig) (*iprdconfig.IPRD
 		newCfg.RotateCaptureFiles = !target.RotateCaptureFiles || !curr.RotateCaptureFiles
 		log.Info(fmt.Sprintf("toggled rotate_capture_files: %v -> %v", curr.RotateCaptureFiles, newCfg.RotateCaptureFiles))
 	}
+	if target.PersistSuppressed {
+		newCfg.PersistSuppressed = !target.PersistSuppressed || !curr.PersistSuppressed
+		log.Info(fmt.Sprintf("toggled persist_suppressed: %v -> %v", curr.PersistSuppressed, newCfg.PersistSuppressed))
+	}
 	return iprdconfig.ParseConfig(newCfg)
 }
 

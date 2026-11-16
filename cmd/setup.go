@@ -350,6 +350,10 @@ func (p *setupPrompter) configure(cfg *iprdconfig.IPRDConfig, getInterfaces setu
 	if err != nil {
 		return err
 	}
+	cfg.PersistSuppressed, err = p.yesNo("Persist actively suppressed devices by the manager across restarts?", cfg.PersistSuppressed)
+	if err != nil {
+		return err
+	}
 
 	advancedDefault := cfg.NoRootNetwork || len(cfg.NetworkInclusions) > 0 || len(cfg.NetworkExclusions) > 0 || len(cfg.IgnoredDevices) > 0
 	advanced, err := p.yesNo("Configure global advanced BPF filters?", advancedDefault)
@@ -498,6 +502,7 @@ func (p *setupPrompter) printSummary(cfg *iprdconfig.IPRDConfig) {
 	}
 	fmt.Fprintf(p.out, "  Known miners only:  %s\n", enabledText(cfg.ForwardKnown))
 	fmt.Fprintf(p.out, "  Known ports only:   %s\n", enabledText(cfg.FilterKnownPorts))
+	fmt.Fprintf(p.out, "  Persist suppressed:  %s\n", enabledText(cfg.PersistSuppressed))
 	advanced := cfg.NoRootNetwork || len(cfg.NetworkInclusions) > 0 || len(cfg.NetworkExclusions) > 0 || len(cfg.IgnoredDevices) > 0
 	fmt.Fprintf(p.out, "  Advanced BPF:       %s\n", enabledText(advanced))
 	if advanced {
