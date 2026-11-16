@@ -279,14 +279,19 @@ func main() {
 	}
 	// update current runtime configuration to the config file on exit.
 	if *flConfigFile != "" {
-		// persist actively suppressed devices if enabled
-		if cfg.PersistSuppressed && len(manager.SuppressedDevices()) > 0 {
-			cfg.IgnoredDevices = append(cfg.IgnoredDevices, manager.SuppressedDevices()...)
+		runtimeCfg := cfg
+		// ensure we have the latest configuration from file.
+		if currCfg, err := iprdconfig.NewIPRDConfigFromFile(*flConfigFile); err == nil {
+			runtimeCfg = cfg.Merge(currCfg)
 		}
-		if err := iprdconfig.WriteIPRDConfigToFile(cfg, *flConfigFile); err != nil {
+		// persist actively suppressed devices if enabled
+		if runtimeCfg.PersistSuppressed && len(manager.SuppressedDevices()) > 0 {
+			runtimeCfg.IgnoredDevices = mergeSortedUnique(runtimeCfg.IgnoredDevices, manager.SuppressedDevices())
+		}
+		if err := iprdconfig.WriteIPRDConfigToFile(runtimeCfg, *flConfigFile); err != nil {
 			log.Error(err)
 		}
-		log.Info(fmt.Sprintf("updated config -> %s", *flConfigFile))
+		log.Info(fmt.Sprintf("wrote updated runtime config -> %s", *flConfigFile))
 	}
 	log.Info("exiting...")
 }
