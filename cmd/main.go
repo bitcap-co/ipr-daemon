@@ -43,6 +43,7 @@ var (
 	flIgnoredDevices     iprdconfig.FlagSlice
 	flCaptureFile        = flag.String("capture-file", "", "Path to write captured packets to in PCAP-NG format for replay/debugging.")
 	flRotateCaptureFiles = flag.Bool("rotate-capture", false, "Switch to rotate up to four capture files instead of flushing the active file at its size limit.")
+	flPersistSuppressed  = flag.Bool("persist-suppressed", false, "Switch to persist suppressed devices on daemon restart as globally ignored devices in the pointed configuration file.")
 	flForwardBind        = flag.String("b", "", "Bind address for the TCP broadcast stream; target host in status mode. Empty binds all interfaces.")
 	flForwardPort        = flag.Int("p", 0, "Forwarding port for the TCP broadcast stream.")
 	flMDNS               = flag.Bool("mdns", false, "Switch to enable mDNS/DNS-SD advertising of the TCP forwarding endpoint.")
@@ -125,6 +126,7 @@ func main() {
 			NetworkExclusions:  []string(flNetworkExclusions),
 			CaptureFile:        *flCaptureFile,
 			RotateCaptureFiles: *flRotateCaptureFiles,
+			PersistSuppressed:  *flPersistSuppressed,
 		},
 		ForwardConfig: iprdconfig.ForwardConfig{
 			Bind:           *flForwardBind,
@@ -274,6 +276,25 @@ func main() {
 			}
 		}
 		log.Fatal(err)
+	}
+	// Merge runtime configuration to the pointed configuration file on exit.
+	if *flConfigFile != "" {
+		currCfg, err := iprdconfig.NewIPRDConfigFromFile(*flConfigFile)
+		if err != nil {
+			log.Fatal(err)
+		}
+		// persist actively suppressed devices if enabled
+		if *flPersistSuppressed && len(manager.SuppressedDevices()) > 0 {
+			cfg.IgnoredDevices = append(cfg.IgnoredDevices, manager.SuppressedDevices()...)
+		}
+		finalCfg, err := updateExistingConfig(currCfg, cfg)
+		if err != nil {
+			log.Error(err)
+		}
+		if err := iprdconfig.WriteIPRDConfigToFile(finalCfg, *flConfigFile); err != nil {
+			log.Error(err)
+		}
+		log.Info(fmt.Sprintf("saved updated config -> %s", *flConfigFile))
 	}
 	log.Info("exiting...")
 }

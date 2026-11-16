@@ -67,6 +67,7 @@ type ListenerConfig struct {
 	NetworkExclusions  []string          `toml:"network_exclusions" json:"network_exclusions"`
 	CaptureFile        string            `toml:"capture_file" json:"capture_file"`
 	RotateCaptureFiles bool              `toml:"rotate_capture_files" json:"rotate_capture_files"`
+	PersistSuppressed  bool              `toml:"persist_suppressed" json:"persist_suppressed"`
 }
 
 // Validate returns an error if ListenerConfig contains invalid values.
@@ -146,6 +147,9 @@ func (cfg *ListenerConfig) Merge(target *ListenerConfig) *ListenerConfig {
 	if target.RotateCaptureFiles {
 		result.RotateCaptureFiles = true
 	}
+	if target.PersistSuppressed {
+		result.PersistSuppressed = true
+	}
 	if target.NoRootNetwork {
 		result.NoRootNetwork = true
 	}
@@ -219,6 +223,7 @@ func DefaultListenerConfig() *ListenerConfig {
 		NetworkExclusions:  []string{},
 		CaptureFile:        "",
 		RotateCaptureFiles: false,
+		PersistSuppressed:  false,
 	}
 }
 

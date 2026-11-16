@@ -116,10 +116,15 @@ func writeStatus(w io.Writer, response iprd.TCPResponse, asJSON bool) error {
 	if _, err := fmt.Fprintf(w, "Listeners: %d/%d active\n", status.ListenersActive, status.ListenersConfigured); err != nil {
 		return err
 	}
-	if _, err := fmt.Fprintf(w, "Packets: %d processed, %d reports, %d duplicates, %d invalid, %d filtered\n",
-		status.Packets.Processed, status.Packets.Reports, status.Packets.Duplicates,
-		status.Packets.Invalid, status.Packets.UnknownFiltered); err != nil {
+	if _, err := fmt.Fprintf(w, "Packets: %d processed, %d reports, %d suppressed, %d duplicates, %d invalid, %d filtered\n",
+		status.Packets.Processed, status.Packets.Reports, status.Packets.Suppressed,
+		status.Packets.Duplicates, status.Packets.Invalid, status.Packets.UnknownFiltered); err != nil {
 		return err
+	}
+	if status.SuppressedDeviceCount > 0 {
+		if _, err := fmt.Fprintf(w, "Suppressed Device Count: %d\n", status.SuppressedDeviceCount); err != nil {
+			return err
+		}
 	}
 	if _, err := fmt.Fprintf(w, "Errors: %d activation, %d capture, %d capture-write; %d reconnects\n",
 		status.ActivationFailures, status.CaptureErrors, status.CaptureWriteErrors, status.Reconnects); err != nil {
