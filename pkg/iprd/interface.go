@@ -52,8 +52,12 @@ func (i *IPRInterface) NetworkPrefix() string {
 
 // String returns IPRInterface as string.
 func (i IPRInterface) String() string {
-	return fmt.Sprintf("%d: %s (%s) Desc:\"%s\"\n   Hardware:%s\n   IPv4:%s",
-		i.Index, i.FriendlyName, i.Name, i.Description, i.HardwareAddr, i.IPv4)
+	vlanConfig := "false"
+	if i.IsVlan() {
+		vlanConfig = fmt.Sprintf("%d (%s)", i.Vlan.Tag, i.Vlan.Parent)
+	}
+	return fmt.Sprintf("%d: %s (%s) Desc:\"%s\"\n   Hardware:%s\n   IPv4:%s\n   Vlan:%s",
+		i.Index, i.FriendlyName, i.Name, i.Description, i.HardwareAddr, i.IPv4, vlanConfig)
 }
 
 // IsUp returns bool for if IPRInterface is marked as UP.
@@ -68,6 +72,47 @@ func (i *IPRInterface) IsLAN() bool {
 	}
 	match := lanRegex.MatchString(i.Description)
 	return match
+}
+
+// IsVlan returns bool for if IPRInterface is a VLAN interface.
+func (i *IPRInterface) IsVlan() bool {
+	return i.Vlan.Tag != 0
+}
+
+// VlanTag returns the VLAN tag of IPRInterface.
+func (i *IPRInterface) VlanTag() uint16 {
+	return i.Vlan.Tag
+}
+
+// VlanParent returns the parent interface name of IPRInterface.
+func (i *IPRInterface) VlanParent() string {
+	return i.Vlan.Parent
+}
+
+// IsVlanOf returns bool for if IPRInterface is a VLAN of the given parent interface name.
+func (i *IPRInterface) IsVlanOf(ifname string) bool {
+	if i == nil || !i.IsVlan() {
+		return false
+	}
+	return i.Vlan.Parent == ifname
+}
+
+// GetVlanInterfaces returns all VLAN IPRInterfaces of the given parent interface name.
+func GetVlanInterfaces(ifname string) ([]*IPRInterface, error) {
+	if ifname == "" {
+		return nil, errInvalidInterfaceName
+	}
+	ifaces, err := GetInterfaces()
+	if err != nil {
+		return nil, err
+	}
+	var vlanIfaces []*IPRInterface
+	for _, iface := range ifaces {
+		if iface.IsVlanOf(ifname) {
+			vlanIfaces = append(vlanIfaces, &iface)
+		}
+	}
+	return vlanIfaces, nil
 }
 
 // GetInterfaceByName returns the IPRInterface matching name.
