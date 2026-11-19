@@ -1,4 +1,4 @@
-//go:build freebsd || linux || darwin
+//go:build linux || darwin
 
 package iprd
 
@@ -53,6 +53,7 @@ func GetInterfaces() ([]IPRInterface, error) {
 			IPv4:         ipv4,
 			HardwareAddr: netInterface.HardwareAddr,
 			Flags:        netInterface.Flags,
+			Vlan:         VlanConfig{},
 		})
 	}
 	if len(interfaces) == 0 {

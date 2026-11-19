@@ -1,3 +1,5 @@
+//go:build windows
+
 package iprd
 
 import (
@@ -89,6 +91,7 @@ func GetInterfaces() ([]IPRInterface, error) {
 			IPv4:         ipv4,
 			HardwareAddr: netInterface.HardwareAddr,
 			Flags:        netInterface.Flags,
+			Vlan:         VlanConfig{},
 		})
 	}
 	if len(interfaces) == 0 {

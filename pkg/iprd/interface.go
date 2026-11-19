@@ -17,6 +17,12 @@ var (
 	errNoValidInterfaces     = errors.New("no valid interfaces to listen on")
 )
 
+// VlanConfig holds the VLAN configuration for an interface.
+type VlanConfig struct {
+	Tag    uint16
+	Parent string
+}
+
 // IPRInterface describes a network interface supported for IP Report listening.
 type IPRInterface struct {
 	Index        int
@@ -26,6 +32,7 @@ type IPRInterface struct {
 	IPv4         net.IP
 	HardwareAddr net.HardwareAddr
 	Flags        net.Flags
+	Vlan         VlanConfig
 }
 
 // IPAddr returns IPv4 as string.
