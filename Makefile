@@ -309,6 +309,12 @@ freebsd: .vagrant-check
 			default:$(PROJECT_NAME)/dist/$(OUTPUT_BINARY)-$(PROJECT_VERSION)-freebsd-amd64 \
 			default:$(PROJECT_NAME)/dist/$(OUTPUT_BINARY)-$(PROJECT_VERSION)-freebsd-arm64 dist/
 
+## freebsd-test : run FreeBSD-specific tests with Vagrant VM
+.PHONY: freebsd-test
+freebsd-test: .vagrant-check
+	vagrant provision && vagrant up && vagrant ssh-config >.vagrant-ssh && \
+		ssh -F .vagrant-ssh default 'sh -c "PATH=/usr/local/bin:$$PATH; cd $(PROJECT_NAME) && gmake .freebsd-test"'
+
 ## freebsd-package : build FreeBSD/amd64 .pkg package with Vagrant VM
 .PHONY: freebsd-package
 freebsd-package: .vagrant-check
@@ -343,6 +349,10 @@ FREEBSD_ARM64_S_NAME := $(DIST_DIR)$(OUTPUT_BINARY)-$(PROJECT_VERSION)-freebsd-a
 # the ports triple/version differs from what the glob finds.
 FREEBSD_ARM64_CC      ?= $(firstword $(wildcard /usr/local/bin/aarch64-*-freebsd*-gcc*))
 FREEBSD_ARM64_SYSROOT ?= /usr/local/freebsd-sysroot/aarch64
+
+.PHONY: .freebsd-test
+.freebsd-test:
+	go test ./pkg/iprd -run 'TestFreeBSD.*ABILayout$$'
 
 freebsd-binaries: freebsd-amd64 freebsd-arm64
 freebsd-amd64: $(FREEBSD_AMD64_S_NAME)
