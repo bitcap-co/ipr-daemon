@@ -61,6 +61,11 @@ func main() {
 	flag.Var(&flMDNSInterfaces, "advertise", "Interface names or indexes on which to advertise mDNS.\nThis flag supports chaining or comma-separated values. The interface owning forward_bind is always included.")
 	flag.Parse()
 
+	suppliedFlags := make(map[string]bool)
+	flag.Visit(func(supplied *flag.Flag) {
+		suppliedFlags[supplied.Name] = true
+	})
+
 	// interactive configuration mode.
 	if *flSetup {
 		var incompatible []string
@@ -145,7 +150,7 @@ func main() {
 		finalCfg := &rawCfg
 		if curr, err := iprdconfig.NewIPRDConfigFromFile(*flWriteConfig); err == nil {
 			// config file exists, merge with current config.
-			finalCfg, err = updateExistingConfig(curr, &rawCfg)
+			finalCfg, err = updateExistingConfig(curr, &rawCfg, explicitOptions{suppressionThresholdSet: suppliedFlags["suppress-threshold"]})
 			if err != nil {
 				log.Fatal(err)
 			}

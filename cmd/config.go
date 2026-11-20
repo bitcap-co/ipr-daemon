@@ -8,7 +8,11 @@ import (
 	iprdconfig "github.com/bitcap-co/ipr-daemon/pkg/iprd/config"
 )
 
-func updateExistingConfig(curr, target *iprdconfig.IPRDConfig) (*iprdconfig.IPRDConfig, error) {
+type explicitOptions struct {
+	suppressionThresholdSet bool
+}
+
+func updateExistingConfig(curr, target *iprdconfig.IPRDConfig, opts explicitOptions) (*iprdconfig.IPRDConfig, error) {
 	newCfg := curr.Merge(target)
 	if len(target.MDNSInterfaces) > 0 {
 		newCfg.MDNSInterfaces = mergeUnique(curr.MDNSInterfaces, target.MDNSInterfaces)
@@ -41,6 +45,24 @@ func updateExistingConfig(curr, target *iprdconfig.IPRDConfig) (*iprdconfig.IPRD
 	if target.CaptureFile != "" && target.CaptureFile != curr.CaptureFile {
 		log.Info(fmt.Sprintf("updated capture_file: %s -> %s", curr.CaptureFile, newCfg.CaptureFile))
 	}
+	if opts.suppressionThresholdSet {
+		if target.SuppressionThreshold == 0 {
+			newCfg.SuppressionThreshold = 0
+		}
+
+		if newCfg.SuppressionThreshold != curr.SuppressionThreshold {
+			message := fmt.Sprintf("updated suppression_threshold: %d -> %d", curr.SuppressionThreshold, newCfg.SuppressionThreshold)
+			if newCfg.SuppressionThreshold == 0 {
+				message += " (disabled)"
+			}
+			log.Info(message)
+		}
+
+		if newCfg.SuppressionThreshold == 0 && newCfg.PersistSuppressed {
+			newCfg.PersistSuppressed = false
+			log.Info("updated persist_suppressed: true -> false")
+		}
+	}
 	// toggle boolean flags
 	if target.Auto {
 		newCfg.Auto = !target.Auto || !curr.Auto
@@ -70,11 +92,14 @@ func updateExistingConfig(curr, target *iprdconfig.IPRDConfig) (*iprdconfig.IPRD
 		newCfg.RotateCaptureFiles = !target.RotateCaptureFiles || !curr.RotateCaptureFiles
 		log.Info(fmt.Sprintf("toggled rotate_capture_files: %v -> %v", curr.RotateCaptureFiles, newCfg.RotateCaptureFiles))
 	}
-	if target.PersistSuppressed {
+	if target.PersistSuppressed && newCfg.SuppressionThreshold > 0 {
 		newCfg.PersistSuppressed = !target.PersistSuppressed || !curr.PersistSuppressed
 		log.Info(fmt.Sprintf("toggled persist_suppressed: %v -> %v", curr.PersistSuppressed, newCfg.PersistSuppressed))
+	} else if target.PersistSuppressed {
+		log.Error(fmt.Errorf("persist_suppressed requires suppression_threshold to be non-zero, ignored"))
+		newCfg.PersistSuppressed = false
 	}
-	return iprdconfig.ParseConfig(newCfg)
+	return iprdconfig.NormalizeConfig(newCfg)
 }
 
 func mergeInterfaceConfigs(curr, target []iprdconfig.InterfaceConfig) []iprdconfig.InterfaceConfig {
