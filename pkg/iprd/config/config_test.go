@@ -300,6 +300,39 @@ listen_interfaces = ["eth0", "eth1"]
 	}
 }
 
+func TestSuppressionThresholdZeroRoundTrip(t *testing.T) {
+	cfg, err := iprdconfig.NewIPRDConfigFromBytes([]byte("suppression_threshold = 0\n"))
+	if err != nil {
+		t.Fatalf("parse explicit zero threshold: %v", err)
+	}
+	if cfg.SuppressionThreshold != 0 {
+		t.Fatalf("parsed suppression threshold = %d, want 0", cfg.SuppressionThreshold)
+	}
+
+	path := filepath.Join(t.TempDir(), "iprdconfig.toml")
+	if err := iprdconfig.WriteIPRDConfigToFile(cfg, path); err != nil {
+		t.Fatalf("write explicit zero threshold: %v", err)
+	}
+	loaded, err := iprdconfig.NewIPRDConfigFromFile(path)
+	if err != nil {
+		t.Fatalf("reload explicit zero threshold: %v", err)
+	}
+	if loaded.SuppressionThreshold != 0 {
+		t.Fatalf("reloaded suppression threshold = %d, want 0", loaded.SuppressionThreshold)
+	}
+}
+
+func TestSuppressionThresholdDefaultsWhenOmitted(t *testing.T) {
+	cfg, err := iprdconfig.NewIPRDConfigFromBytes(nil)
+	if err != nil {
+		t.Fatalf("parse omitted threshold: %v", err)
+	}
+	want := iprdconfig.DefaultListenerConfig().SuppressionThreshold
+	if cfg.SuppressionThreshold != want {
+		t.Fatalf("suppression threshold = %d, want default %d", cfg.SuppressionThreshold, want)
+	}
+}
+
 func TestWriteConfigUsesPluralListenInterfaces(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "iprdconfig.toml")
 	cfg := iprdconfig.DefaultIPRDConfig()

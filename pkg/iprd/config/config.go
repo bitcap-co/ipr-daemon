@@ -227,12 +227,21 @@ func DefaultListenerConfig() *ListenerConfig {
 	}
 }
 
+// NormalizeListenerConfig normalizes and validates a complete listener configuration
+// without reapplying defaults. This preserves valid zero values.
+func NormalizeListenerConfig(supplied *ListenerConfig) (*ListenerConfig, error) {
+	if supplied == nil {
+		return nil, fmt.Errorf("listener configuration is nil")
+	}
+	cfg := *supplied
+	cfg.normalizeListenInterfaces()
+	return &cfg, cfg.Validate()
+}
+
 // ParseListenerConfig applies listener defaults, normalizes interface selectors,
 // and validates the resulting configuration.
 func ParseListenerConfig(supplied *ListenerConfig) (*ListenerConfig, error) {
-	cfg := DefaultListenerConfig().Merge(supplied)
-	cfg.normalizeListenInterfaces()
-	return cfg, cfg.Validate()
+	return NormalizeListenerConfig(DefaultListenerConfig().Merge(supplied))
 }
 
 // ForwardConfig describes the daemon's TCP forwarding endpoint and service advertisement.
@@ -325,12 +334,21 @@ func DefaultIPRDConfig() *IPRDConfig {
 	}
 }
 
-// ParseConfig applies daemon defaults, normalizes interface selectors, and validates the result.
-func ParseConfig(supplied *IPRDConfig) (*IPRDConfig, error) {
-	cfg := DefaultIPRDConfig().Merge(supplied)
+// NormalizeConfig normalizes and validates a complete daemon configuration
+// without reapplying defaults. This preserves valid zero values.
+func NormalizeConfig(supplied *IPRDConfig) (*IPRDConfig, error) {
+	if supplied == nil {
+		return nil, fmt.Errorf("configuration is nil")
+	}
+	cfg := *supplied
 	cfg.normalizeListenInterfaces()
 	cfg.MDNSInterfaces = normalizeInterfaceSelectors(cfg.MDNSInterfaces)
-	return cfg, cfg.Validate()
+	return &cfg, cfg.Validate()
+}
+
+// ParseConfig applies daemon defaults, normalizes interface selectors, and validates the result.
+func ParseConfig(supplied *IPRDConfig) (*IPRDConfig, error) {
+	return NormalizeConfig(DefaultIPRDConfig().Merge(supplied))
 }
 
 func normalizeInterfaceSelectors(values []string) []string {
