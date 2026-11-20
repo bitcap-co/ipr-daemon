@@ -54,20 +54,21 @@ func interfaceConfigSelectors(configs []InterfaceConfig) []string {
 
 // ListenerConfig describes packet capture and IP report processing behavior.
 type ListenerConfig struct {
-	Debug              bool              `toml:"debug" json:"debug"`
-	Auto               bool              `toml:"auto" json:"auto"`
-	ListenInterfaces   []string          `toml:"listen_interfaces,omitempty" json:"listen_interfaces,omitempty"`
-	ListenInterface    string            `toml:"listen_interface,omitempty" json:"listen_interface,omitempty"` // Deprecated: use ListenInterfaces.
-	Interfaces         []InterfaceConfig `toml:"interfaces,omitempty" json:"interfaces,omitempty"`
-	ForwardKnown       bool              `toml:"forward_known" json:"forward_known"`
-	NoRootNetwork      bool              `toml:"no_root_network" json:"no_root_network"`
-	FilterKnownPorts   bool              `toml:"filter_known_ports" json:"filter_known_ports"`
-	IgnoredDevices     []string          `toml:"ignored_devices" json:"ignored_devices"`
-	NetworkInclusions  []string          `toml:"network_inclusions" json:"network_inclusions"`
-	NetworkExclusions  []string          `toml:"network_exclusions" json:"network_exclusions"`
-	CaptureFile        string            `toml:"capture_file" json:"capture_file"`
-	RotateCaptureFiles bool              `toml:"rotate_capture_files" json:"rotate_capture_files"`
-	PersistSuppressed  bool              `toml:"persist_suppressed" json:"persist_suppressed"`
+	Debug                bool              `toml:"debug" json:"debug"`
+	Auto                 bool              `toml:"auto" json:"auto"`
+	ListenInterfaces     []string          `toml:"listen_interfaces,omitempty" json:"listen_interfaces,omitempty"`
+	ListenInterface      string            `toml:"listen_interface,omitempty" json:"listen_interface,omitempty"` // Deprecated: use ListenInterfaces.
+	Interfaces           []InterfaceConfig `toml:"interfaces,omitempty" json:"interfaces,omitempty"`
+	ForwardKnown         bool              `toml:"forward_known" json:"forward_known"`
+	NoRootNetwork        bool              `toml:"no_root_network" json:"no_root_network"`
+	FilterKnownPorts     bool              `toml:"filter_known_ports" json:"filter_known_ports"`
+	IgnoredDevices       []string          `toml:"ignored_devices" json:"ignored_devices"`
+	NetworkInclusions    []string          `toml:"network_inclusions" json:"network_inclusions"`
+	NetworkExclusions    []string          `toml:"network_exclusions" json:"network_exclusions"`
+	CaptureFile          string            `toml:"capture_file" json:"capture_file"`
+	RotateCaptureFiles   bool              `toml:"rotate_capture_files" json:"rotate_capture_files"`
+	SuppressionThreshold int               `toml:"suppression_threshold" json:"suppression_threshold"`
+	PersistSuppressed    bool              `toml:"persist_suppressed" json:"persist_suppressed"`
 }
 
 // Validate returns an error if ListenerConfig contains invalid values.
@@ -96,6 +97,12 @@ func (cfg *ListenerConfig) Validate() error {
 		if interfaceCfg.NoRootNetwork && len(interfaceCfg.NetworkInclusions) == 0 {
 			return fmt.Errorf("interface %q excludes its root network but has no network inclusions", selector)
 		}
+	}
+	if cfg.SuppressionThreshold < 0 {
+		return fmt.Errorf("suppression_threshold must be a positive integer")
+	}
+	if cfg.PersistSuppressed && cfg.SuppressionThreshold == 0 {
+		return fmt.Errorf("persist_suppressed requires suppression_threshold to be non-zero")
 	}
 	return nil
 }
@@ -146,6 +153,14 @@ func (cfg *ListenerConfig) Merge(target *ListenerConfig) *ListenerConfig {
 	}
 	if target.RotateCaptureFiles {
 		result.RotateCaptureFiles = true
+	}
+	suppressionThreshold := target.SuppressionThreshold
+	// clamp suppression threshold to 50
+	if suppressionThreshold > 50 {
+		suppressionThreshold = 50
+	}
+	if suppressionThreshold != 0 {
+		result.SuppressionThreshold = suppressionThreshold
 	}
 	if target.PersistSuppressed {
 		result.PersistSuppressed = true
@@ -210,20 +225,21 @@ func (cfg *ListenerConfig) interfaceConfig(selector string) *InterfaceConfig {
 // DefaultListenerConfig returns the default packet listener configuration.
 func DefaultListenerConfig() *ListenerConfig {
 	return &ListenerConfig{
-		Debug:              false,
-		Auto:               false,
-		ListenInterfaces:   []string{},
-		ListenInterface:    "",
-		Interfaces:         []InterfaceConfig{},
-		ForwardKnown:       false,
-		NoRootNetwork:      false,
-		FilterKnownPorts:   false,
-		IgnoredDevices:     []string{},
-		NetworkInclusions:  []string{},
-		NetworkExclusions:  []string{},
-		CaptureFile:        "",
-		RotateCaptureFiles: false,
-		PersistSuppressed:  false,
+		Debug:                false,
+		Auto:                 false,
+		ListenInterfaces:     []string{},
+		ListenInterface:      "",
+		Interfaces:           []InterfaceConfig{},
+		ForwardKnown:         false,
+		NoRootNetwork:        false,
+		FilterKnownPorts:     false,
+		IgnoredDevices:       []string{},
+		NetworkInclusions:    []string{},
+		NetworkExclusions:    []string{},
+		CaptureFile:          "",
+		RotateCaptureFiles:   false,
+		SuppressionThreshold: 5,
+		PersistSuppressed:    false,
 	}
 }
 
