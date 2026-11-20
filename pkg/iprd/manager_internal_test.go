@@ -14,6 +14,10 @@ import (
 	"github.com/gopacket/gopacket/layers"
 )
 
+var (
+	defaultSuppressionThreshold int = 5
+)
+
 func generateValidPayload(srcIP, srcMAC string, dstPort int) []byte {
 	minerHint, _ := GetMinerHintFromPort(dstPort)
 	switch minerHint {
@@ -83,7 +87,7 @@ func mustHardwareAddr(t *testing.T, value string) net.HardwareAddr {
 }
 
 func TestSuppressionStoreThresholdAndIsolation(t *testing.T) {
-	store := newSuppressionStore()
+	store := newSuppressionStore(defaultSuppressionThreshold)
 	belowThreshold := "aa:bb:cc:dd:ee:01"
 	suppressedSecond := "aa:bb:cc:dd:ee:03"
 	suppressedFirst := "aa:bb:cc:dd:ee:02"
@@ -109,7 +113,7 @@ func TestSuppressionStoreThresholdAndIsolation(t *testing.T) {
 }
 
 func TestSuppressionStoreConcurrentAccess(t *testing.T) {
-	store := newSuppressionStore()
+	store := newSuppressionStore(defaultSuppressionThreshold)
 	key := "aa:bb:cc:dd:ee:01"
 
 	var wg sync.WaitGroup
@@ -131,6 +135,22 @@ func TestSuppressionStoreConcurrentAccess(t *testing.T) {
 
 	if !store.shouldSuppress(key) {
 		t.Fatal("device was not suppressed after concurrent updates")
+	}
+}
+
+func TestListenerManagerPreservesDisabledSuppression(t *testing.T) {
+	cfg := iprdconfig.DefaultListenerConfig()
+	cfg.SuppressionThreshold = 0
+
+	manager, err := NewListenerManager(cfg, NewLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if manager.cfg.SuppressionThreshold != 0 {
+		t.Fatalf("suppression threshold = %d, want 0", manager.cfg.SuppressionThreshold)
+	}
+	if manager.suppression != nil {
+		t.Fatal("suppression store initialized while suppression is disabled")
 	}
 }
 
@@ -266,6 +286,7 @@ func TestListenerManagerStatusTracksActivationFailureAndShutdown(t *testing.T) {
 func TestListenerManagerStatusConcurrent(t *testing.T) {
 	cfg := iprdconfig.DefaultListenerConfig()
 	cfg.ListenInterfaces = []string{"test0"}
+	cfg.SuppressionThreshold = defaultSuppressionThreshold
 	manager, err := NewListenerManager(cfg, NewLogger())
 	if err != nil {
 		t.Fatal(err)
@@ -346,7 +367,9 @@ func TestListenerManagerPacketStatus(t *testing.T) {
 }
 
 func TestListenerManagerSuppressesGenericNetworkNoise(t *testing.T) {
-	manager, err := NewListenerManager(iprdconfig.DefaultListenerConfig(), NewLogger())
+	cfg := iprdconfig.DefaultListenerConfig()
+	cfg.SuppressionThreshold = defaultSuppressionThreshold
+	manager, err := NewListenerManager(cfg, NewLogger())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -381,7 +404,9 @@ func TestListenerManagerSuppressesGenericNetworkNoise(t *testing.T) {
 }
 
 func TestListenerManagerDoesNotSuppressTypedValidationFailures(t *testing.T) {
-	manager, err := NewListenerManager(iprdconfig.DefaultListenerConfig(), NewLogger())
+	cfg := iprdconfig.DefaultListenerConfig()
+	cfg.SuppressionThreshold = defaultSuppressionThreshold
+	manager, err := NewListenerManager(cfg, NewLogger())
 	if err != nil {
 		t.Fatal(err)
 	}

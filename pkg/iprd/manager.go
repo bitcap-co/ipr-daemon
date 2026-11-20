@@ -12,21 +12,23 @@ import (
 	"github.com/gopacket/gopacket"
 )
 
-const (
-	defaultSuppressionThreshold int = 5
-)
-
 // suppressionStore is used as a simple in-memory store for generic noise suppression on the network.
 // It tracks the number of invalid packets per key and marks a key as suppressed if it reaches the threshold.
 type suppressionStore struct {
-	mu     sync.RWMutex
-	counts map[string]int
+	mu        sync.RWMutex
+	counts    map[string]int
+	threshold int
 }
 
-func newSuppressionStore() *suppressionStore {
+func newSuppressionStore(threshold int) *suppressionStore {
 	return &suppressionStore{
-		counts: make(map[string]int),
+		counts:    make(map[string]int),
+		threshold: threshold,
 	}
+}
+
+func (s *suppressionStore) suppressionThreshold() int {
+	return s.threshold
 }
 
 func (s *suppressionStore) add(key string) {
@@ -37,7 +39,7 @@ func (s *suppressionStore) add(key string) {
 
 func (s *suppressionStore) shouldSuppress(key string) bool {
 	s.mu.RLock()
-	suppressed := s.counts[key] >= defaultSuppressionThreshold
+	suppressed := s.counts[key] >= s.threshold
 	s.mu.RUnlock()
 	return suppressed
 }
@@ -46,7 +48,7 @@ func (s *suppressionStore) suppressedKeys() []string {
 	s.mu.RLock()
 	suppressed := make([]string, 0)
 	for key, count := range s.counts {
-		if count >= defaultSuppressionThreshold {
+		if count >= s.threshold {
 			suppressed = append(suppressed, key)
 		}
 	}
@@ -78,7 +80,10 @@ type ListenerManager struct {
 // NewListenerManager returns a manager with one listener per configured
 // interface. Auto mode creates one listener and ignores explicit selectors.
 func NewListenerManager(cfg *iprdconfig.ListenerConfig, logger Logger) (*ListenerManager, error) {
-	managerCfg, err := iprdconfig.ParseListenerConfig(cfg)
+	if cfg == nil {
+		cfg = iprdconfig.DefaultListenerConfig()
+	}
+	managerCfg, err := iprdconfig.NormalizeListenerConfig(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("listener config: %w", err)
 	}
@@ -87,6 +92,10 @@ func NewListenerManager(cfg *iprdconfig.ListenerConfig, logger Logger) (*Listene
 	}
 	capture := NewCaptureWriter(managerCfg.CaptureFile, managerCfg.RotateCaptureFiles, logger)
 	managerCfg.CaptureFile = capture.Path()
+	var suppression *suppressionStore
+	if managerCfg.SuppressionThreshold > 0 {
+		suppression = newSuppressionStore(managerCfg.SuppressionThreshold)
+	}
 	cfg = managerCfg
 	return &ListenerManager{
 		cfg:         cfg,
@@ -96,7 +105,7 @@ func NewListenerManager(cfg *iprdconfig.ListenerConfig, logger Logger) (*Listene
 		capture:     capture,
 		reports:     make(chan *IPReportPacket, 256),
 		telemetry:   newManagerTelemetry(),
-		suppression: newSuppressionStore(),
+		suppression: suppression,
 	}, nil
 }
 
@@ -104,6 +113,9 @@ func NewListenerManager(cfg *iprdconfig.ListenerConfig, logger Logger) (*Listene
 // A device is automatically suppressed by the manager when its invalid packet count reaches
 // the suppression threshold.
 func (m *ListenerManager) SuppressedDevices() []string {
+	if m.suppression == nil {
+		return nil
+	}
 	return m.suppression.suppressedKeys()
 }
 
@@ -318,7 +330,7 @@ func (m *ListenerManager) processCapturedPacket(captured CapturedPacket) *IPRepo
 		ipr.InterfaceName = fmt.Sprintf("#%d", captured.Interface.Index)
 	}
 
-	if m.suppression.shouldSuppress(ipr.SrcMAC) {
+	if m.suppression != nil && m.suppression.shouldSuppress(ipr.SrcMAC) {
 		m.telemetry.suppressed.Add(1)
 		m.log.Warn(fmt.Sprintf("%s - suppressed device: %s", ipr.String(), ipr.SrcMAC))
 		return nil
@@ -334,7 +346,9 @@ func (m *ListenerManager) processCapturedPacket(captured CapturedPacket) *IPRepo
 		} else {
 			m.telemetry.invalid.Add(1)
 			// increment source MAC invalid count towards noise suppression.
-			m.suppression.add(ipr.SrcMAC)
+			if m.suppression != nil {
+				m.suppression.add(ipr.SrcMAC)
+			}
 		}
 		if m.cfg.Debug {
 			m.log.Error(fmt.Errorf("%s - not valid: %w", ipr.String(), err))
