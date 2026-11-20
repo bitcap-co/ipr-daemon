@@ -46,7 +46,7 @@ var (
 	flSuppressionThreshold = flag.Int("suppress-threshold", 5, "Number of invalid packets required to actively suppress a source MAC address/device from further processing.\nSuppression only targets non-valid/unrecognized network traffic; valid/recognized IP reports are ignored. Value of 0 disables suppression.")
 	flPersistSuppressed    = flag.Bool("persist-suppressed", false, "Switch to persist suppressed devices on daemon restart as globally ignored devices in the pointed configuration file.")
 	flForwardBind          = flag.String("b", "", "Bind address for the TCP broadcast stream; target host in status mode. Empty binds all interfaces.")
-	flForwardPort          = flag.Int("p", 0, "Forwarding port for the TCP broadcast stream.")
+	flForwardPort          = flag.Int("p", 7788, "Forwarding port for the TCP broadcast stream.")
 	flMDNS                 = flag.Bool("mdns", false, "Switch to enable mDNS/DNS-SD advertising of the TCP forwarding endpoint.")
 	flMDNSInterfaces       iprdconfig.FlagSlice
 	flConfigFile           = flag.String("c", "", "Path to TOML configuration file. Overrides any other supplied flags.")
