@@ -27,29 +27,30 @@ var (
 	log = iprd.NewLogger()
 
 	// flags
-	flVersion            = flag.Bool("version", false, "Prints ipr-daemon version information and exits.")
-	flSetup              = flag.Bool("setup", false, "Runs an interactive configuration wizard and exits. Use -c to edit an existing configuration.")
-	flList               = flag.Bool("list", false, "Lists all available network interfaces for IP report listening and exits.")
-	flStatus             = flag.Bool("status", false, "Queries health/status of a running daemon and exits.\nDefaults to local daemon, use -b, -p, -c flags to specify a remote endpoint.")
-	flStatusJSON         = flag.Bool("status-json", false, "Queries health/status of a running daemon and prints as JSON.")
-	flDebug              = flag.Bool("d", false, "Switch to enable packet debugging output.")
-	flAuto               = flag.Bool("a", false, "Switch to use the defined LAN interface for listening (OPNSense/pfSense). Overrides -i flag.")
-	flInterfaces         = make(iprdconfig.FlagInterface)
-	flForwardKnown       = flag.Bool("known", false, "Switch to only forward IP reports from known miner types over TCP broadcast stream.\nUnknown IP reports are logged but not forwarded.")
-	flNoRootNetwork      = flag.Bool("no-root-network", false, "Switch to remove interface network from BPF filter. Must add additional network inclusion(s) via -add-network flag.\n(Global: applies to all interface selectors.)")
-	flFilterKnownPorts   = flag.Bool("known-ports", false, "Switch to only allow packets from ports of known miner types through the BPF filter.\nThis has a similar effect to -known but unknown packets are dropped entirely and not logged/captured.\n(Global: applies to all interface selectors.)")
-	flNetworkInclusions  iprdconfig.FlagSlice
-	flNetworkExclusions  iprdconfig.FlagSlice
-	flIgnoredDevices     iprdconfig.FlagSlice
-	flCaptureFile        = flag.String("capture-file", "", "Path to write captured packets to in PCAP-NG format for replay/debugging.")
-	flRotateCaptureFiles = flag.Bool("rotate-capture", false, "Switch to rotate up to four capture files instead of flushing the active file at its size limit.")
-	flPersistSuppressed  = flag.Bool("persist-suppressed", false, "Switch to persist suppressed devices on daemon restart as globally ignored devices in the pointed configuration file.")
-	flForwardBind        = flag.String("b", "", "Bind address for the TCP broadcast stream; target host in status mode. Empty binds all interfaces.")
-	flForwardPort        = flag.Int("p", 0, "Forwarding port for the TCP broadcast stream.")
-	flMDNS               = flag.Bool("mdns", false, "Switch to enable mDNS/DNS-SD advertising of the TCP forwarding endpoint.")
-	flMDNSInterfaces     iprdconfig.FlagSlice
-	flConfigFile         = flag.String("c", "", "Path to TOML configuration file. Overrides any other supplied flags.")
-	flWriteConfig        = flag.String("w", "", "Path to TOML configuration file. Writes the supplied arguments to new config file or updates an existing one.")
+	flVersion              = flag.Bool("version", false, "Prints ipr-daemon version information and exits.")
+	flSetup                = flag.Bool("setup", false, "Runs an interactive configuration wizard and exits. Use -c to edit an existing configuration.")
+	flList                 = flag.Bool("list", false, "Lists all available network interfaces for IP report listening and exits.")
+	flStatus               = flag.Bool("status", false, "Queries health/status of a running daemon and exits.\nDefaults to local daemon, use -b, -p, -c flags to specify a remote endpoint.")
+	flStatusJSON           = flag.Bool("status-json", false, "Queries health/status of a running daemon and prints as JSON.")
+	flDebug                = flag.Bool("d", false, "Switch to enable packet debugging output.")
+	flAuto                 = flag.Bool("a", false, "Switch to use the defined LAN interface for listening (OPNSense/pfSense). Overrides -i flag.")
+	flInterfaces           = make(iprdconfig.FlagInterface)
+	flForwardKnown         = flag.Bool("known", false, "Switch to only forward IP reports from known miner types over TCP broadcast stream.\nUnknown IP reports are logged but not forwarded.")
+	flNoRootNetwork        = flag.Bool("no-root-network", false, "Switch to remove interface network from BPF filter. Must add additional network inclusion(s) via -add-network flag.\n(Global: applies to all interface selectors.)")
+	flFilterKnownPorts     = flag.Bool("known-ports", false, "Switch to only allow packets from ports of known miner types through the BPF filter.\nThis has a similar effect to -known but unknown packets are dropped entirely and not logged/captured.\n(Global: applies to all interface selectors.)")
+	flNetworkInclusions    iprdconfig.FlagSlice
+	flNetworkExclusions    iprdconfig.FlagSlice
+	flIgnoredDevices       iprdconfig.FlagSlice
+	flCaptureFile          = flag.String("capture-file", "", "Path to write captured packets to in PCAP-NG format for replay/debugging.")
+	flRotateCaptureFiles   = flag.Bool("rotate-capture", false, "Switch to rotate up to four capture files instead of flushing the active file at its size limit.")
+	flSuppressionThreshold = flag.Int("suppress-threshold", 5, "Number of invalid packets required to actively suppress a source MAC address/device from further processing.\nSuppression only targets non-valid/unrecognized network traffic; valid/recognized IP reports are ignored. Value of 0 disables suppression.")
+	flPersistSuppressed    = flag.Bool("persist-suppressed", false, "Switch to persist suppressed devices on daemon restart as globally ignored devices in the pointed configuration file.")
+	flForwardBind          = flag.String("b", "", "Bind address for the TCP broadcast stream; target host in status mode. Empty binds all interfaces.")
+	flForwardPort          = flag.Int("p", 0, "Forwarding port for the TCP broadcast stream.")
+	flMDNS                 = flag.Bool("mdns", false, "Switch to enable mDNS/DNS-SD advertising of the TCP forwarding endpoint.")
+	flMDNSInterfaces       iprdconfig.FlagSlice
+	flConfigFile           = flag.String("c", "", "Path to TOML configuration file. Overrides any other supplied flags.")
+	flWriteConfig          = flag.String("w", "", "Path to TOML configuration file. Writes the supplied arguments to new config file or updates an existing one.")
 )
 
 func main() {
@@ -116,17 +117,18 @@ func main() {
 			Auto:             *flAuto,
 			ListenInterfaces: listenInterfaces,
 			// Keep the first selector available through the legacy singular field.
-			ListenInterface:    listenInterface,
-			Interfaces:         flInterfaces.Configs(),
-			ForwardKnown:       *flForwardKnown,
-			NoRootNetwork:      *flNoRootNetwork,
-			FilterKnownPorts:   *flFilterKnownPorts,
-			IgnoredDevices:     []string(flIgnoredDevices),
-			NetworkInclusions:  []string(flNetworkInclusions),
-			NetworkExclusions:  []string(flNetworkExclusions),
-			CaptureFile:        *flCaptureFile,
-			RotateCaptureFiles: *flRotateCaptureFiles,
-			PersistSuppressed:  *flPersistSuppressed,
+			ListenInterface:      listenInterface,
+			Interfaces:           flInterfaces.Configs(),
+			ForwardKnown:         *flForwardKnown,
+			NoRootNetwork:        *flNoRootNetwork,
+			FilterKnownPorts:     *flFilterKnownPorts,
+			IgnoredDevices:       []string(flIgnoredDevices),
+			NetworkInclusions:    []string(flNetworkInclusions),
+			NetworkExclusions:    []string(flNetworkExclusions),
+			CaptureFile:          *flCaptureFile,
+			RotateCaptureFiles:   *flRotateCaptureFiles,
+			SuppressionThreshold: *flSuppressionThreshold,
+			PersistSuppressed:    *flPersistSuppressed,
 		},
 		ForwardConfig: iprdconfig.ForwardConfig{
 			Bind:           *flForwardBind,
