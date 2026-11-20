@@ -146,7 +146,7 @@ func runSetup(in io.Reader, out io.Writer, configPath string, getInterfaces setu
 	if err := prompter.configure(cfg, getInterfaces); err != nil {
 		return err
 	}
-	parsed, err := iprdconfig.ParseConfig(cfg)
+	parsed, err := iprdconfig.NormalizeConfig(cfg)
 	if err != nil {
 		return fmt.Errorf("invalid configuration: %w", err)
 	}
@@ -342,6 +342,28 @@ func (p *setupPrompter) configure(cfg *iprdconfig.IPRDConfig, getInterfaces setu
 		cfg.RotateCaptureFiles = false
 	}
 
+	for {
+		suppressThreshold, err := p.integer("Set number of invalid packets required to suppress a device (0 to disable)", cfg.SuppressionThreshold)
+		if err != nil {
+			return err
+		}
+		if suppressThreshold >= 0 && suppressThreshold <= 50 {
+			cfg.SuppressionThreshold = suppressThreshold
+			break
+		}
+		fmt.Fprintln(p.out, "Suppression threshold must be between 0 and 50.")
+	}
+
+	if cfg.SuppressionThreshold > 0 {
+		cfg.PersistSuppressed, err = p.yesNo("Persist actively suppressed devices by the manager across restarts?", cfg.PersistSuppressed)
+		if err != nil {
+			return err
+		}
+	} else {
+		cfg.SuppressionThreshold = 0
+		cfg.PersistSuppressed = false
+	}
+
 	cfg.ForwardKnown, err = p.yesNo("Forward only reports recognized as supported miner types?", cfg.ForwardKnown)
 	if err != nil {
 		return err
@@ -468,38 +490,45 @@ func (p *setupPrompter) printSummary(cfg *iprdconfig.IPRDConfig) {
 	fmt.Fprintln(p.out)
 	fmt.Fprintln(p.out, "Configuration summary")
 	if cfg.Auto {
-		fmt.Fprintln(p.out, "  Capture mode:       Automatic LAN interface")
+		fmt.Fprintln(p.out, "  Capture mode:          Automatic LAN interface")
 	} else {
-		fmt.Fprintf(p.out, "  Interfaces:         %s\n", strings.Join(cfg.ListenInterfaces, ", "))
+		fmt.Fprintf(p.out, "  Interfaces:            %s\n", strings.Join(cfg.ListenInterfaces, ", "))
 	}
 	bind := cfg.Bind
 	if bind == "" {
 		bind = "all addresses"
 	}
-	fmt.Fprintf(p.out, "  Forward endpoint:   %s, port %d\n", bind, cfg.Port)
-	fmt.Fprintf(p.out, "  mDNS:               %s\n", enabledText(cfg.MDNS))
+	fmt.Fprintf(p.out, "  Forward endpoint:      %s, port %d\n", bind, cfg.Port)
+	fmt.Fprintf(p.out, "  mDNS:                  %s\n", enabledText(cfg.MDNS))
 	if cfg.MDNS {
 		switch {
 		case isExplicitForwardBind(cfg.Bind):
-			fmt.Fprintf(p.out, "  mDNS interface:     Interface owning %s\n", cfg.Bind)
+			fmt.Fprintf(p.out, "  mDNS interface:        Interface owning %s\n", cfg.Bind)
 			if len(cfg.MDNSInterfaces) > 0 {
-				fmt.Fprintf(p.out, "  mDNS additional:    %s\n", strings.Join(cfg.MDNSInterfaces, ", "))
+				fmt.Fprintf(p.out, "  mDNS additional:       %s\n", strings.Join(cfg.MDNSInterfaces, ", "))
 			}
 		case len(cfg.MDNSInterfaces) == 0:
-			fmt.Fprintln(p.out, "  mDNS interfaces:    All suitable interfaces")
+			fmt.Fprintln(p.out, "  mDNS interfaces:       All suitable interfaces")
 		default:
-			fmt.Fprintf(p.out, "  mDNS interfaces:    %s\n", strings.Join(cfg.MDNSInterfaces, ", "))
+			fmt.Fprintf(p.out, "  mDNS interfaces:       %s\n", strings.Join(cfg.MDNSInterfaces, ", "))
 		}
 	}
 	if cfg.CaptureFile == "" {
-		fmt.Fprintln(p.out, "  Packet capture:     Disabled")
+		fmt.Fprintln(p.out, "  Packet capture:        Disabled")
 	} else {
-		fmt.Fprintf(p.out, "  Packet capture:     %s (rotation: %s)\n", cfg.CaptureFile, enabledText(cfg.RotateCaptureFiles))
+		fmt.Fprintf(p.out, "  Packet capture:        %s (rotation: %s)\n", cfg.CaptureFile, enabledText(cfg.RotateCaptureFiles))
 	}
-	fmt.Fprintf(p.out, "  Known miners only:  %s\n", enabledText(cfg.ForwardKnown))
-	fmt.Fprintf(p.out, "  Known ports only:   %s\n", enabledText(cfg.FilterKnownPorts))
+
+	if cfg.SuppressionThreshold == 0 {
+		fmt.Fprintln(p.out, "  Suppression threshold: Disabled")
+	} else {
+		fmt.Fprintf(p.out, "  Suppression threshold: %d\n", cfg.SuppressionThreshold)
+		fmt.Fprintf(p.out, "  Persist suppressed:    %s\n", enabledText(cfg.PersistSuppressed))
+	}
+	fmt.Fprintf(p.out, "  Known miners only:     %s\n", enabledText(cfg.ForwardKnown))
+	fmt.Fprintf(p.out, "  Known ports only:      %s\n", enabledText(cfg.FilterKnownPorts))
 	advanced := cfg.NoRootNetwork || len(cfg.NetworkInclusions) > 0 || len(cfg.NetworkExclusions) > 0 || len(cfg.IgnoredDevices) > 0
-	fmt.Fprintf(p.out, "  Advanced BPF:       %s\n", enabledText(advanced))
+	fmt.Fprintf(p.out, "  Advanced BPF:          %s\n", enabledText(advanced))
 	if advanced {
 		fmt.Fprintf(p.out, "     No root network:    %s\n", enabledText(cfg.NoRootNetwork))
 		if len(cfg.NetworkInclusions) > 0 {

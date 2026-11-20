@@ -101,10 +101,12 @@ func TestWriteStatus(t *testing.T) {
 			Packets: iprd.PacketCounters{
 				Processed:       10,
 				Reports:         6,
+				Suppressed:      0,
 				Invalid:         1,
 				Duplicates:      2,
 				UnknownFiltered: 1,
 			},
+			SuppressedDeviceCount: 0,
 			Listeners: []iprd.ListenerStatus{
 				{Interface: "eth0", State: iprd.ListenerStateActive},
 				{Interface: "eth1", State: iprd.ListenerStateReconnecting, LastError: "interface unavailable"},
@@ -121,7 +123,7 @@ func TestWriteStatus(t *testing.T) {
 		"Built: 2026-10-20T12:00:00Z",
 		"IP Report status: degraded",
 		"Listeners: 1/2 active",
-		"Packets: 10 processed, 6 reports, 2 duplicates, 1 invalid, 1 filtered",
+		"Packets: 10 processed, 6 reports, 0 suppressed, 2 duplicates, 1 invalid, 1 filtered",
 		"eth1: reconnecting",
 	} {
 		if !strings.Contains(human.String(), want) {

@@ -18,6 +18,26 @@ const (
 	sealMinerPayloadOffset int = 8
 )
 
+// InvalidIPReportError is returned when an known/recognized IP report datagram fails validation.
+// Err is the underlying validation/parse error (Optional).
+type InvalidIPReportError struct {
+	Reason string
+	Err    error
+}
+
+func (e *InvalidIPReportError) Error() string {
+	if e.Err != nil {
+		return fmt.Sprintf("failed to validate: %s - %v", e.Reason, e.Err)
+	}
+	return fmt.Sprintf("failed to validate: %s", e.Reason)
+}
+
+// IsInvalidIPReportError returns true if the error is an InvalidIPReportError.
+func IsInvalidIPReportError(err error) bool {
+	var e *InvalidIPReportError
+	return errors.As(err, &e)
+}
+
 var (
 	// ErrDuplicatePacket is returned when the processor recently handled an IP
 	// report from the same source MAC address.
@@ -135,13 +155,13 @@ func (p *PacketProcessor) parseIPReportPacketAt(packet *IPReportPacket, observed
 	}
 	if pattern, ok := GetMsgPatternFromHint(packet.MinerHint); ok {
 		if !pattern.Match(message) {
-			return fmt.Errorf("failed to validate %s packet: failed match", packet.MinerHint)
+			return &InvalidIPReportError{Reason: "failed match"}
 		}
 	}
 	if report, ok := NewIPReportFromHint(packet.MinerHint); ok {
 		// parse raw datagram bytes in case of delimiting/padding bytes
 		if err := report.Parse(packet.Datagram); err != nil {
-			return fmt.Errorf("failed to validate %s packet: %w", packet.MinerHint, err)
+			return &InvalidIPReportError{Reason: "invalid datagram", Err: err}
 		}
 	}
 	// update record with new IP report entry

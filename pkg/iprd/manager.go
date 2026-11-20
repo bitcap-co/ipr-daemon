@@ -4,12 +4,59 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
 	iprdconfig "github.com/bitcap-co/ipr-daemon/pkg/iprd/config"
 	"github.com/gopacket/gopacket"
 )
+
+// suppressionStore is used as a simple in-memory store for generic noise suppression on the network.
+// It tracks the number of invalid packets per key and marks a key as suppressed if it reaches the threshold.
+type suppressionStore struct {
+	mu        sync.RWMutex
+	counts    map[string]int
+	threshold int
+}
+
+func newSuppressionStore(threshold int) *suppressionStore {
+	return &suppressionStore{
+		counts:    make(map[string]int),
+		threshold: threshold,
+	}
+}
+
+func (s *suppressionStore) suppressionThreshold() int {
+	return s.threshold
+}
+
+func (s *suppressionStore) add(key string) {
+	s.mu.Lock()
+	s.counts[key]++
+	s.mu.Unlock()
+}
+
+func (s *suppressionStore) shouldSuppress(key string) bool {
+	s.mu.RLock()
+	suppressed := s.counts[key] >= s.threshold
+	s.mu.RUnlock()
+	return suppressed
+}
+
+func (s *suppressionStore) suppressedKeys() []string {
+	s.mu.RLock()
+	suppressed := make([]string, 0)
+	for key, count := range s.counts {
+		if count >= s.threshold {
+			suppressed = append(suppressed, key)
+		}
+	}
+	s.mu.RUnlock()
+
+	sort.Strings(suppressed)
+	return suppressed
+}
 
 var (
 	// ErrListenerManagerAlreadyStarted is returned when the listener manager is started more than once.
@@ -19,20 +66,24 @@ var (
 // ListenerManager coordinates interface listeners, capture writing, packet
 // processing, and a single combined IP report stream.
 type ListenerManager struct {
-	cfg       *iprdconfig.ListenerConfig
-	log       Logger
-	listeners []*IPRListener
-	processor *PacketProcessor
-	capture   *CaptureWriter
-	reports   chan *IPReportPacket
-	runOnce   sync.Once
-	telemetry managerTelemetry
+	cfg         *iprdconfig.ListenerConfig
+	log         Logger
+	listeners   []*IPRListener
+	processor   *PacketProcessor
+	capture     *CaptureWriter
+	reports     chan *IPReportPacket
+	runOnce     sync.Once
+	telemetry   managerTelemetry
+	suppression *suppressionStore
 }
 
 // NewListenerManager returns a manager with one listener per configured
 // interface. Auto mode creates one listener and ignores explicit selectors.
 func NewListenerManager(cfg *iprdconfig.ListenerConfig, logger Logger) (*ListenerManager, error) {
-	managerCfg, err := iprdconfig.ParseListenerConfig(cfg)
+	if cfg == nil {
+		cfg = iprdconfig.DefaultListenerConfig()
+	}
+	managerCfg, err := iprdconfig.NormalizeListenerConfig(cfg)
 	if err != nil {
 		return nil, fmt.Errorf("listener config: %w", err)
 	}
@@ -41,16 +92,31 @@ func NewListenerManager(cfg *iprdconfig.ListenerConfig, logger Logger) (*Listene
 	}
 	capture := NewCaptureWriter(managerCfg.CaptureFile, managerCfg.RotateCaptureFiles, logger)
 	managerCfg.CaptureFile = capture.Path()
+	var suppression *suppressionStore
+	if managerCfg.SuppressionThreshold > 0 {
+		suppression = newSuppressionStore(managerCfg.SuppressionThreshold)
+	}
 	cfg = managerCfg
 	return &ListenerManager{
-		cfg:       cfg,
-		log:       logger,
-		listeners: newManagedListeners(cfg, logger),
-		processor: NewPacketProcessor(nil),
-		capture:   capture,
-		reports:   make(chan *IPReportPacket, 256),
-		telemetry: newManagerTelemetry(),
+		cfg:         cfg,
+		log:         logger,
+		listeners:   newManagedListeners(cfg, logger),
+		processor:   NewPacketProcessor(nil),
+		capture:     capture,
+		reports:     make(chan *IPReportPacket, 256),
+		telemetry:   newManagerTelemetry(),
+		suppression: suppression,
 	}, nil
+}
+
+// SuppressedDevices returns the list of actively noise-suppressed source MAC addresses.
+// A device is automatically suppressed by the manager when its invalid packet count reaches
+// the suppression threshold.
+func (m *ListenerManager) SuppressedDevices() []string {
+	if m.suppression == nil {
+		return nil
+	}
+	return m.suppression.suppressedKeys()
 }
 
 // Reports returns the manager's combined stream of validated IP reports.
@@ -64,6 +130,7 @@ func (m *ListenerManager) Reports() <-chan *IPReportPacket {
 // packet and listener diagnostics. Calling Status does not reset any counters.
 func (m *ListenerManager) Status() ManagerStatus {
 	status := m.telemetry.snapshot()
+	status.SuppressedDeviceCount = len(m.SuppressedDevices())
 	status.ListenersConfigured = len(m.listeners)
 	status.Listeners = make([]ListenerStatus, 0, len(m.listeners))
 	for _, listener := range m.listeners {
@@ -262,12 +329,26 @@ func (m *ListenerManager) processCapturedPacket(captured CapturedPacket) *IPRepo
 	if ipr.InterfaceName == "" {
 		ipr.InterfaceName = fmt.Sprintf("#%d", captured.Interface.Index)
 	}
+
+	if m.suppression != nil && m.suppression.shouldSuppress(ipr.SrcMAC) {
+		m.telemetry.suppressed.Add(1)
+		m.log.Warn(fmt.Sprintf("%s - suppressed device: %s", ipr.String(), ipr.SrcMAC))
+		return nil
+	}
+
 	if err := m.processor.ParseIPReportPacket(ipr); err != nil {
 		if errors.Is(err, ErrDuplicatePacket) {
 			m.telemetry.duplicates.Add(1)
 			m.log.Warn(fmt.Sprintf("%s - %s", ipr.String(), err))
+		} else if IsInvalidIPReportError(err) {
+			m.telemetry.invalid.Add(1)
+			m.log.Warn(fmt.Sprintf("%s - %s", ipr.String(), err))
 		} else {
 			m.telemetry.invalid.Add(1)
+			// increment source MAC invalid count towards noise suppression.
+			if m.suppression != nil {
+				m.suppression.add(ipr.SrcMAC)
+			}
 		}
 		if m.cfg.Debug {
 			m.log.Error(fmt.Errorf("%s - not valid: %w", ipr.String(), err))

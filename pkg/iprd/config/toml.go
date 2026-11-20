@@ -9,13 +9,12 @@ import (
 
 // NewIPRDConfigFromBytes unmarshals TOML data into IPRDConfig
 func NewIPRDConfigFromBytes(data []byte) (*IPRDConfig, error) {
-	var cfg *IPRDConfig
-	err := toml.Unmarshal(data, &cfg)
-	if err != nil {
+	cfg := DefaultIPRDConfig()
+	if err := toml.Unmarshal(data, cfg); err != nil {
 		return nil, err
 	}
 
-	return ParseConfig(cfg)
+	return NormalizeConfig(cfg)
 }
 
 // NewIPRDConfigFromFile reads a TOML configuration file at filePath into IPRDConfig
@@ -35,7 +34,7 @@ func NewIPRDConfigFromFile(filePath string) (*IPRDConfig, error) {
 
 // WriteIPRDConfigToFile write TOML configuration of supplied to filePath
 func WriteIPRDConfigToFile(supplied *IPRDConfig, filePath string) error {
-	cfg, err := ParseConfig(supplied)
+	cfg, err := NormalizeConfig(supplied)
 	if err != nil {
 		return err
 	}

@@ -27,6 +27,8 @@ func TestRunSetupCreatesConfiguration(t *testing.T) {
 		"y",
 		"/tmp/iprd-capture.pcapng",
 		"y",
+		"",
+		"y",
 		"y",
 		"y",
 		"n",
@@ -67,6 +69,9 @@ func TestRunSetupCreatesConfiguration(t *testing.T) {
 	if !cfg.ForwardKnown || !cfg.FilterKnownPorts {
 		t.Fatalf("known filtering = forward %v, ports %v; want both enabled", cfg.ForwardKnown, cfg.FilterKnownPorts)
 	}
+	if !cfg.PersistSuppressed {
+		t.Fatalf("persist suppressed = %v; want enabled", cfg.PersistSuppressed)
+	}
 	if !strings.Contains(output.String(), "Configuration written to "+destination) {
 		t.Fatalf("setup output did not confirm destination:\n%s", output.String())
 	}
@@ -87,6 +92,7 @@ func TestRunSetupCanonicalizesMDNSIndexToOSInterfaceName(t *testing.T) {
 		"y",
 		"7,Ethernet 3,missing",
 		"n",
+		"0",
 		"n",
 		"n",
 		"n",
@@ -141,6 +147,7 @@ func TestRunSetupEditsExistingConfigurationWithExplicitFalseValues(t *testing.T)
 		"",
 		"n",
 		"n",
+		"0",
 		"n",
 		"n",
 		"n",
@@ -258,6 +265,7 @@ func TestRunSetupCanCancelWithoutWriting(t *testing.T) {
 		"",
 		"n",
 		"n",
+		"0",
 		"n",
 		"n",
 		"n",
@@ -366,7 +374,7 @@ func TestSetupSummaryDescribesMDNSInterfaceSelection(t *testing.T) {
 				Bind: "0.0.0.0",
 				MDNS: true,
 			}},
-			want: []string{"mDNS interfaces:    All suitable interfaces"},
+			want: []string{"mDNS interfaces:       All suitable interfaces"},
 		},
 		{
 			name: "explicit bind includes owner and additional interfaces",
@@ -375,7 +383,7 @@ func TestSetupSummaryDescribesMDNSInterfaceSelection(t *testing.T) {
 				MDNS:           true,
 				MDNSInterfaces: []string{"vlan20"},
 			}},
-			want: []string{"Interface owning 192.168.1.20", "mDNS additional:    vlan20"},
+			want: []string{"Interface owning 192.168.1.20", "mDNS additional:       vlan20"},
 		},
 	}
 	for _, tt := range tests {

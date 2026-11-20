@@ -43,6 +43,7 @@ const (
 type PacketCounters struct {
 	Processed       uint64 `json:"processed"`
 	Reports         uint64 `json:"reports"`
+	Suppressed      uint64 `json:"suppressed"`
 	Invalid         uint64 `json:"invalid"`
 	Duplicates      uint64 `json:"duplicates"`
 	UnknownFiltered uint64 `json:"unknownFiltered"`
@@ -64,31 +65,34 @@ type ListenerStatus struct {
 // it can therefore have zero active listeners. Failed means Run has terminated
 // with an error.
 type ManagerStatus struct {
-	State               ManagerState     `json:"state"`
-	ListenersConfigured int              `json:"listenersConfigured"`
-	ListenersActive     int              `json:"listenersActive"`
-	ActivationFailures  uint64           `json:"activationFailures"`
-	CaptureErrors       uint64           `json:"captureErrors"`
-	Reconnects          uint64           `json:"reconnects"`
-	CaptureWriteErrors  uint64           `json:"captureWriteErrors"`
-	Packets             PacketCounters   `json:"packets"`
-	Listeners           []ListenerStatus `json:"listeners"`
-	LastPacketAt        time.Time        `json:"lastPacketAt,omitzero"`
-	LastReportAt        time.Time        `json:"lastReportAt,omitzero"`
-	LastError           string           `json:"lastError,omitempty"`
-	LastErrorAt         time.Time        `json:"lastErrorAt,omitzero"`
+	State                 ManagerState     `json:"state"`
+	ListenersConfigured   int              `json:"listenersConfigured"`
+	ListenersActive       int              `json:"listenersActive"`
+	ActivationFailures    uint64           `json:"activationFailures"`
+	CaptureErrors         uint64           `json:"captureErrors"`
+	Reconnects            uint64           `json:"reconnects"`
+	CaptureWriteErrors    uint64           `json:"captureWriteErrors"`
+	SuppressedDeviceCount int              `json:"suppressedDeviceCount"`
+	Packets               PacketCounters   `json:"packets"`
+	Listeners             []ListenerStatus `json:"listeners"`
+	LastPacketAt          time.Time        `json:"lastPacketAt,omitzero"`
+	LastReportAt          time.Time        `json:"lastReportAt,omitzero"`
+	LastError             string           `json:"lastError,omitempty"`
+	LastErrorAt           time.Time        `json:"lastErrorAt,omitzero"`
 }
 
 type managerTelemetry struct {
-	mu           sync.RWMutex
-	state        ManagerState
-	lastError    string
-	lastErrorAt  time.Time
-	lastPacketAt time.Time
-	lastReportAt time.Time
+	mu                    sync.RWMutex
+	state                 ManagerState
+	lastError             string
+	lastErrorAt           time.Time
+	lastPacketAt          time.Time
+	lastReportAt          time.Time
+	suppressedDeviceCount int
 
 	processed          atomic.Uint64
 	reports            atomic.Uint64
+	suppressed         atomic.Uint64
 	invalid            atomic.Uint64
 	duplicates         atomic.Uint64
 	unknownFiltered    atomic.Uint64
@@ -129,17 +133,19 @@ func (t *managerTelemetry) recordReport(at time.Time) {
 func (t *managerTelemetry) snapshot() ManagerStatus {
 	t.mu.RLock()
 	status := ManagerStatus{
-		State:              t.state,
-		CaptureWriteErrors: t.captureWriteErrors.Load(),
-		LastPacketAt:       t.lastPacketAt,
-		LastReportAt:       t.lastReportAt,
-		LastError:          t.lastError,
-		LastErrorAt:        t.lastErrorAt,
+		State:                 t.state,
+		CaptureWriteErrors:    t.captureWriteErrors.Load(),
+		LastPacketAt:          t.lastPacketAt,
+		LastReportAt:          t.lastReportAt,
+		LastError:             t.lastError,
+		LastErrorAt:           t.lastErrorAt,
+		SuppressedDeviceCount: t.suppressedDeviceCount,
 	}
 	t.mu.RUnlock()
 	status.Packets = PacketCounters{
 		Processed:       t.processed.Load(),
 		Reports:         t.reports.Load(),
+		Suppressed:      t.suppressed.Load(),
 		Invalid:         t.invalid.Load(),
 		Duplicates:      t.duplicates.Load(),
 		UnknownFiltered: t.unknownFiltered.Load(),
