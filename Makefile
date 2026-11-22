@@ -354,7 +354,7 @@ FREEBSD_ARM64_SYSROOT ?= /usr/local/freebsd-sysroot/aarch64
 .freebsd-test:
 	go test ./pkg/iprd -run 'TestFreeBSD.*ABILayout$$'
 
-freebsd-binaries: freebsd-amd64 freebsd-arm64
+freebsd-binaries: .freebsd-test freebsd-amd64 freebsd-arm64
 freebsd-amd64: $(FREEBSD_AMD64_S_NAME)
 freebsd-arm64: $(FREEBSD_ARM64_S_NAME)
 
