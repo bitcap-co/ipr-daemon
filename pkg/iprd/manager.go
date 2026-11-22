@@ -12,23 +12,21 @@ import (
 	"github.com/gopacket/gopacket"
 )
 
+const (
+	suppressionThreshold int = 10
+)
+
 // suppressionStore is used as a simple in-memory store for generic noise suppression on the network.
 // It tracks the number of invalid packets per key and marks a key as suppressed if it reaches the threshold.
 type suppressionStore struct {
-	mu        sync.RWMutex
-	counts    map[string]int
-	threshold int
+	mu     sync.RWMutex
+	counts map[string]int
 }
 
-func newSuppressionStore(threshold int) *suppressionStore {
+func newSuppressionStore() *suppressionStore {
 	return &suppressionStore{
-		counts:    make(map[string]int),
-		threshold: threshold,
+		counts: make(map[string]int),
 	}
-}
-
-func (s *suppressionStore) suppressionThreshold() int {
-	return s.threshold
 }
 
 func (s *suppressionStore) add(key string) {
@@ -39,7 +37,7 @@ func (s *suppressionStore) add(key string) {
 
 func (s *suppressionStore) shouldSuppress(key string) bool {
 	s.mu.RLock()
-	suppressed := s.counts[key] >= s.threshold
+	suppressed := s.counts[key] >= suppressionThreshold
 	s.mu.RUnlock()
 	return suppressed
 }
@@ -48,7 +46,7 @@ func (s *suppressionStore) suppressedKeys() []string {
 	s.mu.RLock()
 	suppressed := make([]string, 0)
 	for key, count := range s.counts {
-		if count >= s.threshold {
+		if count >= suppressionThreshold {
 			suppressed = append(suppressed, key)
 		}
 	}
@@ -93,8 +91,8 @@ func NewListenerManager(cfg *iprdconfig.ListenerConfig, logger Logger) (*Listene
 	capture := NewCaptureWriter(managerCfg.CaptureFile, managerCfg.RotateCaptureFiles, logger)
 	managerCfg.CaptureFile = capture.Path()
 	var suppression *suppressionStore
-	if managerCfg.SuppressionThreshold > 0 {
-		suppression = newSuppressionStore(managerCfg.SuppressionThreshold)
+	if !managerCfg.DisableSuppression {
+		suppression = newSuppressionStore()
 	}
 	cfg = managerCfg
 	return &ListenerManager{

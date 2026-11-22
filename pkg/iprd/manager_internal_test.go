@@ -14,10 +14,6 @@ import (
 	"github.com/gopacket/gopacket/layers"
 )
 
-var (
-	defaultSuppressionThreshold int = 5
-)
-
 func generateValidPayload(srcIP, srcMAC string, dstPort int) []byte {
 	minerHint, _ := GetMinerHintFromPort(dstPort)
 	switch minerHint {
@@ -87,24 +83,24 @@ func mustHardwareAddr(t *testing.T, value string) net.HardwareAddr {
 }
 
 func TestSuppressionStoreThresholdAndIsolation(t *testing.T) {
-	store := newSuppressionStore(defaultSuppressionThreshold)
+	store := newSuppressionStore()
 	belowThreshold := "aa:bb:cc:dd:ee:01"
 	suppressedSecond := "aa:bb:cc:dd:ee:03"
 	suppressedFirst := "aa:bb:cc:dd:ee:02"
 
-	for i := 0; i < defaultSuppressionThreshold-1; i++ {
+	for i := 0; i < suppressionThreshold-1; i++ {
 		store.add(belowThreshold)
 	}
-	for i := 0; i < defaultSuppressionThreshold; i++ {
+	for i := 0; i < suppressionThreshold; i++ {
 		store.add(suppressedSecond)
 		store.add(suppressedFirst)
 	}
 
 	if store.shouldSuppress(belowThreshold) {
-		t.Fatalf("device was suppressed below threshold %d", defaultSuppressionThreshold)
+		t.Fatalf("device was suppressed below threshold %d", suppressionThreshold)
 	}
 	if !store.shouldSuppress(suppressedFirst) || !store.shouldSuppress(suppressedSecond) {
-		t.Fatalf("devices were not suppressed at threshold %d", defaultSuppressionThreshold)
+		t.Fatalf("devices were not suppressed at threshold %d", suppressionThreshold)
 	}
 	want := []string{suppressedFirst, suppressedSecond}
 	if got := store.suppressedKeys(); !reflect.DeepEqual(got, want) {
@@ -113,7 +109,7 @@ func TestSuppressionStoreThresholdAndIsolation(t *testing.T) {
 }
 
 func TestSuppressionStoreConcurrentAccess(t *testing.T) {
-	store := newSuppressionStore(defaultSuppressionThreshold)
+	store := newSuppressionStore()
 	key := "aa:bb:cc:dd:ee:01"
 
 	var wg sync.WaitGroup
@@ -140,14 +136,14 @@ func TestSuppressionStoreConcurrentAccess(t *testing.T) {
 
 func TestListenerManagerPreservesDisabledSuppression(t *testing.T) {
 	cfg := iprdconfig.DefaultListenerConfig()
-	cfg.SuppressionThreshold = 0
+	cfg.DisableSuppression = true
 
 	manager, err := NewListenerManager(cfg, NewLogger())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if manager.cfg.SuppressionThreshold != 0 {
-		t.Fatalf("suppression threshold = %d, want 0", manager.cfg.SuppressionThreshold)
+	if manager.cfg.DisableSuppression != true {
+		t.Fatalf("disable suppression = %v, want true", manager.cfg.DisableSuppression)
 	}
 	if manager.suppression != nil {
 		t.Fatal("suppression store initialized while suppression is disabled")
@@ -286,7 +282,6 @@ func TestListenerManagerStatusTracksActivationFailureAndShutdown(t *testing.T) {
 func TestListenerManagerStatusConcurrent(t *testing.T) {
 	cfg := iprdconfig.DefaultListenerConfig()
 	cfg.ListenInterfaces = []string{"test0"}
-	cfg.SuppressionThreshold = defaultSuppressionThreshold
 	manager, err := NewListenerManager(cfg, NewLogger())
 	if err != nil {
 		t.Fatal(err)
@@ -368,7 +363,6 @@ func TestListenerManagerPacketStatus(t *testing.T) {
 
 func TestListenerManagerSuppressesGenericNetworkNoise(t *testing.T) {
 	cfg := iprdconfig.DefaultListenerConfig()
-	cfg.SuppressionThreshold = defaultSuppressionThreshold
 	manager, err := NewListenerManager(cfg, NewLogger())
 	if err != nil {
 		t.Fatal(err)
@@ -376,7 +370,7 @@ func TestListenerManagerSuppressesGenericNetworkNoise(t *testing.T) {
 	mac := "aa:bb:cc:dd:ee:20"
 	noise := capturedUDPPacket(t, mac, 14235, 1, []byte("unrelated network noise"))
 
-	for i := 0; i < defaultSuppressionThreshold; i++ {
+	for i := 0; i < suppressionThreshold; i++ {
 		if report := manager.processCapturedPacket(noise); report != nil {
 			t.Fatalf("noise packet %d returned a report", i+1)
 		}
@@ -394,9 +388,9 @@ func TestListenerManagerSuppressesGenericNetworkNoise(t *testing.T) {
 		t.Fatalf("suppressed device count = %d, want 1", status.SuppressedDeviceCount)
 	}
 	want := PacketCounters{
-		Processed:  uint64(defaultSuppressionThreshold + 1),
+		Processed:  uint64(suppressionThreshold + 1),
 		Suppressed: 1,
-		Invalid:    uint64(defaultSuppressionThreshold),
+		Invalid:    uint64(suppressionThreshold),
 	}
 	if status.Packets != want {
 		t.Fatalf("packet counters = %+v, want %+v", status.Packets, want)
@@ -405,7 +399,6 @@ func TestListenerManagerSuppressesGenericNetworkNoise(t *testing.T) {
 
 func TestListenerManagerDoesNotSuppressTypedValidationFailures(t *testing.T) {
 	cfg := iprdconfig.DefaultListenerConfig()
-	cfg.SuppressionThreshold = defaultSuppressionThreshold
 	manager, err := NewListenerManager(cfg, NewLogger())
 	if err != nil {
 		t.Fatal(err)
@@ -413,7 +406,7 @@ func TestListenerManagerDoesNotSuppressTypedValidationFailures(t *testing.T) {
 	mac := "aa:bb:cc:dd:ee:21"
 	invalidReport := capturedUDPPacket(t, mac, 14235, 1, []byte("invalid report from 192.168.1.100"))
 
-	for i := 0; i < defaultSuppressionThreshold+1; i++ {
+	for i := 0; i < suppressionThreshold+1; i++ {
 		if report := manager.processCapturedPacket(invalidReport); report != nil {
 			t.Fatalf("invalid report packet %d returned a report", i+1)
 		}
@@ -425,8 +418,8 @@ func TestListenerManagerDoesNotSuppressTypedValidationFailures(t *testing.T) {
 		t.Fatalf("suppressed devices = %v, want none", got)
 	}
 	status := manager.Status()
-	if status.Packets.Invalid != uint64(defaultSuppressionThreshold+1) {
-		t.Fatalf("invalid packet count = %d, want %d", status.Packets.Invalid, defaultSuppressionThreshold+1)
+	if status.Packets.Invalid != uint64(suppressionThreshold+1) {
+		t.Fatalf("invalid packet count = %d, want %d", status.Packets.Invalid, suppressionThreshold+1)
 	}
 	if status.Packets.Suppressed != 0 || status.SuppressedDeviceCount != 0 {
 		t.Fatalf("unexpected suppression status: %+v", status)
