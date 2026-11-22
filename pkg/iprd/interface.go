@@ -79,29 +79,30 @@ func (i *IPRInterface) IsVlan() bool {
 }
 
 // IsVlanOf returns bool for if IPRInterface is a VLAN of the given parent interface name.
-func (i *IPRInterface) IsVlanOf(ifname string) bool {
+func (i *IPRInterface) IsVlanOf(name string) bool {
 	if i == nil || !i.IsVlan() {
 		return false
 	}
-	return i.Vlan.Parent == ifname
+	return i.Vlan.Parent == name
 }
 
-// GetVlanInterfaces returns all VLAN IPRInterfaces of the given parent interface name.
-func GetVlanInterfaces(ifname string) ([]*IPRInterface, error) {
-	if ifname == "" {
+// GetVlanInterfaces returns a list of available VLAN IPRInterfaces of the given parent interface name.
+// Returns the empty list instead of an error if no VLAN interfaces are found.
+func GetVlanInterfaces(name string) ([]*IPRInterface, error) {
+	if name == "" {
 		return nil, errInvalidInterfaceName
 	}
 	ifaces, err := GetInterfaces()
 	if err != nil {
 		return nil, err
 	}
-	var vlanIfaces []*IPRInterface
+	vlans := make([]*IPRInterface, 0)
 	for _, iface := range ifaces {
-		if iface.IsVlanOf(ifname) {
-			vlanIfaces = append(vlanIfaces, &iface)
+		if iface.IsVlanOf(name) {
+			vlans = append(vlans, &iface)
 		}
 	}
-	return vlanIfaces, nil
+	return vlans, nil
 }
 
 // GetInterfaceByName returns the IPRInterface matching name.

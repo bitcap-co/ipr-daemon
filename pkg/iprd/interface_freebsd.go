@@ -15,17 +15,19 @@ import (
 const ifreqDataSize = 16
 
 /*
-struct ifreq {
-	char	ifr_name[IFNAMSIZ];
-	union {
-		...
-		caddr_t	ifru_data;
-		...
-	} ifr_ifru;
+	struct ifreq {
+		char ifr_name[IFNAMSIZ];
+		union {
+			...
+			caddr_t	ifru_data;
+			...
+		} ifr_ifru;
+
+ifeq is 32 bytes, and its data union is at offset 0x10 (16 bytes).
+
+freeBSDIfReq represents the FreeBSD ifreq kernel ABI structure.
+Explicit padding is used to ensure it is aligned for 32-bit and 64-bit architectures.
 */
-// freeBSDIfReq represents the FreeBSD ifreq kernel ABI structure.
-// ifeq is 32 bytes, and its data union is 16 bytes.
-// Explicit padding is used to ensure it is aligned for 32-bit and 64-bit architectures.
 type freeBSDIfReq struct {
 	Name [unix.IFNAMSIZ]byte
 	Data unsafe.Pointer
@@ -34,7 +36,7 @@ type freeBSDIfReq struct {
 
 /*
 	struct	vlanreq {
-		char	vlr_parent[IFNAMSIZ];
+		char vlr_parent[IFNAMSIZ];
 		u_short	vlr_tag;
 		u_short	vlr_proto;
 	};
