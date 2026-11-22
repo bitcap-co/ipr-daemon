@@ -342,26 +342,15 @@ func (p *setupPrompter) configure(cfg *iprdconfig.IPRDConfig, getInterfaces setu
 		cfg.RotateCaptureFiles = false
 	}
 
-	for {
-		suppressThreshold, err := p.integer("Set number of invalid packets required to suppress a device (0 to disable)", cfg.SuppressionThreshold)
-		if err != nil {
-			return err
-		}
-		if suppressThreshold >= 0 && suppressThreshold <= 50 {
-			cfg.SuppressionThreshold = suppressThreshold
-			break
-		}
-		fmt.Fprintln(p.out, "Suppression threshold must be between 0 and 50.")
+	cfg.DisableSuppression, err = p.yesNo("Disable automatic suppression of unrecognized/unknown network traffic?", cfg.DisableSuppression)
+	if err != nil {
+		return err
 	}
-
-	if cfg.SuppressionThreshold > 0 {
+	if !cfg.DisableSuppression {
 		cfg.PersistSuppressed, err = p.yesNo("Persist actively suppressed devices by the manager across restarts?", cfg.PersistSuppressed)
 		if err != nil {
 			return err
 		}
-	} else {
-		cfg.SuppressionThreshold = 0
-		cfg.PersistSuppressed = false
 	}
 
 	cfg.ForwardKnown, err = p.yesNo("Forward only reports recognized as supported miner types?", cfg.ForwardKnown)
@@ -519,10 +508,10 @@ func (p *setupPrompter) printSummary(cfg *iprdconfig.IPRDConfig) {
 		fmt.Fprintf(p.out, "  Packet capture:        %s (rotation: %s)\n", cfg.CaptureFile, enabledText(cfg.RotateCaptureFiles))
 	}
 
-	if cfg.SuppressionThreshold == 0 {
-		fmt.Fprintln(p.out, "  Suppression threshold: Disabled")
+	if cfg.DisableSuppression {
+		fmt.Fprintln(p.out, "  Suppression:           Disabled")
 	} else {
-		fmt.Fprintf(p.out, "  Suppression threshold: %d\n", cfg.SuppressionThreshold)
+		fmt.Fprintf(p.out, "  Suppression:           %s\n", enabledText(!cfg.DisableSuppression))
 		fmt.Fprintf(p.out, "  Persist suppressed:    %s\n", enabledText(cfg.PersistSuppressed))
 	}
 	fmt.Fprintf(p.out, "  Known miners only:     %s\n", enabledText(cfg.ForwardKnown))

@@ -33,7 +33,7 @@ func TestUpdateExistingConfigUpdatesOnlyMatchingInterface(t *testing.T) {
 		},
 	}}
 
-	got, err := updateExistingConfig(curr, target, explicitOptions{})
+	got, err := updateExistingConfig(curr, target)
 	if err != nil {
 		t.Fatalf("updateExistingConfig: %v", err)
 	}
@@ -62,7 +62,7 @@ func TestUpdateExistingConfigMergesMDNSInterfaces(t *testing.T) {
 		MDNSInterfaces: []string{"7", "vlan20"},
 	}}
 
-	got, err := updateExistingConfig(curr, target, explicitOptions{})
+	got, err := updateExistingConfig(curr, target)
 	if err != nil {
 		t.Fatalf("updateExistingConfig: %v", err)
 	}
@@ -76,7 +76,7 @@ func TestUpdateExistingConfigAutoModeDoesNotRequireInterface(t *testing.T) {
 	curr := iprdconfig.DefaultIPRDConfig()
 	target := &iprdconfig.IPRDConfig{ListenerConfig: iprdconfig.ListenerConfig{Auto: true}}
 
-	got, err := updateExistingConfig(curr, target, explicitOptions{})
+	got, err := updateExistingConfig(curr, target)
 	if err != nil {
 		t.Fatalf("updateExistingConfig: %v", err)
 	}
@@ -93,7 +93,7 @@ func TestUpdateExistingConfigValidatesGlobalListenerConfig(t *testing.T) {
 	curr.ListenInterfaces = []string{"eth0"}
 	target := &iprdconfig.IPRDConfig{ListenerConfig: iprdconfig.ListenerConfig{NoRootNetwork: true}}
 
-	if _, err := updateExistingConfig(curr, target, explicitOptions{}); err == nil {
+	if _, err := updateExistingConfig(curr, target); err == nil {
 		t.Fatal("updateExistingConfig accepted no_root_network without network inclusions")
 	}
 }
@@ -109,7 +109,7 @@ func TestUpdateExistingConfigAutoModeIgnoresExplicitInterfaceValidation(t *testi
 		}},
 	}}
 
-	got, err := updateExistingConfig(curr, target, explicitOptions{})
+	got, err := updateExistingConfig(curr, target)
 	if err != nil {
 		t.Fatalf("updateExistingConfig: %v", err)
 	}
@@ -125,41 +125,8 @@ func TestUpdateExistingConfigDisablingAutoValidatesExplicitInterfaces(t *testing
 	curr.Interfaces = []iprdconfig.InterfaceConfig{{Selector: "eth0", NoRootNetwork: true}}
 	target := &iprdconfig.IPRDConfig{ListenerConfig: iprdconfig.ListenerConfig{Auto: true}}
 
-	if _, err := updateExistingConfig(curr, target, explicitOptions{}); err == nil {
+	if _, err := updateExistingConfig(curr, target); err == nil {
 		t.Fatalf("updateExistingConfig accepted invalid explicit interface after disabling auto")
-	}
-}
-
-func TestUpdateExistingConfigSuppressionThresholdIntent(t *testing.T) {
-	tests := []struct {
-		name     string
-		target   int
-		explicit bool
-		want     int
-	}{
-		{name: "omitted preserves current", target: 0, explicit: false, want: 10},
-		{name: "explicit zero disables", target: 0, explicit: true, want: 0},
-		{name: "explicit nonzero updates", target: 20, explicit: true, want: 20},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			curr := iprdconfig.DefaultIPRDConfig()
-			curr.SuppressionThreshold = 10
-			target := &iprdconfig.IPRDConfig{ListenerConfig: iprdconfig.ListenerConfig{
-				SuppressionThreshold: tt.target,
-			}}
-
-			got, err := updateExistingConfig(curr, target, explicitOptions{
-				suppressionThresholdSet: tt.explicit,
-			})
-			if err != nil {
-				t.Fatalf("updateExistingConfig: %v", err)
-			}
-			if got.SuppressionThreshold != tt.want {
-				t.Fatalf("suppression threshold = %d, want %d", got.SuppressionThreshold, tt.want)
-			}
-		})
 	}
 }
 
@@ -178,7 +145,7 @@ func TestUpdateExistingConfigAddsMultipleTargetInterfaces(t *testing.T) {
 		},
 	}}
 
-	got, err := updateExistingConfig(curr, target, explicitOptions{})
+	got, err := updateExistingConfig(curr, target)
 	if err != nil {
 		t.Fatalf("updateExistingConfig: %v", err)
 	}
