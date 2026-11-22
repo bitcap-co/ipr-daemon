@@ -44,7 +44,7 @@ var (
 	flCaptureFile        = flag.String("capture-file", "", "Path to write captured packets to in PCAP-NG format for replay/debugging.")
 	flRotateCaptureFiles = flag.Bool("rotate-capture", false, "Switch to rotate up to four capture files instead of flushing the active file at its size limit.")
 	flDisableSuppression = flag.Bool("disable-suppression", false, "Switch to disable automatic suppression of unrecognized/unknown network traffic.\nAutomatic suppression is enabled by default to suppress network devices sending unrecognized/invalid traffic\nfor \"less-isolated\" networks/interfaces (e.g. other network devices on the same network).")
-	flPersistSuppressed  = flag.Bool("persist-suppressed", false, "Switch to persist currently suppressed devices on as globally ignored devices in the pointed configuration file. Effective on next daemon restart.")
+	flPersistSuppressed  = flag.Bool("persist-suppressed", false, "Switch to persist currently suppressed devices as globally ignored devices in the pointed configuration file. Effective on next daemon restart.")
 	flForwardBind        = flag.String("b", "", "Bind address for the TCP broadcast stream; target host in status mode. Empty binds all interfaces.")
 	flForwardPort        = flag.Int("p", 7788, "Forwarding port for the TCP broadcast stream.")
 	flMDNS               = flag.Bool("mdns", false, "Switch to enable mDNS/DNS-SD advertising of the TCP forwarding endpoint.")

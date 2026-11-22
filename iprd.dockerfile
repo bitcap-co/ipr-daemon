@@ -53,6 +53,12 @@ network_inclusions = [""]
 # network_exclusions is a list of networks to additionally exclude in BPF filter.
 # these get appended after network_inclusions.
 network_exclusions = [""]
+# disable_suppression is a switch to disable automatic suppression of unrecognized/unknown network traffic.
+# when disabled, unrecognized traffic is not suppressed and will be logged/captured as normal.
+disable_suppression = false
+# persist_suppressed is a switch to persist the currently suppressed devices as globally ignored devices in the BPF filter.
+# when enabled, the list of suppressed devices is appended to the global ignored_devices list and effective on next daemon restart.
+persist_suppressed = false
 # capture_file is a path to write received packets to in PCAP-NG format for replay/debugging.
 capture_file = ""
 # rotate_capture_files keeps the active capture plus three numbered history files instead of flushing it.
