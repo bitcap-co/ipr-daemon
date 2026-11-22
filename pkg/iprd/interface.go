@@ -9,7 +9,7 @@ import (
 )
 
 var (
-	lanRegex = regexp.MustCompile(`^lan|^LAN`)
+	lanDescription = regexp.MustCompile(`^lan|^Lan|^LAN`)
 
 	errInvalidInterfaceName  = errors.New("invalid interface name")
 	errInvalidInterfaceIndex = errors.New("invalid interface index")
@@ -70,23 +70,12 @@ func (i *IPRInterface) IsLAN() bool {
 	if i.Description == "" {
 		return false
 	}
-	match := lanRegex.MatchString(i.Description)
-	return match
+	return lanDescription.MatchString(i.Description)
 }
 
 // IsVlan returns bool for if IPRInterface is a VLAN interface.
 func (i *IPRInterface) IsVlan() bool {
 	return i.Vlan.Tag != 0
-}
-
-// VlanTag returns the VLAN tag of IPRInterface.
-func (i *IPRInterface) VlanTag() uint16 {
-	return i.Vlan.Tag
-}
-
-// VlanParent returns the parent interface name of IPRInterface.
-func (i *IPRInterface) VlanParent() string {
-	return i.Vlan.Parent
 }
 
 // IsVlanOf returns bool for if IPRInterface is a VLAN of the given parent interface name.
