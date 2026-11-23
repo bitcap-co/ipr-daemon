@@ -176,6 +176,33 @@ func TestListenerManagerInitialStatus(t *testing.T) {
 	}
 }
 
+func TestListenerManagerStatusUptimeLifecycle(t *testing.T) {
+	manager, err := NewListenerManager(iprdconfig.DefaultListenerConfig(), NewLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if uptime := manager.Status().Uptime; uptime != 0 {
+		t.Fatalf("idle uptime = %d, want 0", uptime)
+	}
+
+	manager.telemetry.start()
+	manager.telemetry.mu.Lock()
+	manager.telemetry.startedAt = time.Now().Add(-2 * time.Second)
+	manager.telemetry.mu.Unlock()
+	if uptime := manager.Status().Uptime; uptime < 2 {
+		t.Fatalf("running uptime = %d, want at least 2 seconds", uptime)
+	}
+
+	for _, state := range []ManagerState{ManagerStateStopped, ManagerStateFailed} {
+		manager.telemetry.setState(state, nil)
+		if uptime := manager.Status().Uptime; uptime != 0 {
+			t.Fatalf("%s uptime = %d, want 0", state, uptime)
+		}
+		manager.telemetry.start()
+	}
+}
+
 func TestListenerManagerRunIsOneShotAndClosesReports(t *testing.T) {
 	manager, err := NewListenerManager(iprdconfig.DefaultListenerConfig(), NewLogger())
 	if err != nil {

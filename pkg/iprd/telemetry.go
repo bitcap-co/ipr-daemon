@@ -66,6 +66,7 @@ type ListenerStatus struct {
 // with an error.
 type ManagerStatus struct {
 	State                 ManagerState     `json:"state"`
+	Uptime                int64            `json:"uptime"`
 	ListenersConfigured   int              `json:"listenersConfigured"`
 	ListenersActive       int              `json:"listenersActive"`
 	ActivationFailures    uint64           `json:"activationFailures"`
@@ -84,6 +85,7 @@ type ManagerStatus struct {
 type managerTelemetry struct {
 	mu                    sync.RWMutex
 	state                 ManagerState
+	startedAt             time.Time
 	lastError             string
 	lastErrorAt           time.Time
 	lastPacketAt          time.Time
@@ -103,10 +105,24 @@ func newManagerTelemetry() managerTelemetry {
 	return managerTelemetry{state: ManagerStateIdle}
 }
 
+func isManagerRunning(state ManagerState) bool {
+	return state == ManagerStateStarting || state == ManagerStateHealthy || state == ManagerStateDegraded
+}
+
+func (t *managerTelemetry) start() {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.startedAt = time.Now()
+	t.state = ManagerStateStarting
+}
+
 func (t *managerTelemetry) setState(state ManagerState, err error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 	t.state = state
+	if state == ManagerStateFailed || state == ManagerStateStopped {
+		t.startedAt = time.Time{}
+	}
 	if err != nil {
 		t.lastError = err.Error()
 		t.lastErrorAt = time.Now()
@@ -132,8 +148,10 @@ func (t *managerTelemetry) recordReport(at time.Time) {
 
 func (t *managerTelemetry) snapshot() ManagerStatus {
 	t.mu.RLock()
+	state := t.state
+	startedAt := t.startedAt
 	status := ManagerStatus{
-		State:                 t.state,
+		State:                 state,
 		CaptureWriteErrors:    t.captureWriteErrors.Load(),
 		LastPacketAt:          t.lastPacketAt,
 		LastReportAt:          t.lastReportAt,
@@ -142,6 +160,11 @@ func (t *managerTelemetry) snapshot() ManagerStatus {
 		SuppressedDeviceCount: t.suppressedDeviceCount,
 	}
 	t.mu.RUnlock()
+
+	if isManagerRunning(state) && !startedAt.IsZero() {
+		status.Uptime = int64(time.Since(startedAt) / time.Second)
+	}
+
 	status.Packets = PacketCounters{
 		Processed:       t.processed.Load(),
 		Reports:         t.reports.Load(),

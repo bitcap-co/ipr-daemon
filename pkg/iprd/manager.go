@@ -179,7 +179,7 @@ func (m *ListenerManager) Run(ctx context.Context) error {
 		return ErrListenerManagerAlreadyStarted
 	}
 	defer close(m.reports)
-	m.telemetry.setState(ManagerStateStarting, nil)
+	m.telemetry.start()
 
 	if len(m.listeners) == 0 {
 		err := fmt.Errorf("no interfaces configured")
