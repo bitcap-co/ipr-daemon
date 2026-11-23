@@ -9,13 +9,19 @@ import (
 )
 
 var (
-	lanRegex = regexp.MustCompile(`^lan|^LAN`)
+	lanDescription = regexp.MustCompile(`^lan|^Lan|^LAN`)
 
 	errInvalidInterfaceName  = errors.New("invalid interface name")
 	errInvalidInterfaceIndex = errors.New("invalid interface index")
 	errInterfaceNotFound     = errors.New("interface not found")
 	errNoValidInterfaces     = errors.New("no valid interfaces to listen on")
 )
+
+// VlanConfig holds the VLAN configuration for an interface.
+type VlanConfig struct {
+	Tag    uint16
+	Parent string
+}
 
 // IPRInterface describes a network interface supported for IP Report listening.
 type IPRInterface struct {
@@ -26,6 +32,7 @@ type IPRInterface struct {
 	IPv4         net.IP
 	HardwareAddr net.HardwareAddr
 	Flags        net.Flags
+	Vlan         VlanConfig
 }
 
 // IPAddr returns IPv4 as string.
@@ -45,8 +52,12 @@ func (i *IPRInterface) NetworkPrefix() string {
 
 // String returns IPRInterface as string.
 func (i IPRInterface) String() string {
-	return fmt.Sprintf("%d: %s (%s) Desc:\"%s\"\n   Hardware:%s\n   IPv4:%s",
-		i.Index, i.FriendlyName, i.Name, i.Description, i.HardwareAddr, i.IPv4)
+	vlanConfig := "false"
+	if i.IsVlan() {
+		vlanConfig = fmt.Sprintf("%d (%s)", i.Vlan.Tag, i.Vlan.Parent)
+	}
+	return fmt.Sprintf("%d: %s (%s) Desc:\"%s\"\n   Hardware:%s\n   IPv4:%s\n   Vlan:%s",
+		i.Index, i.FriendlyName, i.Name, i.Description, i.HardwareAddr, i.IPv4, vlanConfig)
 }
 
 // IsUp returns bool for if IPRInterface is marked as UP.
@@ -59,8 +70,39 @@ func (i *IPRInterface) IsLAN() bool {
 	if i.Description == "" {
 		return false
 	}
-	match := lanRegex.MatchString(i.Description)
-	return match
+	return lanDescription.MatchString(i.Description)
+}
+
+// IsVlan returns bool for if IPRInterface is a VLAN interface.
+func (i *IPRInterface) IsVlan() bool {
+	return i.Vlan.Tag != 0
+}
+
+// IsVlanOf returns bool for if IPRInterface is a VLAN of the given parent interface name.
+func (i *IPRInterface) IsVlanOf(name string) bool {
+	if i == nil || !i.IsVlan() {
+		return false
+	}
+	return i.Vlan.Parent == name
+}
+
+// GetVlanInterfaces returns a list of available VLAN IPRInterfaces of the given parent interface name.
+// Returns the empty list instead of an error if no VLAN interfaces are found.
+func GetVlanInterfaces(name string) ([]*IPRInterface, error) {
+	if name == "" {
+		return nil, errInvalidInterfaceName
+	}
+	ifaces, err := GetInterfaces()
+	if err != nil {
+		return nil, err
+	}
+	vlans := make([]*IPRInterface, 0)
+	for _, iface := range ifaces {
+		if iface.IsVlanOf(name) {
+			vlans = append(vlans, &iface)
+		}
+	}
+	return vlans, nil
 }
 
 // GetInterfaceByName returns the IPRInterface matching name.
