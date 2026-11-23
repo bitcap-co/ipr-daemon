@@ -17,6 +17,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
 	"github.com/bitcap-co/ipr-daemon/pkg/iprd"
@@ -34,12 +35,14 @@ var (
 const maxDecompressedPayloadSize = 64 * 1024 * 1024
 
 var (
-	pcapNGMagic              = []byte{0x0a, 0x0d, 0x0d, 0x0a}
-	payloadIPv4RE            = regexp.MustCompile(`\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\b`)
-	payloadMACRE             = regexp.MustCompile(`(?i)\b(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}\b`)
-	payloadCompactMACRE      = regexp.MustCompile(`(?i)\b[0-9a-f]{12}\b`)
-	payloadIPv6Token         = regexp.MustCompile(`(?i)\b[0-9a-f:.]*:[0-9a-f:.]+\b`)
-	payloadSensitiveStringRE = regexp.MustCompile(`(?i)"(mainboardsn|boardsn|sn|serial|serial[_-]?number|serial[_-]?no|pool|pool[_-]?url|url|worker|worker[_-]?name|user|user[_-]?name|password|pass)"(\s*:\s*)"([^"\\]*(?:\\.[^"\\]*)*)"`)
+	pcapNGMagic                   = []byte{0x0a, 0x0d, 0x0d, 0x0a}
+	payloadIPv4RE                 = regexp.MustCompile(`\b(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9]?[0-9])\b`)
+	payloadMACRE                  = regexp.MustCompile(`(?i)\b(?:[0-9a-f]{2}[:-]){5}[0-9a-f]{2}\b`)
+	payloadCompactMACRE           = regexp.MustCompile(`(?i)\b[0-9a-f]{12}\b`)
+	payloadIPv6Token              = regexp.MustCompile(`(?i)\b[0-9a-f:.]*:[0-9a-f:.]+\b`)
+	payloadSensitiveStringRE      = regexp.MustCompile(`(?i)"(mainboardsn|boardsn|boardsnarray|cpbsn|ctrlsn|boxsn|sn|serial|serial[_-]?number|serial[_-]?no|pool|pool[_-]?url|url|worker|worker[_-]?name|user|user[_-]?name|password|pass)"(\s*:\s*)"([^"\\]*(?:\\.[^"\\]*)*)"`)
+	payloadSensitiveStringArrayRE = regexp.MustCompile(`(?is)"(cpbsn)"(\s*:\s*)\[((?:[^\x5d"]|"(?:[^"\\]|\\.)*")*)\]`)
+	payloadJSONStringRE           = regexp.MustCompile(`"(?:[^"\\]|\\.)*"`)
 )
 
 func main() {
@@ -307,7 +310,7 @@ func (a *addressAnonymizer) sensitiveValue(field, original string) string {
 	field = strings.ToLower(field)
 	category := field
 	switch field {
-	case "mainboardsn", "boardsn", "sn", "serial", "serialnumber", "serial_number", "serial-number", "serialno", "serial_no", "serial-no":
+	case "mainboardsn", "boardsn", "cpbsn", "ctrlsn", "boxsn", "sn", "serial", "serialnumber", "serial_number", "serial-number", "serialno", "serial_no", "serial-no":
 		category = "serial"
 	case "pool", "poolurl", "pool_url", "pool-url", "url":
 		category = "pool"
@@ -335,6 +338,24 @@ func (a *addressAnonymizer) sensitiveValue(field, original string) string {
 }
 
 func (a *addressAnonymizer) sensitiveStrings(payload []byte) []byte {
+	payload = payloadSensitiveStringArrayRE.ReplaceAllFunc(payload, func(match []byte) []byte {
+		parts := payloadSensitiveStringArrayRE.FindSubmatchIndex(match)
+		if len(parts) != 8 {
+			return match
+		}
+		field := string(match[parts[2]:parts[3]])
+		values := payloadJSONStringRE.ReplaceAllFunc(match[parts[6]:parts[7]], func(value []byte) []byte {
+			original, err := strconv.Unquote(string(value))
+			if err != nil {
+				return value
+			}
+			return []byte(strconv.Quote(a.sensitiveValue(field, original)))
+		})
+		result := append([]byte(nil), match[:parts[6]]...)
+		result = append(result, values...)
+		return append(result, match[parts[7]:]...)
+	})
+
 	return payloadSensitiveStringRE.ReplaceAllFunc(payload, func(match []byte) []byte {
 		parts := payloadSensitiveStringRE.FindSubmatch(match)
 		if len(parts) != 4 {

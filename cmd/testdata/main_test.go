@@ -139,6 +139,24 @@ func TestPlainPayloadAnonymizesSensitiveJSONStrings(t *testing.T) {
 	}
 }
 
+func TestPlainPayloadAnonymizesGoldshellSerialArray(t *testing.T) {
+	anonymizer := newAddressAnonymizer()
+	payload := []byte(`{"boxsn":"BOX-PRIVATE","cpbsn":["BOARD-PRIVATE-1","BOARD-PRIVATE-2",null,"BOARD-PRIVATE-3"],"ctrlsn":"CTRL-PRIVATE"}`)
+
+	anonymized := anonymizer.plainPayload(payload)
+	for _, sensitive := range []string{"BOX-PRIVATE", "BOARD-PRIVATE-1", "BOARD-PRIVATE-2", "BOARD-PRIVATE-3", "CTRL-PRIVATE"} {
+		if bytes.Contains(anonymized, []byte(sensitive)) {
+			t.Fatalf("payload retains sensitive value %q: %s", sensitive, anonymized)
+		}
+	}
+	if got, want := bytes.Count(anonymized, []byte("serial-")), 5; got != want {
+		t.Fatalf("serial replacement count = %d, want %d: %s", got, want, anonymized)
+	}
+	if !bytes.Contains(anonymized, []byte(`"cpbsn":["serial-1","serial-2",null,"serial-3"]`)) {
+		t.Fatalf("cpbsn array was not preserved and anonymized: %s", anonymized)
+	}
+}
+
 func TestFrameAnonymizesPrefixedZlibPayload(t *testing.T) {
 	const (
 		originalIP  = "172.16.50.29"
