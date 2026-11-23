@@ -113,6 +113,9 @@ func writeStatus(w io.Writer, response iprd.TCPResponse, asJSON bool) error {
 	if _, err := fmt.Fprintf(w, "IP Report status: %s\n", status.State); err != nil {
 		return err
 	}
+	if _, err := fmt.Fprintf(w, "Uptime: %s\n", formatStatusUptime(status.Uptime)); err != nil {
+		return err
+	}
 	if _, err := fmt.Fprintf(w, "Listeners: %d/%d active\n", status.ListenersActive, status.ListenersConfigured); err != nil {
 		return err
 	}
@@ -162,4 +165,35 @@ func formatStatusTime(value time.Time) string {
 		return "never"
 	}
 	return value.Local().Format(time.RFC3339)
+}
+
+func formatStatusUptime(value int64) string {
+	if value <= 0 {
+		return "not started"
+	}
+
+	elapsed := time.Duration(value) * time.Second
+
+	days := elapsed / (24 * time.Hour)
+	elapsed -= days * (24 * time.Hour)
+	hours := elapsed / time.Hour
+	elapsed -= hours * time.Hour
+	minutes := elapsed / time.Minute
+	elapsed -= minutes * time.Minute
+	seconds := elapsed / time.Second
+
+	var duration []string
+	if days > 0 {
+		duration = append(duration, fmt.Sprintf("%dd", days))
+	}
+	if hours > 0 {
+		duration = append(duration, fmt.Sprintf("%dh", hours))
+	}
+	if minutes > 0 {
+		duration = append(duration, fmt.Sprintf("%dm", minutes))
+	}
+	if seconds > 0 {
+		duration = append(duration, fmt.Sprintf("%ds", seconds))
+	}
+	return strings.Join(duration, " ")
 }

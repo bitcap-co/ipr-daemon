@@ -94,6 +94,7 @@ func TestWriteStatus(t *testing.T) {
 		},
 		Status: &iprd.ManagerStatus{
 			State:               iprd.ManagerStateDegraded,
+			Uptime:              7000,
 			ListenersConfigured: 2,
 			ListenersActive:     1,
 			ActivationFailures:  1,
@@ -122,6 +123,7 @@ func TestWriteStatus(t *testing.T) {
 		"IP Report Daemon 0.5.7 (v0.5.7, 0123456)",
 		"Built: 2026-10-20T12:00:00Z",
 		"IP Report status: degraded",
+		"Uptime: 1h 56m 40s",
 		"Listeners: 1/2 active",
 		"Packets: 10 processed, 6 reports, 0 suppressed, 2 duplicates, 1 invalid, 1 filtered",
 		"eth1: reconnecting",
